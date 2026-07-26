@@ -317,10 +317,10 @@ class AuthService {
 </html>`;
 
     const nodemailer = require('nodemailer');
-    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const smtpPort = Number(process.env.SMTP_PORT) || 465;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const smtpPort = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 465;
+    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD;
 
     if (smtpUser && smtpPass) {
       try {
@@ -331,19 +331,22 @@ class AuthService {
           auth: { user: smtpUser, pass: smtpPass }
         });
 
+        const attachments = [];
+        if (fs.existsSync(logoPath)) {
+          attachments.push({
+            filename: 'chazin-logo.jpg',
+            path: logoPath,
+            cid: 'chazinLogo'
+          });
+        }
+
         await transporter.sendMail({
           from: `"Chazin Food" <${smtpUser}>`,
           to: user.email,
           subject: '🔐 Restablecer Contraseña - Chazin Food',
           text: `Hola ${user.nombre},\n\nPara restablecer tu contraseña de Chazin Food, ingresa al siguiente enlace:\n${resetLink}\n\nEste enlace expira en 1 hora.`,
           html: htmlContent,
-          attachments: [
-            {
-              filename: 'chazin-logo.jpg',
-              path: logoPath,
-              cid: 'chazinLogo'
-            }
-          ]
+          attachments
         });
         console.log(`✅ Correo de recuperación enviado con logo embebido liviano a ${user.email}`);
       } catch (emailError) {

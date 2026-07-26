@@ -248,6 +248,13 @@ class InsumoPreparadoService {
 
     await DetalleInsumoPreparadoInsumo.destroy({ where: { idPreparado: id } });
     await p.destroy();
+
+    const count = await InsumoPreparado.count();
+    if (count === 0) {
+      const connectDB = require('../../persistence/config/db');
+      await connectDB.sequelize.query('ALTER TABLE `insumopreparado` AUTO_INCREMENT = 1;');
+    }
+
     return { message: 'Insumo preparado eliminado físicamente' };
   }
 }

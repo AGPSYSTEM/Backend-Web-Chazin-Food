@@ -163,6 +163,13 @@ class UserService {
 
     await Cliente.destroy({ where: { idUsuario: id } });
     await user.destroy();
+
+    const count = await User.count();
+    if (count === 0) {
+      const connectDB = require('../../persistence/config/db');
+      await connectDB.sequelize.query('ALTER TABLE `usuario` AUTO_INCREMENT = 1;');
+    }
+
     return { message: 'Usuario eliminado exitosamente' };
   }
 }

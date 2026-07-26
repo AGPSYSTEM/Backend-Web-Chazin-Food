@@ -92,6 +92,13 @@ class CategoryService {
     }
 
     await cat.destroy();
+
+    const count = await CategoriaInsumo.count();
+    if (count === 0) {
+      const connectDB = require('../../persistence/config/db');
+      await connectDB.sequelize.query('ALTER TABLE `categoriainsumo` AUTO_INCREMENT = 1;');
+    }
+
     return { message: 'Categoría eliminada exitosamente' };
   }
 }
