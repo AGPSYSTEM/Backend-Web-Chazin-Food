@@ -78,6 +78,24 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Servidor monolítico unificado escuchando en el puerto ${PORT} en modo ${process.env.NODE_ENV || 'development'}`);
 });
+
+// Manejo de cierre limpio para evitar errores EADDRINUSE con nodemon
+const handleShutdown = (signal) => {
+  console.log(`Recibida señal ${signal}. Cerrando servidor en puerto ${PORT}...`);
+  server.close(() => {
+    console.log('Servidor HTTP cerrado correctamente.');
+    process.exit(0);
+  });
+};
+
+process.once('SIGUSR2', () => {
+  server.close(() => {
+    process.kill(process.pid, 'SIGUSR2');
+  });
+});
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+
