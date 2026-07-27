@@ -183,11 +183,9 @@ class InsumoService {
     }
     await insumo.destroy();
 
-    const count = await Insumo.count();
-    if (count === 0) {
-      const connectDB = require('../../persistence/config/db');
-      await connectDB.sequelize.query('ALTER TABLE `insumo` AUTO_INCREMENT = 1;');
-    }
+    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+    await resetAutoIncrement('insumo', 'idInsumo');
+
 
     return { message: 'Insumo eliminado físicamente' };
   }

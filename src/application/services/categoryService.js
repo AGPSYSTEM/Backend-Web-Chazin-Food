@@ -93,11 +93,9 @@ class CategoryService {
 
     await cat.destroy();
 
-    const count = await CategoriaInsumo.count();
-    if (count === 0) {
-      const connectDB = require('../../persistence/config/db');
-      await connectDB.sequelize.query('ALTER TABLE `categoriainsumo` AUTO_INCREMENT = 1;');
-    }
+    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+    await resetAutoIncrement('categoriainsumo', 'idCategoriaInsumo');
+
 
     return { message: 'Categoría eliminada exitosamente' };
   }

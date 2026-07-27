@@ -59,11 +59,8 @@ class AuthService {
       fechaRegistro: new Date()
     };
 
-    if (finalDocumento && !isNaN(parseInt(finalDocumento))) {
-      userPayload.idUsuario = parseInt(finalDocumento);
-    }
-
     const user = await User.create(userPayload);
+
 
     if (direccion) {
       try {
