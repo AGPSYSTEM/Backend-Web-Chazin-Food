@@ -399,6 +399,220 @@ const Product = sequelize.define('producto', {
   }
 }, { tableName: 'producto', timestamps: false });
 
+const CategoriaProducto = sequelize.define('categoriaproducto', {
+  idCategoriaProducto: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idCategoriaProducto'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idCategoriaProducto;
+    }
+  },
+  nombre: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true
+  },
+  descripcion: {
+    type: DataTypes.STRING(255)
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'categoriaproducto', timestamps: false });
+
+const Venta = sequelize.define('venta', {
+  idVenta: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idVenta'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idVenta;
+    }
+  },
+  idCliente: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idUsuario: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idDescuento: {
+    type: DataTypes.INTEGER
+  },
+  fechaVenta: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  subtotal: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  },
+  descuentoAplicado: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0
+  },
+  total: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  },
+  estadoEntrega: {
+    type: DataTypes.ENUM('PENDIENTE', 'PREPARANDO', 'LISTO', 'EN_CAMINO', 'ENTREGADO', 'CANCELADO'),
+    defaultValue: 'PENDIENTE'
+  },
+  observaciones: {
+    type: DataTypes.TEXT
+  }
+}, { tableName: 'venta', timestamps: false });
+
+const DetalleVentaProducto = sequelize.define('detalleventaproducto', {
+  idDetalleVenta: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  idVenta: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idVariante: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  cantidad: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1
+  },
+  precioUnitario: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  subtotal: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  },
+  observaciones: {
+    type: DataTypes.STRING(255)
+  }
+}, { tableName: 'detalleventaproducto', timestamps: false });
+
+const FichaTecnica = sequelize.define('fichatecnica', {
+  idFichaTecnica: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idFichaTecnica'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idFichaTecnica;
+    }
+  },
+  idVariante: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  descripcion: {
+    type: DataTypes.TEXT
+  },
+  fechaCreacion: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
+}, { tableName: 'fichatecnica', timestamps: false });
+
+const DetalleFichaInsumo = sequelize.define('detallefichainsumo', {
+  idDetalleFicha: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  idFichaTecnica: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  cantidad: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  }
+}, { tableName: 'detallefichainsumo', timestamps: false });
+
+const Compra = sequelize.define('compra', {
+  idCompra: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idCompra'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idCompra;
+    }
+  },
+  idProveedor: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  fechaCompra: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  total: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  },
+  estado: {
+    type: DataTypes.ENUM('PENDIENTE', 'RECIBIDA', 'CANCELADA'),
+    defaultValue: 'RECIBIDA'
+  }
+}, { tableName: 'compra', timestamps: false });
+
+const DetalleCompraInsumo = sequelize.define('detallecomprainsumo', {
+  idDetalleCompra: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  idCompra: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  cantidad: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  precioUnitario: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  subtotal: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  }
+}, { tableName: 'detallecomprainsumo', timestamps: false });
+
+
 const Order = sequelize.define('pedido', {
   id: {
     type: DataTypes.INTEGER,
@@ -457,6 +671,25 @@ Trazabilidad.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
 
 Order.belongsTo(User, { foreignKey: 'clienteId', as: 'cliente' });
 
+Product.belongsTo(CategoriaProducto, { foreignKey: 'idCategoriaProducto', as: 'categoriaProducto' });
+CategoriaProducto.hasMany(Product, { foreignKey: 'idCategoriaProducto' });
+
+Venta.belongsTo(Cliente, { foreignKey: 'idCliente', as: 'cliente' });
+Venta.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
+Venta.hasMany(DetalleVentaProducto, { foreignKey: 'idVenta', as: 'detalles' });
+DetalleVentaProducto.belongsTo(Venta, { foreignKey: 'idVenta' });
+
+FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles' });
+DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica' });
+DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+
+Compra.belongsTo(Proveedor, { foreignKey: 'idProveedor', as: 'proveedor' });
+Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
+Compra.hasMany(DetalleCompraInsumo, { foreignKey: 'idCompra', as: 'detalles' });
+DetalleCompraInsumo.belongsTo(Compra, { foreignKey: 'idCompra' });
+DetalleCompraInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+
+
 module.exports = {
   sequelize,
   Role,
@@ -473,5 +706,12 @@ module.exports = {
   DetalleInsumoPreparadoInsumo,
   Trazabilidad,
   Product,
-  Order
+  Order,
+  CategoriaProducto,
+  Venta,
+  DetalleVentaProducto,
+  FichaTecnica,
+  DetalleFichaInsumo,
+  Compra,
+  DetalleCompraInsumo
 };

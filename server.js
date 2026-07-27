@@ -60,6 +60,13 @@ app.use('/api/categorias-insumo', require('./src/presentation/routes/categoriaIn
 app.use('/api/insumos-preparados', require('./src/presentation/routes/insumoPreparadoRoutes'));
 app.use('/api/proveedores', require('./src/presentation/routes/proveedorRoutes'));
 app.use('/api/trazabilidad', require('./src/presentation/routes/trazabilidadRoutes'));
+app.use('/api/clientes', require('./src/presentation/routes/clienteRoutes'));
+app.use('/api/categorias-producto', require('./src/presentation/routes/categoriaProductoRoutes'));
+app.use('/api/compras', require('./src/presentation/routes/compraRoutes'));
+app.use('/api/ventas', require('./src/presentation/routes/ventaRoutes'));
+app.use('/api/fichas-tecnicas', require('./src/presentation/routes/fichaTecnicaRoutes'));
+app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes'));
+app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
