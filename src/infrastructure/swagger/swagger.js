@@ -889,4 +889,255 @@ module.exports = {
  *     responses:
  *       201:
  *         description: Movimiento de trazabilidad registrado.
+ *
+ * /api/clientes:
+ *   get:
+ *     summary: Obtener todos los clientes
+ *     tags: [Clientes]
+ *     responses:
+ *       200:
+ *         description: Lista de clientes con datos de usuario asociado.
+ *   post:
+ *     summary: Crear un nuevo cliente
+ *     tags: [Clientes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idUsuario
+ *             properties:
+ *               idUsuario:
+ *                 type: integer
+ *                 description: ID del usuario existente que será registrado como cliente
+ *                 example: 5
+ *               direccion:
+ *                 type: string
+ *                 description: Dirección de entrega del cliente
+ *                 example: "Calle 45 # 12-30, Bogotá"
+ *     responses:
+ *       201:
+ *         description: Cliente creado exitosamente.
+ *       400:
+ *         description: Datos inválidos o usuario no encontrado.
+ *
+ * /api/clientes/{id}:
+ *   get:
+ *     summary: Obtener cliente por ID
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del cliente
+ *     responses:
+ *       200:
+ *         description: Cliente encontrado con datos de usuario.
+ *       404:
+ *         description: Cliente no encontrado.
+ *   put:
+ *     summary: Actualizar datos de un cliente
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del cliente a actualizar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idUsuario:
+ *                 type: integer
+ *                 example: 5
+ *               direccion:
+ *                 type: string
+ *                 example: "Carrera 7 # 22-15, Medellín"
+ *     responses:
+ *       200:
+ *         description: Cliente actualizado exitosamente.
+ *       404:
+ *         description: Cliente no encontrado.
+ *   delete:
+ *     summary: Eliminar un cliente
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del cliente a eliminar
+ *     responses:
+ *       200:
+ *         description: Cliente eliminado exitosamente.
+ *       404:
+ *         description: Cliente no encontrado.
+ *
+ * /api/ventas:
+ *   get:
+ *     summary: Obtener todas las ventas
+ *     tags: [Gestión de Ventas]
+ *     responses:
+ *       200:
+ *         description: Lista de ventas con cliente, usuario y detalles de productos.
+ *   post:
+ *     summary: Registrar una nueva venta
+ *     tags: [Gestión de Ventas]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idCliente
+ *               - idUsuario
+ *               - subtotal
+ *               - total
+ *             properties:
+ *               idCliente:
+ *                 type: integer
+ *                 description: ID del cliente que realiza la compra
+ *                 example: 1
+ *               idUsuario:
+ *                 type: integer
+ *                 description: ID del usuario (empleado) que registra la venta
+ *                 example: 2
+ *               idDescuento:
+ *                 type: integer
+ *                 description: ID del descuento aplicado (opcional)
+ *                 example: null
+ *               subtotal:
+ *                 type: number
+ *                 description: Subtotal antes de descuento
+ *                 example: 45000.00
+ *               descuentoAplicado:
+ *                 type: number
+ *                 description: Monto del descuento aplicado
+ *                 example: 5000.00
+ *               total:
+ *                 type: number
+ *                 description: Total de la venta después de descuento
+ *                 example: 40000.00
+ *               estadoEntrega:
+ *                 type: string
+ *                 enum: [PENDIENTE, PREPARANDO, LISTO, EN_CAMINO, ENTREGADO, CANCELADO]
+ *                 description: Estado de entrega inicial
+ *                 example: "PENDIENTE"
+ *               observaciones:
+ *                 type: string
+ *                 description: Notas adicionales sobre la venta
+ *                 example: "Cliente solicita entrega después de las 3pm"
+ *               detalles:
+ *                 type: array
+ *                 description: Lista de productos vendidos
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - idVariante
+ *                     - cantidad
+ *                     - precioUnitario
+ *                     - subtotal
+ *                   properties:
+ *                     idVariante:
+ *                       type: integer
+ *                       description: ID de la variante del producto
+ *                       example: 3
+ *                     cantidad:
+ *                       type: integer
+ *                       description: Cantidad de unidades
+ *                       example: 2
+ *                     precioUnitario:
+ *                       type: number
+ *                       description: Precio por unidad
+ *                       example: 22500.00
+ *                     subtotal:
+ *                       type: number
+ *                       description: Subtotal de la línea (cantidad × precioUnitario)
+ *                       example: 45000.00
+ *                     observaciones:
+ *                       type: string
+ *                       example: "Sin cebolla"
+ *     responses:
+ *       201:
+ *         description: Venta registrada exitosamente con detalles.
+ *       400:
+ *         description: Datos de venta inválidos.
+ *
+ * /api/ventas/{id}:
+ *   get:
+ *     summary: Obtener detalle de una venta por ID
+ *     tags: [Gestión de Ventas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la venta
+ *     responses:
+ *       200:
+ *         description: Detalle completo de la venta con cliente, usuario y productos.
+ *       404:
+ *         description: Venta no encontrada.
+ *
+ * /api/ventas/{id}/estado:
+ *   put:
+ *     summary: Actualizar el estado de entrega de una venta
+ *     tags: [Gestión de Ventas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la venta
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - estado
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [PENDIENTE, PREPARANDO, LISTO, EN_CAMINO, ENTREGADO, CANCELADO]
+ *                 description: Nuevo estado de entrega
+ *                 example: "PREPARANDO"
+ *     responses:
+ *       200:
+ *         description: Estado de la venta actualizado exitosamente.
+ *       404:
+ *         description: Venta no encontrada.
+ *
+ * /api/ventas/{id}/cancelar:
+ *   put:
+ *     summary: Cancelar una venta
+ *     tags: [Gestión de Ventas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la venta a cancelar
+ *     responses:
+ *       200:
+ *         description: Venta cancelada exitosamente (estado cambia a CANCELADO).
+ *       404:
+ *         description: Venta no encontrada.
+ *
  */
+
