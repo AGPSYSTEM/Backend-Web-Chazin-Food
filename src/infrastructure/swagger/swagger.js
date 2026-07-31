@@ -1139,5 +1139,92 @@ module.exports = {
  *       404:
  *         description: Venta no encontrada.
  *
+ * /api/produccion:
+ *   get:
+ *     summary: Obtener todas las órdenes de producción
+ *     tags: [Gestión de Producción]
+ *     responses:
+ *       200:
+ *         description: Lista de órdenes de producción registradas.
+ *   post:
+ *     summary: Crear una nueva orden de producción
+ *     tags: [Gestión de Producción]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - platilloNombre
+ *               - cantidad
+ *             properties:
+ *               platilloNombre:
+ *                 type: string
+ *                 description: Nombre del platillo o receta a producir
+ *                 example: "Hamburguesa Especial"
+ *               cantidad:
+ *                 type: integer
+ *                 description: Cantidad de porciones a producir
+ *                 example: 20
+ *               fecha:
+ *                 type: string
+ *                 format: date
+ *                 description: Fecha planificada de producción
+ *                 example: "2026-07-31"
+ *     responses:
+ *       201:
+ *         description: Orden de producción creada exitosamente.
+ *       400:
+ *         description: Datos de la orden inválidos.
+ *
+ * /api/produccion/{id}:
+ *   delete:
+ *     summary: Eliminar una orden de producción
+ *     tags: [Gestión de Producción]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la orden de producción a eliminar
+ *     responses:
+ *       200:
+ *         description: Orden de producción eliminada exitosamente.
+ *       404:
+ *         description: Orden de producción no encontrada.
+ *
+ * /api/produccion/{id}/estado:
+ *   put:
+ *     summary: Actualizar el estado de una orden de producción
+ *     tags: [Gestión de Producción]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la orden de producción
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - estado
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [Planeada, En Proceso, Finalizada, Cancelada]
+ *                 description: Nuevo estado de la orden de producción
+ *                 example: "En Proceso"
+ *     responses:
+ *       200:
+ *         description: Estado de la orden actualizado exitosamente.
+ *       404:
+ *         description: Orden de producción no encontrada.
+ *
  */
 
