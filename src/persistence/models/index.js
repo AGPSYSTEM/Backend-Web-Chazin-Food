@@ -613,36 +613,6 @@ const DetalleCompraInsumo = sequelize.define('detallecomprainsumo', {
 }, { tableName: 'detallecomprainsumo', timestamps: false });
 
 
-const Order = sequelize.define('pedido', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  clienteId: {
-    type: DataTypes.INTEGER
-  },
-  items: {
-    type: DataTypes.TEXT
-  },
-  total: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false
-  },
-  estado: {
-    type: DataTypes.STRING,
-    defaultValue: 'pendiente'
-  },
-  metodoPago: {
-    type: DataTypes.STRING,
-    defaultValue: 'efectivo'
-  },
-  fechaCreacion: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
-  }
-}, { tableName: 'pedido', timestamps: false });
-
 // Relationships / Associations
 User.belongsTo(Role, { foreignKey: 'idRol', as: 'rolInfo' });
 Role.hasMany(User, { foreignKey: 'idRol' });
@@ -668,8 +638,6 @@ DetalleInsumoPreparadoInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'in
 
 Trazabilidad.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
 Trazabilidad.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
-
-Order.belongsTo(User, { foreignKey: 'clienteId', as: 'cliente' });
 
 Product.belongsTo(CategoriaProducto, { foreignKey: 'idCategoriaProducto', as: 'categoriaProducto' });
 CategoriaProducto.hasMany(Product, { foreignKey: 'idCategoriaProducto' });
@@ -706,7 +674,6 @@ module.exports = {
   DetalleInsumoPreparadoInsumo,
   Trazabilidad,
   Product,
-  Order,
   CategoriaProducto,
   Venta,
   DetalleVentaProducto,
