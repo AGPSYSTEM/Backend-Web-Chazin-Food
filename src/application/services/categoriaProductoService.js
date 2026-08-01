@@ -92,6 +92,9 @@ class CategoriaProductoService {
     }
 
     await cat.destroy();
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+    await resequenceTableIds('categoriaproducto', 'idCategoriaProducto', ['producto']);
+
     return { message: 'Categoría de producto eliminada exitosamente' };
   }
 }
