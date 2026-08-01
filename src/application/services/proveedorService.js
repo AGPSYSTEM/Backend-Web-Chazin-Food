@@ -11,10 +11,14 @@ class ProveedorService {
       tipoPersona: p.idTipoProveedor === 1 ? 'Jurídica' : 'Natural',
       idTipoDocumento: p.idTipoDocumento,
       numeroDocumento: p.numeroDocumento || '',
+      nit: p.numeroDocumento || '',
+      documento: p.numeroDocumento || '',
       telefono: p.telefono || '',
       correo: p.correo || '',
+      email: p.correo || '',
       direccion: p.direccion || '',
       nombreContacto: p.nombreContacto || '',
+      contacto: p.nombreContacto || '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo'
     }));
   }
@@ -34,22 +38,29 @@ class ProveedorService {
       tipoPersona: p.idTipoProveedor === 1 ? 'Jurídica' : 'Natural',
       idTipoDocumento: p.idTipoDocumento,
       numeroDocumento: p.numeroDocumento || '',
+      nit: p.numeroDocumento || '',
+      documento: p.numeroDocumento || '',
       telefono: p.telefono || '',
       correo: p.correo || '',
+      email: p.correo || '',
       direccion: p.direccion || '',
       nombreContacto: p.nombreContacto || '',
+      contacto: p.nombreContacto || '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo'
     };
   }
 
   static async create(data) {
-    const { nombre, numeroDocumento, telefono, correo, direccion, tipoPersona, estado, nombreContacto } = data;
+    const { nombre, numeroDocumento, nit, documento, telefono, correo, email, direccion, tipoPersona, estado, nombreContacto, contacto } = data;
     if (!nombre) {
       const error = new Error('El nombre del proveedor es requerido');
       error.statusCode = 400;
       throw error;
     }
 
+    const finalNumeroDocumento = numeroDocumento || nit || documento || '';
+    const finalCorreo = correo || email || '';
+    const finalNombreContacto = nombreContacto || contacto || '';
     const idTipoProveedor = tipoPersona === 'Natural' ? 2 : 1;
     const estadoInt = estado === 'Activo' || estado === 1 ? 1 : 0;
 
@@ -57,11 +68,11 @@ class ProveedorService {
       nombre,
       idTipoProveedor,
       idTipoDocumento: 1,
-      numeroDocumento: numeroDocumento || '',
+      numeroDocumento: finalNumeroDocumento,
       telefono: telefono || '',
-      correo: correo || '',
+      correo: finalCorreo,
       direccion: direccion || '',
-      nombreContacto: nombreContacto || '',
+      nombreContacto: finalNombreContacto,
       estado: estadoInt
     });
 
@@ -76,14 +87,18 @@ class ProveedorService {
       throw error;
     }
 
-    const { nombre, numeroDocumento, telefono, correo, direccion, tipoPersona, estado, nombreContacto } = data;
+    const { nombre, numeroDocumento, nit, documento, telefono, correo, email, direccion, tipoPersona, estado, nombreContacto, contacto } = data;
+
+    const finalNumeroDocumento = numeroDocumento !== undefined ? numeroDocumento : (nit !== undefined ? nit : documento);
+    const finalCorreo = correo !== undefined ? correo : email;
+    const finalNombreContacto = nombreContacto !== undefined ? nombreContacto : contacto;
 
     if (nombre !== undefined) p.nombre = nombre;
-    if (numeroDocumento !== undefined) p.numeroDocumento = numeroDocumento;
-    if (telefono !== undefined) p.telefono = telefono;
-    if (correo !== undefined) p.correo = correo;
-    if (direccion !== undefined) p.direccion = direccion;
-    if (nombreContacto !== undefined) p.nombreContacto = nombreContacto;
+    if (finalNumeroDocumento !== undefined) p.numeroDocumento = finalNumeroDocumento || '';
+    if (telefono !== undefined) p.telefono = telefono || '';
+    if (finalCorreo !== undefined) p.correo = finalCorreo || '';
+    if (direccion !== undefined) p.direccion = direccion || '';
+    if (finalNombreContacto !== undefined) p.nombreContacto = finalNombreContacto || '';
     if (tipoPersona !== undefined) p.idTipoProveedor = tipoPersona === 'Natural' ? 2 : 1;
     if (estado !== undefined) p.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
 
