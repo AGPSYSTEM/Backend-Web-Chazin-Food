@@ -50,7 +50,7 @@ app.use('/api/orders', require('./src/presentation/routes/ventaRoutes'));
 
 // Rutas en Español
 app.use('/api/autenticacion', require('./src/presentation/routes/authRoutes'));
-app.use('/api/categorias', require('./src/presentation/routes/categoryRoutes'));
+app.use('/api/categorias', require('./src/presentation/routes/categoriaProductoRoutes'));
 app.use('/api/usuarios', require('./src/presentation/routes/userRoutes'));
 app.use('/api/productos', require('./src/presentation/routes/productRoutes'));
 app.use('/api/pedidos', require('./src/presentation/routes/ventaRoutes'));
