@@ -151,8 +151,8 @@ class ProveedorService {
     }
 
     await p.destroy();
-    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
-    await resetAutoIncrement('proveedor', 'idProveedor');
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+    await resequenceTableIds('proveedor', 'idProveedor', ['insumo', 'compra']);
 
     return { message: 'Proveedor eliminado exitosamente' };
   }
