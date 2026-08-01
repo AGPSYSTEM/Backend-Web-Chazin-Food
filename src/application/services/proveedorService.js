@@ -52,8 +52,15 @@ class ProveedorService {
 
   static async create(data) {
     const { nombre, numeroDocumento, nit, documento, telefono, correo, email, direccion, tipoPersona, estado, nombreContacto, contacto } = data;
-    if (!nombre) {
+    if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del proveedor es requerido');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existing = await Proveedor.findOne({ where: { nombre: nombre.trim() } });
+    if (existing) {
+      const error = new Error('Ya existe un proveedor registrado con ese nombre');
       error.statusCode = 400;
       throw error;
     }
@@ -65,7 +72,7 @@ class ProveedorService {
     const estadoInt = estado === 'Activo' || estado === 1 ? 1 : 0;
 
     const proveedor = await Proveedor.create({
-      nombre,
+      nombre: nombre.trim(),
       idTipoProveedor,
       idTipoDocumento: 1,
       numeroDocumento: finalNumeroDocumento,
@@ -93,7 +100,7 @@ class ProveedorService {
     const finalCorreo = correo !== undefined ? correo : email;
     const finalNombreContacto = nombreContacto !== undefined ? nombreContacto : contacto;
 
-    if (nombre !== undefined) p.nombre = nombre;
+    if (nombre !== undefined) p.nombre = nombre.trim();
     if (finalNumeroDocumento !== undefined) p.numeroDocumento = finalNumeroDocumento || '';
     if (telefono !== undefined) p.telefono = telefono || '';
     if (finalCorreo !== undefined) p.correo = finalCorreo || '';
@@ -113,9 +120,10 @@ class ProveedorService {
       error.statusCode = 404;
       throw error;
     }
-    p.estado = 0;
-    await p.save();
-    return { message: 'Proveedor desactivado exitosamente' };
+    await p.destroy();
+    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+    await resetAutoIncrement('proveedor', 'idProveedor');
+    return { message: 'Proveedor eliminado exitosamente' };
   }
 }
 

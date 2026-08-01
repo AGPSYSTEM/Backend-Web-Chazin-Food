@@ -97,14 +97,21 @@ class InsumoService {
       precioUnitario, idProveedor, descripcion
     } = insumoData;
 
-    if (!nombre) {
+    if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del insumo es requerido');
       error.statusCode = 400;
       throw error;
     }
 
+    const existing = await Insumo.findOne({ where: { nombre: nombre.trim(), estado: 1 } });
+    if (existing) {
+      const error = new Error('Ya existe un insumo activo registrado con ese nombre');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const insumo = await Insumo.create({
-      nombre,
+      nombre: nombre.trim(),
       idCategoriaInsumo: idCategoriaInsumo || null,
       stock: stock || 0,
       stockMinimo: stockMinimo || 0,
@@ -134,7 +141,7 @@ class InsumoService {
       precioUnitario, idProveedor, descripcion, estado
     } = insumoData;
 
-    if (nombre !== undefined) insumo.nombre = nombre;
+    if (nombre !== undefined) insumo.nombre = nombre.trim();
     if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo;
     if (stock !== undefined) insumo.stock = stock;
     if (stockMinimo !== undefined) insumo.stockMinimo = stockMinimo;
@@ -159,6 +166,8 @@ class InsumoService {
     }
     insumo.estado = 0;
     await insumo.save();
+    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+    await resetAutoIncrement('insumo', 'idInsumo');
     return { message: 'Insumo movido a la papelera' };
   }
 
