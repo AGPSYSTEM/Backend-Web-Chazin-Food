@@ -1,4 +1,4 @@
-const { Proveedor } = require('../../persistence/models');
+const { Proveedor, Insumo, Compra } = require('../../persistence/models');
 
 class ProveedorService {
   static async getAll() {
@@ -113,6 +113,26 @@ class ProveedorService {
     return this.getById(idProveedor);
   }
 
+  static async toggleEstado(idProveedor, estado) {
+    const p = await Proveedor.findByPk(idProveedor);
+    if (!p) {
+      const error = new Error('Proveedor no encontrado');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    let nuevoEstado = 1;
+    if (estado !== undefined) {
+      nuevoEstado = (estado === 'Activo' || estado === 1 || estado === '1' || estado === true) ? 1 : 0;
+    } else {
+      nuevoEstado = p.estado === 1 ? 0 : 1;
+    }
+
+    p.estado = nuevoEstado;
+    await p.save();
+    return this.getById(idProveedor);
+  }
+
   static async delete(idProveedor) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
@@ -120,9 +140,20 @@ class ProveedorService {
       error.statusCode = 404;
       throw error;
     }
+
+    const insumosAsociados = await Insumo.count({ where: { idProveedor } });
+    const comprasAsociadas = await Compra.count({ where: { idProveedor } });
+
+    if (insumosAsociados > 0 || comprasAsociadas > 0) {
+      const error = new Error(`No se puede eliminar el proveedor porque tiene ${insumosAsociados > 0 ? insumosAsociados + ' insumo(s)' : ''}${insumosAsociados > 0 && comprasAsociadas > 0 ? ' y ' : ''}${comprasAsociadas > 0 ? comprasAsociadas + ' compra(s)' : ''} asociado(s).`);
+      error.statusCode = 400;
+      throw error;
+    }
+
     await p.destroy();
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('proveedor', 'idProveedor');
+
     return { message: 'Proveedor eliminado exitosamente' };
   }
 }

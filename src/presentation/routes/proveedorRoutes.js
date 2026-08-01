@@ -5,6 +5,7 @@ const {
   getProveedorById,
   createProveedor,
   updateProveedor,
+  toggleProveedorEstado,
   deleteProveedor,
 } = require('../controllers/proveedorController');
 
@@ -16,5 +17,8 @@ router.route('/:id')
   .get(getProveedorById)
   .put(updateProveedor)
   .delete(deleteProveedor);
+
+router.put('/:id/estado', toggleProveedorEstado);
+router.patch('/:id/estado', toggleProveedorEstado);
 
 module.exports = router;

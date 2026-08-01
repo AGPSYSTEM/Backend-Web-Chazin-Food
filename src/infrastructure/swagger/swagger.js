@@ -856,7 +856,33 @@ module.exports = {
  *           type: integer
  *     responses:
  *       200:
- *         description: Proveedor eliminado.
+ *         description: Proveedor eliminado exitosamente.
+ *       400:
+ *         description: No se puede eliminar porque tiene insumos o compras asociadas.
+ * 
+ * /api/proveedores/{id}/estado:
+ *   put:
+ *     summary: Cambiar estado del proveedor (Activar/Inactivar)
+ *     tags: [Proveedores]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 example: "Activo"
+ *     responses:
+ *       200:
+ *         description: Estado del proveedor actualizado exitosamente.
  * 
  * /api/trazabilidad:
  *   get:
