@@ -454,7 +454,9 @@ module.exports = {
  *           type: integer
  *     responses:
  *       200:
- *         description: Categoría eliminada.
+ *         description: Categoría eliminada exitosamente.
+ *       400:
+ *         description: No se puede eliminar la categoría porque tiene productos asociados.
  * 
  * /api/roles:
  *   get:
