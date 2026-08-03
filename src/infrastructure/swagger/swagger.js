@@ -1254,5 +1254,102 @@ module.exports = {
  *       404:
  *         description: Orden de producción no encontrada.
  *
+ * /api/eventos:
+ *   get:
+ *     summary: Obtener la lista de todos los eventos de fichas técnicas
+ *     tags: [Gestión de Eventos]
+ *     responses:
+ *       200:
+ *         description: Lista de eventos obtenida exitosamente.
+ *   post:
+ *     summary: Crear un nuevo evento
+ *     tags: [Gestión de Eventos]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nombreEvento
+ *             properties:
+ *               nombreEvento:
+ *                 type: string
+ *                 example: "Temporada de Verano — Carne extra incluida"
+ *               descripcion:
+ *                 type: string
+ *                 example: "Evento especial de verano con ingredientes adicionales"
+ *               fechaInicio:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-01"
+ *               fechaFin:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-31"
+ *               estado:
+ *                 type: string
+ *                 example: "Activo"
+ *     responses:
+ *       201:
+ *         description: Evento creado exitosamente.
+ *
+ * /api/eventos/{id}:
+ *   get:
+ *     summary: Obtener un evento por ID
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalles del evento devueltos correctamente.
+ *       404:
+ *         description: Evento no encontrado.
+ *   put:
+ *     summary: Actualizar un evento
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombreEvento:
+ *                 type: string
+ *               descripcion:
+ *                 type: string
+ *               fechaInicio:
+ *                 type: string
+ *               fechaFin:
+ *                 type: string
+ *               estado:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Evento actualizado exitosamente.
+ *   delete:
+ *     summary: Eliminar un evento
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Evento eliminado exitosamente.
  */
+
 
