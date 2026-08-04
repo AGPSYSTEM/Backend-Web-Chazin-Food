@@ -573,12 +573,29 @@ module.exports = {
  *               stock:
  *                 type: number
  *                 example: 50
+ *               stockMinimo:
+ *                 type: number
+ *                 example: 5
  *               unidadMedida:
  *                 type: string
  *                 example: kg
  *               precioUnitario:
  *                 type: number
  *                 example: 1200.00
+ *               idProveedor:
+ *                 type: integer
+ *                 example: 1
+ *               fechaExpedicion:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-01"
+ *               fechaVencimiento:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-12-31"
+ *               descripcion:
+ *                 type: string
+ *                 example: Harina refinada de trigo multipropósito
  *     responses:
  *       201:
  *         description: Insumo creado correctamente.

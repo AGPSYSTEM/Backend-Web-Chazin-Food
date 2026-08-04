@@ -91,16 +91,27 @@ class InsumoService {
   }
 
   static async create(insumoData) {
-    const {
+    let {
       nombre, idCategoriaInsumo, stock, stockMinimo,
       fechaExpedicion, fechaVencimiento, unidadMedida,
-      precioUnitario, idProveedor, descripcion
+      precioUnitario, idProveedor, descripcion,
+      categoria, proveedor
     } = insumoData;
 
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del insumo es requerido');
       error.statusCode = 400;
       throw error;
+    }
+
+    if (!idCategoriaInsumo && categoria) {
+      const cat = await CategoriaInsumo.findOne({ where: { nombre: categoria } });
+      if (cat) idCategoriaInsumo = cat.idCategoriaInsumo;
+    }
+
+    if (!idProveedor && proveedor) {
+      const prov = await Proveedor.findOne({ where: { nombre: proveedor } });
+      if (prov) idProveedor = prov.idProveedor;
     }
 
     const existing = await Insumo.findOne({ where: { nombre: nombre.trim(), estado: 1 } });
@@ -113,12 +124,12 @@ class InsumoService {
     const insumo = await Insumo.create({
       nombre: nombre.trim(),
       idCategoriaInsumo: idCategoriaInsumo || null,
-      stock: stock || 0,
-      stockMinimo: stockMinimo || 0,
+      stock: stock !== undefined && stock !== null ? stock : 0,
+      stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? stockMinimo : 0,
       fechaExpedicion: fechaExpedicion || null,
       fechaVencimiento: fechaVencimiento || null,
       unidadMedida: unidadMedida || 'und',
-      precioUnitario: precioUnitario || 0,
+      precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? precioUnitario : 0,
       idProveedor: idProveedor || null,
       descripcion: descripcion || '',
       estado: 1
@@ -135,11 +146,22 @@ class InsumoService {
       throw error;
     }
 
-    const {
+    let {
       nombre, idCategoriaInsumo, stock, stockMinimo,
       fechaExpedicion, fechaVencimiento, unidadMedida,
-      precioUnitario, idProveedor, descripcion, estado
+      precioUnitario, idProveedor, descripcion, estado,
+      categoria, proveedor
     } = insumoData;
+
+    if (!idCategoriaInsumo && categoria) {
+      const cat = await CategoriaInsumo.findOne({ where: { nombre: categoria } });
+      if (cat) idCategoriaInsumo = cat.idCategoriaInsumo;
+    }
+
+    if (!idProveedor && proveedor) {
+      const prov = await Proveedor.findOne({ where: { nombre: proveedor } });
+      if (prov) idProveedor = prov.idProveedor;
+    }
 
     if (nombre !== undefined) insumo.nombre = nombre.trim();
     if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo;
@@ -151,7 +173,9 @@ class InsumoService {
     if (precioUnitario !== undefined) insumo.precioUnitario = precioUnitario;
     if (idProveedor !== undefined) insumo.idProveedor = idProveedor;
     if (descripcion !== undefined) insumo.descripcion = descripcion;
-    if (estado !== undefined) insumo.estado = estado;
+    if (estado !== undefined) {
+      insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+    }
 
     await insumo.save();
     return this.getById(idInsumo);
