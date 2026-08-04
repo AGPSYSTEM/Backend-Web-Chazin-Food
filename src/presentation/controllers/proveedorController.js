@@ -25,7 +25,14 @@ const createProveedor = async (req, res, next) => {
     const nuevoProveedor = await ProveedorService.create(req.body);
     res.status(201).json(nuevoProveedor);
   } catch (error) {
-    if (error.statusCode) res.status(error.statusCode);
+    const status = error.statusCode || 500;
+    if (error.errores) {
+      return res.status(status).json({
+        mensaje: error.message,
+        errores: error.errores,
+      });
+    }
+    res.status(status);
     next(error);
   }
 };
@@ -35,7 +42,14 @@ const updateProveedor = async (req, res, next) => {
     const actualizado = await ProveedorService.update(req.params.id, req.body);
     res.json(actualizado);
   } catch (error) {
-    if (error.statusCode) res.status(error.statusCode);
+    const status = error.statusCode || 500;
+    if (error.errores) {
+      return res.status(status).json({
+        mensaje: error.message,
+        errores: error.errores,
+      });
+    }
+    res.status(status);
     next(error);
   }
 };
@@ -61,6 +75,26 @@ const deleteProveedor = async (req, res, next) => {
   }
 };
 
+const restoreProveedor = async (req, res, next) => {
+  try {
+    const restaurado = await ProveedorService.restore(req.params.id);
+    res.json(restaurado);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+const deletePermanenteProveedor = async (req, res, next) => {
+  try {
+    const result = await ProveedorService.deletePermanente(req.params.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   getProveedores,
   getProveedorById,
@@ -68,4 +102,6 @@ module.exports = {
   updateProveedor,
   toggleProveedorEstado,
   deleteProveedor,
+  restoreProveedor,
+  deletePermanenteProveedor,
 };
