@@ -658,6 +658,40 @@ DetalleCompraInsumo.belongsTo(Compra, { foreignKey: 'idCompra' });
 DetalleCompraInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
 
 
+const Evento = sequelize.define('evento', {
+  idEvento: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idEvento'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idEvento;
+    }
+  },
+  nombreEvento: {
+    type: DataTypes.STRING(120),
+    allowNull: false
+  },
+  descripcion: {
+    type: DataTypes.TEXT
+  },
+  fechaInicio: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
+  fechaFin: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'evento', timestamps: false });
+
 module.exports = {
   sequelize,
   Role,
@@ -680,5 +714,6 @@ module.exports = {
   FichaTecnica,
   DetalleFichaInsumo,
   Compra,
-  DetalleCompraInsumo
+  DetalleCompraInsumo,
+  Evento
 };

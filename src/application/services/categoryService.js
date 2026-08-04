@@ -93,9 +93,8 @@ class CategoryService {
 
     await cat.destroy();
 
-    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
-    await resetAutoIncrement('categoriainsumo', 'idCategoriaInsumo');
-
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+    await resequenceTableIds('categoriainsumo', 'idCategoriaInsumo', ['insumo']);
 
     return { message: 'Categoría eliminada exitosamente' };
   }
