@@ -101,13 +101,20 @@ class CompraService {
 
   static async create(data) {
     const estadoEntrada = data.estado !== undefined && data.estado !== null ? data.estado : "(NO ENVIADO, default PENDIENTE)";
-    const estadoNormalizado = normalizarEstado(data.estado !== undefined && data.estado !== null ? data.estado : ESTADO_PENDIENTE);
+
+    // SALVAGUARDA ABSOLUTA: Al CREAR una compra, el estado SIEMPRE será PENDIENTE.
+    // Bajo NINGUNA circunstancia se permite crear una compra directamente en RECIBIDA.
+    // Para sumar stock, el usuario DEBE marcarla como Recibida vía updateEstado()
+    // (botón "Marcar como Recibida" en la UI).
+    const _estadoPropuesto = normalizarEstado(data.estado !== undefined && data.estado !== null ? data.estado : ESTADO_PENDIENTE);
+    const estadoNormalizado = ESTADO_PENDIENTE;
+
     console.log(`==========================================================================`);
     console.log(`[COMPRA CREATE] NUEVA COMPRA solicitada`);
     console.log(`[COMPRA CREATE]   - estadoEntrada (lo que llegó del frontend): ${estadoEntrada}`);
-    console.log(`[COMPRA CREATE]   - estadoNormalizado (lo que usaremos en BD): ${estadoNormalizado}`);
-    console.log(`[COMPRA CREATE]   - esEstadoRecibida(estadoNormalizado) = ${esEstadoRecibida(estadoNormalizado)}`);
-    console.log(`[COMPRA CREATE]   - esEstadoPendiente(estadoNormalizado) = ${esEstadoPendiente(estadoNormalizado)}`);
+    console.log(`[COMPRA CREATE]   - _estadoPropuesto tras normalizar: ${_estadoPropuesto}`);
+    console.log(`[COMPRA CREATE]   - estadoNormalizado (FORZADO a PENDIENTE por seguridad): ${estadoNormalizado}`);
+    console.log(`[COMPRA CREATE]   - ⛔ NOTA: el stock de insumos NO se actualizará al crear. Se requiere marcar la compra como RECIBIDA manualmente luego.`);
     console.log(`[COMPRA CREATE]   - Cantidad de detalles: ${(data.detalles || []).length}`);
     console.log(`==========================================================================`);
 
@@ -127,68 +134,7 @@ class CompraService {
         subtotal: d.subtotal || (d.cantidad * d.precioUnitario)
       }));
       await DetalleCompraInsumo.bulkCreate(detalles);
-
-      if (!esEstadoRecibida(estadoNormalizado)) {
-        console.log(`[COMPRA CREATE] #${compra.idCompra}: ⛔ NO SE ACTUALIZA STOCK (estado=${estadoNormalizado}). Se requiere RECIBIDA para sumar insumos.`);
-      }
-
-      if (esEstadoRecibida(estadoNormalizado)) {
-        console.log(`[COMPRA CREATE] #${compra.idCompra}: ✅ SÍ SE ACTUALIZARÁ STOCK (estado=RECIBIDA). Sumando insumos...`);
-        const mapaAgrupado = new Map();
-        for (const d of data.detalles) {
-          const idIns = Number(d.idInsumo);
-          if (!mapaAgrupado.has(idIns)) {
-            mapaAgrupado.set(idIns, {
-              idInsumo: idIns,
-              cantidadTotal: 0,
-              precioUnitario: d.precioUnitario,
-              subtotalTotal: 0
-            });
-          }
-          const entry = mapaAgrupado.get(idIns);
-          const cantNum = parseFloat(d.cantidad) || 0;
-          const precNum = parseFloat(d.precioUnitario) || 0;
-          entry.cantidadTotal += cantNum;
-          entry.precioUnitario = precNum;
-          entry.subtotalTotal += parseFloat(d.subtotal || (cantNum * precNum)) || 0;
-        }
-
-        const proveedor = await Proveedor.findByPk(data.idProveedor, { attributes: ['nombre'] });
-        const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${data.idProveedor}`;
-        const numeroFactura = `COMP-${String(compra.idCompra).padStart(4, '0')}`;
-
-        for (const [idIns, entry] of mapaAgrupado.entries()) {
-          console.log(`[COMPRA CREATE] #${compra.idCompra} → Sumando insumo #${idIns} cantidad=+${entry.cantidadTotal}`);
-          try {
-            const t = await sequelize.transaction();
-            try {
-              await Insumo.update(
-                { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${entry.cantidadTotal}`) },
-                { where: { idInsumo: idIns }, transaction: t }
-              );
-              const insumo = await Insumo.findByPk(idIns, { transaction: t });
-              await t.commit();
-
-              if (insumo) {
-                await TrazabilidadService.create({
-                  tipo: 'compra',
-                  entidadNombre: insumo.nombre,
-                  detalle: `Reabastecimiento por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')}`,
-                  idInsumo: idIns,
-                  tipoMovimiento: 'Entrada',
-                  cantidad: entry.cantidadTotal,
-                  motivo: `Compra ${numeroFactura} registrada — Proveedor: ${proveedorNombre}`
-                });
-              }
-            } catch (txErr) {
-              try { await t.rollback(); } catch (_) {}
-              throw txErr;
-            }
-          } catch (err) {
-            console.warn(`Advertencia al reabastecer insumo #${idIns}:`, err.message);
-          }
-        }
-      }
+      console.log(`[COMPRA CREATE] #${compra.idCompra}: ${detalles.length} detalle(s) guardado(s). Stock de insumos: INTOCADO (estado=PENDIENTE).`);
     }
 
     return this.getById(compra.idCompra);
@@ -203,29 +149,70 @@ class CompraService {
       return;
     }
 
-    const detalles = await DetalleCompraInsumo.findAll({
-      where: { idCompra: compra.idCompra }
+    const idCompra = Number(compra.idCompra);
+    const compraCompleta = await Compra.findByPk(idCompra, {
+      include: [
+        { model: Proveedor, as: 'proveedor', attributes: ['idProveedor', 'nombre'] },
+        { model: DetalleCompraInsumo, as: 'detalles' }
+      ]
     });
-    if (!detalles || detalles.length === 0) return;
+    if (!compraCompleta) return;
+
+    const detalles = compraCompleta.detalles || [];
+    if (!detalles.length) return;
+
+    const proveedor = compraCompleta.proveedor;
+    const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${compraCompleta.idProveedor}`;
+    const numeroFactura = `COMP-${String(idCompra).padStart(4, '0')}`;
 
     const mapaAgrupado = new Map();
     for (const d of detalles) {
       const idIns = Number(d.idInsumo);
       if (!mapaAgrupado.has(idIns)) {
-        mapaAgrupado.set(idIns, { idInsumo: idIns, cantidadTotal: 0 });
+        mapaAgrupado.set(idIns, {
+          idInsumo: idIns,
+          cantidadTotal: 0,
+          precioUnitario: parseFloat(d.precioUnitario) || 0,
+          subtotalTotal: 0
+        });
       }
-      mapaAgrupado.get(idIns).cantidadTotal += parseFloat(d.cantidad) || 0;
+      const e = mapaAgrupado.get(idIns);
+      const cantNum = parseFloat(d.cantidad) || 0;
+      e.cantidadTotal += cantNum;
+      e.precioUnitario = parseFloat(d.precioUnitario) || e.precioUnitario;
+      e.subtotalTotal += parseFloat(d.subtotal || (cantNum * e.precioUnitario)) || 0;
     }
 
     const operacion = signo > 0 ? "SUMAR" : "RESTAR";
+    const tipoMovimiento = signo > 0 ? 'Entrada' : 'Salida';
+    const motivoAjuste = signo > 0
+      ? `Compra ${numeroFactura} marcada como Recibida — Proveedor: ${proveedorNombre}`
+      : `Reversa por anulación/cambio de estado de compra ${numeroFactura} — Proveedor: ${proveedorNombre}`;
+
     for (const [idIns, entry] of mapaAgrupado.entries()) {
       try {
         const cantidadAjuste = signo * entry.cantidadTotal;
-        console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${compra.idCompra} (estado=${estadoNormalizado}): ${cantidadAjuste >= 0 ? "+" : ""}${cantidadAjuste}`);
+        console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${idCompra} (estado=${estadoNormalizado}): ${cantidadAjuste >= 0 ? "+" : ""}${cantidadAjuste}`);
         await Insumo.update(
           { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${cantidadAjuste}`) },
           { where: { idInsumo: idIns } }
         );
+        try {
+          const insumo = await Insumo.findByPk(idIns);
+          if (insumo) {
+            await TrazabilidadService.create({
+              tipo: 'compra',
+              entidadNombre: insumo.nombre,
+              detalle: `${signo > 0 ? "Reabastecimiento" : "Reversa"} por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')} | Estado final: ${estadoNormalizado}`,
+              idInsumo: idIns,
+              tipoMovimiento: tipoMovimiento,
+              cantidad: Math.abs(cantidadAjuste),
+              motivo: motivoAjuste
+            });
+          }
+        } catch (tzErr) {
+          console.warn(`[COMPRA STOCK] Error registrando trazabilidad para insumo #${idIns}:`, tzErr.message);
+        }
       } catch (err) {
         console.warn(`Advertencia al ajustar stock insumo #${idIns}:`, err.message);
       }
