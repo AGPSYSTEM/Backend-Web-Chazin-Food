@@ -97,7 +97,17 @@ class CompraService {
   }
 
   static async create(data) {
+    const estadoEntrada = data.estado !== undefined && data.estado !== null ? data.estado : "(NO ENVIADO, default RECIBIDA)";
     const estadoNormalizado = normalizarEstado(data.estado || ESTADO_RECIBIDA);
+    console.log(`==========================================================================`);
+    console.log(`[COMPRA CREATE] NUEVA COMPRA solicitada`);
+    console.log(`[COMPRA CREATE]   - estadoEntrada (lo que llegó del frontend): ${estadoEntrada}`);
+    console.log(`[COMPRA CREATE]   - estadoNormalizado (lo que usaremos en BD): ${estadoNormalizado}`);
+    console.log(`[COMPRA CREATE]   - esEstadoRecibida(estadoNormalizado) = ${esEstadoRecibida(estadoNormalizado)}`);
+    console.log(`[COMPRA CREATE]   - esEstadoPendiente(estadoNormalizado) = ${esEstadoPendiente(estadoNormalizado)}`);
+    console.log(`[COMPRA CREATE]   - Cantidad de detalles: ${(data.detalles || []).length}`);
+    console.log(`==========================================================================`);
+
     const compra = await Compra.create({
       idProveedor: data.idProveedor,
       fechaCompra: data.fechaCompra || new Date(),
@@ -115,7 +125,12 @@ class CompraService {
       }));
       await DetalleCompraInsumo.bulkCreate(detalles);
 
+      if (!esEstadoRecibida(estadoNormalizado)) {
+        console.log(`[COMPRA CREATE] #${compra.idCompra}: ⛔ NO SE ACTUALIZA STOCK (estado=${estadoNormalizado}). Se requiere RECIBIDA para sumar insumos.`);
+      }
+
       if (esEstadoRecibida(estadoNormalizado)) {
+        console.log(`[COMPRA CREATE] #${compra.idCompra}: ✅ SÍ SE ACTUALIZARÁ STOCK (estado=RECIBIDA). Sumando insumos...`);
         const mapaAgrupado = new Map();
         for (const d of data.detalles) {
           const idIns = Number(d.idInsumo);
@@ -140,6 +155,7 @@ class CompraService {
         const numeroFactura = `COMP-${String(compra.idCompra).padStart(4, '0')}`;
 
         for (const [idIns, entry] of mapaAgrupado.entries()) {
+          console.log(`[COMPRA CREATE] #${compra.idCompra} → Sumando insumo #${idIns} cantidad=+${entry.cantidadTotal}`);
           try {
             const t = await sequelize.transaction();
             try {
