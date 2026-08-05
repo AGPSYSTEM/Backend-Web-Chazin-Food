@@ -178,6 +178,12 @@ class CompraService {
   static async _ajustarStockPorCompra(compra, signo) {
     if (!compra || !compra.idCompra) return;
 
+    const estadoNormalizado = normalizarEstado(compra.estado);
+    if (signo > 0 && !esEstadoRecibida(estadoNormalizado)) {
+      console.warn(`[COMPRA STOCK] BLOQUEADO ajuste +(sumar) para compra #${compra.idCompra}: estado=${estadoNormalizado} se requiere RECIBIDA.`);
+      return;
+    }
+
     const detalles = await DetalleCompraInsumo.findAll({
       where: { idCompra: compra.idCompra }
     });
@@ -192,9 +198,11 @@ class CompraService {
       mapaAgrupado.get(idIns).cantidadTotal += parseFloat(d.cantidad) || 0;
     }
 
+    const operacion = signo > 0 ? "SUMAR" : "RESTAR";
     for (const [idIns, entry] of mapaAgrupado.entries()) {
       try {
         const cantidadAjuste = signo * entry.cantidadTotal;
+        console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${compra.idCompra} (estado=${estadoNormalizado}): ${cantidadAjuste >= 0 ? "+" : ""}${cantidadAjuste}`);
         await Insumo.update(
           { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${cantidadAjuste}`) },
           { where: { idInsumo: idIns } }
@@ -214,17 +222,28 @@ class CompraService {
     }
     const estadoAnterior = normalizarEstado(c.estado);
     const estadoNuevo = normalizarEstado(estado);
+    console.log(`[COMPRA UPDATE_ESTADO] #${id}: ${estadoAnterior} → ${estadoNuevo}`);
 
     if (estadoAnterior !== estadoNuevo) {
       if (esEstadoRecibida(estadoAnterior) && esEstadoCancelada(estadoNuevo)) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición RECIBIDA→CANCELADA (resta stock)`);
         await this._ajustarStockPorCompra(c, -1);
       } else if (esEstadoPendiente(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
-        await this._ajustarStockPorCompra(c, +1);
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición PENDIENTE→RECIBIDA (suma stock)`);
+        const compraValidada = { ...c.toJSON ? c.toJSON() : c, estado: estadoNuevo };
+        await this._ajustarStockPorCompra(compraValidada, +1);
       } else if (esEstadoCancelada(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
-        await this._ajustarStockPorCompra(c, +1);
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición CANCELADA→RECIBIDA (suma stock)`);
+        const compraValidada = { ...c.toJSON ? c.toJSON() : c, estado: estadoNuevo };
+        await this._ajustarStockPorCompra(compraValidada, +1);
       } else if (esEstadoRecibida(estadoAnterior) && esEstadoPendiente(estadoNuevo)) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición RECIBIDA→PENDIENTE (resta stock)`);
         await this._ajustarStockPorCompra(c, -1);
+      } else {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición ${estadoAnterior}→${estadoNuevo} sin impacto en stock`);
       }
+    } else {
+      console.log(`[COMPRA UPDATE_ESTADO] #${id}: estado no cambió (${estadoNuevo}) - sin acción`);
     }
 
     c.estado = estadoNuevo;
@@ -248,14 +267,23 @@ class CompraService {
     return mapa;
   }
 
-  static async _aplicarDiferenciaStock(idCompra, mapaViejo, mapaNuevo) {
+  static async _aplicarDiferenciaStock(idCompra, mapaViejo, mapaNuevo, opts = {}) {
+    const { estadoFinalCompraNormalizado } = opts;
     const idsInsumos = new Set([...mapaViejo.keys(), ...mapaNuevo.keys()]);
     for (const idIns of idsInsumos) {
       const viejo = mapaViejo.get(idIns) || 0;
       const nuevo = mapaNuevo.get(idIns) || 0;
       const diff = nuevo - viejo;
       if (Math.abs(diff) < 0.0001) continue;
+
+      if (diff > 0 && estadoFinalCompraNormalizado !== undefined && !esEstadoRecibida(estadoFinalCompraNormalizado)) {
+        console.warn(`[COMPRA STOCK] BLOQUEADO diff +(sumar) insumo #${idIns} compra #${idCompra}: diff=${diff} estadoFinal=${estadoFinalCompraNormalizado} necesita RECIBIDA.`);
+        continue;
+      }
+
       try {
+        const operacion = diff > 0 ? "SUMAR" : "RESTAR";
+        console.log(`[COMPRA STOCK] DIF ${operacion} insumo #${idIns} compra #${idCompra} (estadoFinal=${estadoFinalCompraNormalizado || "N/A"}): diff=${diff} (anterior=${viejo}, nuevo=${nuevo})`);
         await Insumo.update(
           { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${diff}`) },
           { where: { idInsumo: idIns } }
@@ -312,12 +340,19 @@ class CompraService {
       const anteriorRecibida = esEstadoRecibida(estadoAnterior);
       const nuevaRecibida = esEstadoRecibida(estadoNuevo);
 
+      console.log(`[COMPRA UPDATE] #${id}: ${estadoAnterior} → ${estadoNuevo} | anteriorRecibida=${anteriorRecibida} nuevaRecibida=${nuevaRecibida}`);
+
       if (anteriorRecibida && nuevaRecibida) {
-        await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo);
+        console.log(`[COMPRA UPDATE] #${id}: ajustando diferencia (sigue RECIBIDA)`);
+        await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo });
       } else if (!anteriorRecibida && nuevaRecibida) {
-        await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo);
+        console.log(`[COMPRA UPDATE] #${id}: sumando TODO nuevo (pasó a RECIBIDA)`);
+        await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo });
       } else if (anteriorRecibida && !nuevaRecibida) {
-        await this._aplicarDiferenciaStock(id, mapaViejo, new Map());
+        console.log(`[COMPRA UPDATE] #${id}: restando TODO viejo (salió de RECIBIDA)`);
+        await this._aplicarDiferenciaStock(id, mapaViejo, new Map(), { estadoFinalCompraNormalizado: estadoNuevo });
+      } else {
+        console.log(`[COMPRA UPDATE] #${id}: SIN CAMBIO DE STOCK (estado nunca fue/será RECIBIDA)`);
       }
 
       await t.commit();
