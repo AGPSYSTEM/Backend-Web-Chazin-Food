@@ -1,4 +1,5 @@
 const { Compra, DetalleCompraInsumo, Proveedor, Insumo } = require('../../persistence/models');
+const TrazabilidadService = require('./trazabilidadService');
 
 class CompraService {
   static async getAll() {
@@ -72,6 +73,7 @@ class CompraService {
   static async create(data) {
     const compra = await Compra.create({
       idProveedor: data.idProveedor,
+      fechaCompra: data.fechaCompra || new Date(),
       total: data.total,
       estado: data.estado || 'RECIBIDA'
     });
@@ -85,6 +87,35 @@ class CompraService {
         subtotal: d.subtotal || (d.cantidad * d.precioUnitario)
       }));
       await DetalleCompraInsumo.bulkCreate(detalles);
+
+      // Reabastecer stock de cada insumo y registrar trazabilidad
+      for (const d of data.detalles) {
+        try {
+          const insumo = await Insumo.findByPk(d.idInsumo);
+          if (insumo) {
+            const cantNum = parseFloat(d.cantidad);
+            insumo.stock = parseFloat(insumo.stock || 0) + cantNum;
+            await insumo.save();
+
+            // Obtener nombre del proveedor para el detalle
+            const proveedor = await Proveedor.findByPk(data.idProveedor, { attributes: ['nombre'] });
+            const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${data.idProveedor}`;
+            const numeroFactura = `COMP-${String(compra.idCompra).padStart(4, '0')}`;
+
+            await TrazabilidadService.create({
+              tipo: 'compra',
+              entidadNombre: insumo.nombre,
+              detalle: `Reabastecimiento por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(d.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(d.subtotal || d.cantidad * d.precioUnitario).toLocaleString('es-CO')}`,
+              idInsumo: d.idInsumo,
+              tipoMovimiento: 'Entrada',
+              cantidad: cantNum,
+              motivo: `Compra ${numeroFactura} registrada — Proveedor: ${proveedorNombre}`
+            });
+          }
+        } catch (err) {
+          console.warn(`Advertencia al reabastecer insumo #${d.idInsumo}:`, err.message);
+        }
+      }
     }
 
     return this.getById(compra.idCompra);
