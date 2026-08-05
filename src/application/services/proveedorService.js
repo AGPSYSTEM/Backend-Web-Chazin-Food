@@ -80,8 +80,9 @@ class ProveedorService {
 
     const finalNumeroDocumento = numeroDocumento || nit || documento || '';
     const finalCorreo = correo || email || '';
-    const finalNombreContacto = nombreContacto || contacto || '';
+    let finalNombreContacto = nombreContacto || contacto || '';
 
+    // Validaciones estructuradas
     const errores = [];
 
     if (!nombre || !String(nombre).trim())
