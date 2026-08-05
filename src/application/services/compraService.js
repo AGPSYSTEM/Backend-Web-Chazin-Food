@@ -1,4 +1,4 @@
-const { Compra, DetalleCompraInsumo, Proveedor, Insumo } = require('../../persistence/models');
+const { Compra, DetalleCompraInsumo, Proveedor, Insumo, sequelize } = require('../../persistence/models');
 const TrazabilidadService = require('./trazabilidadService');
 
 class CompraService {
@@ -88,37 +88,96 @@ class CompraService {
       }));
       await DetalleCompraInsumo.bulkCreate(detalles);
 
-      // Reabastecer stock de cada insumo y registrar trazabilidad
-      for (const d of data.detalles) {
-        try {
-          const insumo = await Insumo.findByPk(d.idInsumo);
-          if (insumo) {
-            const cantNum = parseFloat(d.cantidad);
-            insumo.stock = parseFloat(insumo.stock || 0) + cantNum;
-            await insumo.save();
+      const esRecibida = (data.estado || 'RECIBIDA') === 'RECIBIDA';
 
-            // Obtener nombre del proveedor para el detalle
-            const proveedor = await Proveedor.findByPk(data.idProveedor, { attributes: ['nombre'] });
-            const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${data.idProveedor}`;
-            const numeroFactura = `COMP-${String(compra.idCompra).padStart(4, '0')}`;
-
-            await TrazabilidadService.create({
-              tipo: 'compra',
-              entidadNombre: insumo.nombre,
-              detalle: `Reabastecimiento por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(d.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(d.subtotal || d.cantidad * d.precioUnitario).toLocaleString('es-CO')}`,
-              idInsumo: d.idInsumo,
-              tipoMovimiento: 'Entrada',
-              cantidad: cantNum,
-              motivo: `Compra ${numeroFactura} registrada — Proveedor: ${proveedorNombre}`
+      if (esRecibida) {
+        const mapaAgrupado = new Map();
+        for (const d of data.detalles) {
+          const idIns = Number(d.idInsumo);
+          if (!mapaAgrupado.has(idIns)) {
+            mapaAgrupado.set(idIns, {
+              idInsumo: idIns,
+              cantidadTotal: 0,
+              precioUnitario: d.precioUnitario,
+              subtotalTotal: 0
             });
           }
-        } catch (err) {
-          console.warn(`Advertencia al reabastecer insumo #${d.idInsumo}:`, err.message);
+          const entry = mapaAgrupado.get(idIns);
+          const cantNum = parseFloat(d.cantidad) || 0;
+          const precNum = parseFloat(d.precioUnitario) || 0;
+          entry.cantidadTotal += cantNum;
+          entry.precioUnitario = precNum;
+          entry.subtotalTotal += parseFloat(d.subtotal || (cantNum * precNum)) || 0;
+        }
+
+        const proveedor = await Proveedor.findByPk(data.idProveedor, { attributes: ['nombre'] });
+        const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${data.idProveedor}`;
+        const numeroFactura = `COMP-${String(compra.idCompra).padStart(4, '0')}`;
+
+        for (const [idIns, entry] of mapaAgrupado.entries()) {
+          try {
+            const t = await sequelize.transaction();
+            try {
+              await Insumo.update(
+                { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${entry.cantidadTotal}`) },
+                { where: { idInsumo: idIns }, transaction: t }
+              );
+              const insumo = await Insumo.findByPk(idIns, { transaction: t });
+              await t.commit();
+
+              if (insumo) {
+                await TrazabilidadService.create({
+                  tipo: 'compra',
+                  entidadNombre: insumo.nombre,
+                  detalle: `Reabastecimiento por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')}`,
+                  idInsumo: idIns,
+                  tipoMovimiento: 'Entrada',
+                  cantidad: entry.cantidadTotal,
+                  motivo: `Compra ${numeroFactura} registrada — Proveedor: ${proveedorNombre}`
+                });
+              }
+            } catch (txErr) {
+              try { await t.rollback(); } catch (_) {}
+              throw txErr;
+            }
+          } catch (err) {
+            console.warn(`Advertencia al reabastecer insumo #${idIns}:`, err.message);
+          }
         }
       }
     }
 
     return this.getById(compra.idCompra);
+  }
+
+  static async _ajustarStockPorCompra(compra, signo) {
+    if (!compra || !compra.idCompra) return;
+
+    const detalles = await DetalleCompraInsumo.findAll({
+      where: { idCompra: compra.idCompra }
+    });
+    if (!detalles || detalles.length === 0) return;
+
+    const mapaAgrupado = new Map();
+    for (const d of detalles) {
+      const idIns = Number(d.idInsumo);
+      if (!mapaAgrupado.has(idIns)) {
+        mapaAgrupado.set(idIns, { idInsumo: idIns, cantidadTotal: 0 });
+      }
+      mapaAgrupado.get(idIns).cantidadTotal += parseFloat(d.cantidad) || 0;
+    }
+
+    for (const [idIns, entry] of mapaAgrupado.entries()) {
+      try {
+        const cantidadAjuste = signo * entry.cantidadTotal;
+        await Insumo.update(
+          { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${cantidadAjuste}`) },
+          { where: { idInsumo: idIns } }
+        );
+      } catch (err) {
+        console.warn(`Advertencia al ajustar stock insumo #${idIns}:`, err.message);
+      }
+    }
   }
 
   static async updateEstado(id, estado) {
@@ -128,7 +187,20 @@ class CompraService {
       error.statusCode = 404;
       throw error;
     }
-    c.estado = estado;
+    const estadoAnterior = c.estado;
+    const estadoNuevo = estado;
+
+    if (estadoAnterior !== estadoNuevo) {
+      if (estadoAnterior === 'RECIBIDA' && estadoNuevo === 'CANCELADA') {
+        await this._ajustarStockPorCompra(c, -1);
+      } else if (estadoAnterior === 'PENDIENTE' && estadoNuevo === 'RECIBIDA') {
+        await this._ajustarStockPorCompra(c, +1);
+      } else if (estadoAnterior === 'CANCELADA' && estadoNuevo === 'RECIBIDA') {
+        await this._ajustarStockPorCompra(c, +1);
+      }
+    }
+
+    c.estado = estadoNuevo;
     await c.save();
     return this.getById(id);
   }
