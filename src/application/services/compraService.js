@@ -12,7 +12,10 @@ function normalizarEstado(estado) {
   if (e === ESTADO_CANCELADA) return ESTADO_CANCELADA;
   if (e === 'COMPLETADA') return ESTADO_RECIBIDA;
   if (e === 'ANULADA') return ESTADO_CANCELADA;
-  return estado;
+  if (e === 'PENDIENTE' || e === 'PENDIENTES' || e === 'PEND') return ESTADO_PENDIENTE;
+  if (e === 'RECIBIDA' || e === 'RECIBIDO' || e === 'REC') return ESTADO_RECIBIDA;
+  if (e === 'CANCELADA' || e === 'CANCELADO' || e === 'ANULADA' || e === 'ANULADO') return ESTADO_CANCELADA;
+  return ESTADO_PENDIENTE;
 }
 
 function esEstadoRecibida(estado) {
@@ -97,8 +100,8 @@ class CompraService {
   }
 
   static async create(data) {
-    const estadoEntrada = data.estado !== undefined && data.estado !== null ? data.estado : "(NO ENVIADO, default RECIBIDA)";
-    const estadoNormalizado = normalizarEstado(data.estado || ESTADO_RECIBIDA);
+    const estadoEntrada = data.estado !== undefined && data.estado !== null ? data.estado : "(NO ENVIADO, default PENDIENTE)";
+    const estadoNormalizado = normalizarEstado(data.estado !== undefined && data.estado !== null ? data.estado : ESTADO_PENDIENTE);
     console.log(`==========================================================================`);
     console.log(`[COMPRA CREATE] NUEVA COMPRA solicitada`);
     console.log(`[COMPRA CREATE]   - estadoEntrada (lo que llegó del frontend): ${estadoEntrada}`);
@@ -284,7 +287,7 @@ class CompraService {
   }
 
   static async _aplicarDiferenciaStock(idCompra, mapaViejo, mapaNuevo, opts = {}) {
-    const { estadoFinalCompraNormalizado } = opts;
+    const { estadoFinalCompraNormalizado, estadoInicialCompraNormalizado } = opts;
     const idsInsumos = new Set([...mapaViejo.keys(), ...mapaNuevo.keys()]);
     for (const idIns of idsInsumos) {
       const viejo = mapaViejo.get(idIns) || 0;
@@ -292,8 +295,15 @@ class CompraService {
       const diff = nuevo - viejo;
       if (Math.abs(diff) < 0.0001) continue;
 
-      if (diff > 0 && estadoFinalCompraNormalizado !== undefined && !esEstadoRecibida(estadoFinalCompraNormalizado)) {
+      const finalEsRecibida = estadoFinalCompraNormalizado !== undefined ? esEstadoRecibida(estadoFinalCompraNormalizado) : undefined;
+      const inicialEsRecibida = estadoInicialCompraNormalizado !== undefined ? esEstadoRecibida(estadoInicialCompraNormalizado) : undefined;
+
+      if (diff > 0 && finalEsRecibida === false) {
         console.warn(`[COMPRA STOCK] BLOQUEADO diff +(sumar) insumo #${idIns} compra #${idCompra}: diff=${diff} estadoFinal=${estadoFinalCompraNormalizado} necesita RECIBIDA.`);
+        continue;
+      }
+      if (diff < 0 && inicialEsRecibida === false) {
+        console.warn(`[COMPRA STOCK] BLOQUEADO diff -(restar) insumo #${idIns} compra #${idCompra}: diff=${diff} estadoInicial=${estadoInicialCompraNormalizado} debe haber sido RECIBIDA para permitir reversa.`);
         continue;
       }
 
@@ -372,13 +382,13 @@ class CompraService {
 
       if (anteriorRecibida && nuevaRecibida) {
         console.log(`[COMPRA UPDATE] #${id}: ✅ ajustando diferencia (sigue RECIBIDA)`);
-        await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo });
+        await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
       } else if (!anteriorRecibida && nuevaRecibida) {
         console.log(`[COMPRA UPDATE] #${id}: ✅ sumando TODO nuevo (pasó a RECIBIDA)`);
-        await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo });
+        await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
       } else if (anteriorRecibida && !nuevaRecibida) {
         console.log(`[COMPRA UPDATE] #${id}: ✅ restando TODO viejo (salió de RECIBIDA)`);
-        await this._aplicarDiferenciaStock(id, mapaViejo, new Map(), { estadoFinalCompraNormalizado: estadoNuevo });
+        await this._aplicarDiferenciaStock(id, mapaViejo, new Map(), { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
       } else {
         console.log(`[COMPRA UPDATE] #${id}: ⛔ GUARDIA TOTAL ACTIVADA - SIN CAMBIO DE STOCK (estado anterior y nuevo NO SON RECIBIDA). Se omiten cálculos.`);
       }
