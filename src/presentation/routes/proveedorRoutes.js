@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getProveedores,
   getProveedorById,
+  getTiposProveedor,
   createProveedor,
   updateProveedor,
   toggleProveedorEstado,
@@ -14,6 +15,8 @@ const {
   validateCreateProveedor,
   validateUpdateProveedor,
 } = require('../../infrastructure/middlewares/proveedorValidation');
+
+router.get('/tipos', getTiposProveedor);
 
 router.route('/')
   .get(getProveedores)

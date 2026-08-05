@@ -73,6 +73,15 @@ class ProveedorService {
     const finalCorreo = correo || email || '';
     let finalNombreContacto = nombreContacto || contacto || '';
 
+    // Validar nombre requerido
+    if (!nombre || !String(nombre).trim()) {
+      const error = new Error('El nombre del proveedor es requerido.');
+    const { nombre, numeroDocumento, nit, documento, telefono, correo, email, direccion, tipoPersona, estado, nombreContacto, contacto } = data;
+
+    const finalNumeroDocumento = numeroDocumento || nit || documento || '';
+    const finalCorreo = correo || email || '';
+    let finalNombreContacto = nombreContacto || contacto || '';
+
     // Validaciones estructuradas
     const errores = [];
 
@@ -131,6 +140,8 @@ class ProveedorService {
     }
 
     const estadoInt = (estado === undefined || estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+    const idTipoProveedor = tipoPersona === 'Natural' ? 2 : 1;
+    const estadoInt = estado === 'Activo' || estado === 1 ? 1 : 0;
 
     const proveedor = await Proveedor.create({
       nombre: nombre.trim(),

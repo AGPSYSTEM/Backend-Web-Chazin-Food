@@ -520,11 +520,51 @@ const FichaTecnica = sequelize.define('fichatecnica', {
       return this.idFichaTecnica;
     }
   },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   idVariante: {
     type: DataTypes.INTEGER,
-    allowNull: false
+    allowNull: true
+  },
+  tipo: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'PRODUCTO'
   },
   descripcion: {
+    type: DataTypes.TEXT
+  },
+  procedimiento: {
+    type: DataTypes.TEXT
+  },
+  tiempoPreparacion: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  rendimiento: {
+    type: DataTypes.STRING(100)
+  },
+  especificaciones: {
+    type: DataTypes.TEXT
+  },
+  caracteristicas: {
+    type: DataTypes.TEXT
+  },
+  informacionNutricional: {
+    type: DataTypes.TEXT
+  },
+  condicionesAlmacenamiento: {
+    type: DataTypes.TEXT
+  },
+  vidaUtil: {
+    type: DataTypes.STRING(100)
+  },
+  observaciones: {
     type: DataTypes.TEXT
   },
   fechaCreacion: {
@@ -550,6 +590,10 @@ const DetalleFichaInsumo = sequelize.define('detallefichainsumo', {
   cantidad: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
+  },
+  unidadMedida: {
+    type: DataTypes.STRING(30),
+    allowNull: true
   }
 }, { tableName: 'detallefichainsumo', timestamps: false });
 
@@ -650,6 +694,8 @@ DetalleVentaProducto.belongsTo(Venta, { foreignKey: 'idVenta' });
 FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles' });
 DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica' });
 DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+FichaTecnica.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo' });
 
 Compra.belongsTo(Proveedor, { foreignKey: 'idProveedor', as: 'proveedor' });
 Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
