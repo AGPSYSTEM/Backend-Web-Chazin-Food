@@ -207,7 +207,8 @@ class CompraService {
               idInsumo: idIns,
               tipoMovimiento: tipoMovimiento,
               cantidad: Math.abs(cantidadAjuste),
-              motivo: motivoAjuste
+              motivo: motivoAjuste,
+              skipStockUpdate: true
             });
           }
         } catch (tzErr) {
