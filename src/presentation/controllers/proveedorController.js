@@ -95,9 +95,20 @@ const deletePermanenteProveedor = async (req, res, next) => {
   }
 };
 
+const getTiposProveedor = async (req, res, next) => {
+  try {
+    const tipos = await ProveedorService.getTipos();
+    res.json(tipos);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   getProveedores,
   getProveedorById,
+  getTiposProveedor,
   createProveedor,
   updateProveedor,
   toggleProveedorEstado,
