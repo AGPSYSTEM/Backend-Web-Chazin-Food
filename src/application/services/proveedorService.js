@@ -227,6 +227,7 @@ class ProveedorService {
       error.statusCode = 404;
       throw error;
     }
+
     const insumosAsociados = await Insumo.count({ where: { idProveedor } });
     const comprasAsociadas = await Compra.count({ where: { idProveedor } });
 
@@ -237,6 +238,10 @@ class ProveedorService {
     }
 
     await p.destroy();
+
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+    await resequenceTableIds('proveedor', 'idProveedor', ['insumo', 'compra']);
+
     return { message: 'Proveedor eliminado permanentemente' };
   }
 }

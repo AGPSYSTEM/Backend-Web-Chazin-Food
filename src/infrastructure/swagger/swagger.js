@@ -454,7 +454,9 @@ module.exports = {
  *           type: integer
  *     responses:
  *       200:
- *         description: Categoría eliminada.
+ *         description: Categoría eliminada exitosamente.
+ *       400:
+ *         description: No se puede eliminar la categoría porque tiene productos asociados.
  * 
  * /api/roles:
  *   get:
@@ -571,12 +573,29 @@ module.exports = {
  *               stock:
  *                 type: number
  *                 example: 50
+ *               stockMinimo:
+ *                 type: number
+ *                 example: 5
  *               unidadMedida:
  *                 type: string
  *                 example: kg
  *               precioUnitario:
  *                 type: number
  *                 example: 1200.00
+ *               idProveedor:
+ *                 type: integer
+ *                 example: 1
+ *               fechaExpedicion:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-01"
+ *               fechaVencimiento:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-12-31"
+ *               descripcion:
+ *                 type: string
+ *                 example: Harina refinada de trigo multipropósito
  *     responses:
  *       201:
  *         description: Insumo creado correctamente.
@@ -856,7 +875,33 @@ module.exports = {
  *           type: integer
  *     responses:
  *       200:
- *         description: Proveedor eliminado.
+ *         description: Proveedor eliminado exitosamente.
+ *       400:
+ *         description: No se puede eliminar porque tiene insumos o compras asociadas.
+ * 
+ * /api/proveedores/{id}/estado:
+ *   put:
+ *     summary: Cambiar estado del proveedor (Activar/Inactivar)
+ *     tags: [Proveedores]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 example: "Activo"
+ *     responses:
+ *       200:
+ *         description: Estado del proveedor actualizado exitosamente.
  * 
  * /api/trazabilidad:
  *   get:
@@ -889,4 +934,439 @@ module.exports = {
  *     responses:
  *       201:
  *         description: Movimiento de trazabilidad registrado.
+ *
+ * /api/clientes:
+ *   get:
+ *     summary: Obtener todos los clientes
+ *     tags: [Clientes]
+ *     responses:
+ *       200:
+ *         description: Lista de clientes con datos de usuario asociado.
+ *   post:
+ *     summary: Crear un nuevo cliente
+ *     tags: [Clientes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idUsuario
+ *             properties:
+ *               idUsuario:
+ *                 type: integer
+ *                 description: ID del usuario existente que será registrado como cliente
+ *                 example: 5
+ *               direccion:
+ *                 type: string
+ *                 description: Dirección de entrega del cliente
+ *                 example: "Calle 45 # 12-30, Bogotá"
+ *     responses:
+ *       201:
+ *         description: Cliente creado exitosamente.
+ *       400:
+ *         description: Datos inválidos o usuario no encontrado.
+ *
+ * /api/clientes/{id}:
+ *   get:
+ *     summary: Obtener cliente por ID
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del cliente
+ *     responses:
+ *       200:
+ *         description: Cliente encontrado con datos de usuario.
+ *       404:
+ *         description: Cliente no encontrado.
+ *   put:
+ *     summary: Actualizar datos de un cliente
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del cliente a actualizar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idUsuario:
+ *                 type: integer
+ *                 example: 5
+ *               direccion:
+ *                 type: string
+ *                 example: "Carrera 7 # 22-15, Medellín"
+ *     responses:
+ *       200:
+ *         description: Cliente actualizado exitosamente.
+ *       404:
+ *         description: Cliente no encontrado.
+ *   delete:
+ *     summary: Eliminar un cliente
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del cliente a eliminar
+ *     responses:
+ *       200:
+ *         description: Cliente eliminado exitosamente.
+ *       404:
+ *         description: Cliente no encontrado.
+ *
+ * /api/ventas:
+ *   get:
+ *     summary: Obtener todas las ventas
+ *     tags: [Gestión de Ventas]
+ *     responses:
+ *       200:
+ *         description: Lista de ventas con cliente, usuario y detalles de productos.
+ *   post:
+ *     summary: Registrar una nueva venta
+ *     tags: [Gestión de Ventas]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idCliente
+ *               - idUsuario
+ *               - subtotal
+ *               - total
+ *             properties:
+ *               idCliente:
+ *                 type: integer
+ *                 description: ID del cliente que realiza la compra
+ *                 example: 1
+ *               idUsuario:
+ *                 type: integer
+ *                 description: ID del usuario (empleado) que registra la venta
+ *                 example: 2
+ *               idDescuento:
+ *                 type: integer
+ *                 description: ID del descuento aplicado (opcional)
+ *                 example: null
+ *               subtotal:
+ *                 type: number
+ *                 description: Subtotal antes de descuento
+ *                 example: 45000.00
+ *               descuentoAplicado:
+ *                 type: number
+ *                 description: Monto del descuento aplicado
+ *                 example: 5000.00
+ *               total:
+ *                 type: number
+ *                 description: Total de la venta después de descuento
+ *                 example: 40000.00
+ *               estadoEntrega:
+ *                 type: string
+ *                 enum: [PENDIENTE, PREPARANDO, LISTO, EN_CAMINO, ENTREGADO, CANCELADO]
+ *                 description: Estado de entrega inicial
+ *                 example: "PENDIENTE"
+ *               observaciones:
+ *                 type: string
+ *                 description: Notas adicionales sobre la venta
+ *                 example: "Cliente solicita entrega después de las 3pm"
+ *               detalles:
+ *                 type: array
+ *                 description: Lista de productos vendidos
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - idVariante
+ *                     - cantidad
+ *                     - precioUnitario
+ *                     - subtotal
+ *                   properties:
+ *                     idVariante:
+ *                       type: integer
+ *                       description: ID de la variante del producto
+ *                       example: 3
+ *                     cantidad:
+ *                       type: integer
+ *                       description: Cantidad de unidades
+ *                       example: 2
+ *                     precioUnitario:
+ *                       type: number
+ *                       description: Precio por unidad
+ *                       example: 22500.00
+ *                     subtotal:
+ *                       type: number
+ *                       description: Subtotal de la línea (cantidad × precioUnitario)
+ *                       example: 45000.00
+ *                     observaciones:
+ *                       type: string
+ *                       example: "Sin cebolla"
+ *     responses:
+ *       201:
+ *         description: Venta registrada exitosamente con detalles.
+ *       400:
+ *         description: Datos de venta inválidos.
+ *
+ * /api/ventas/{id}:
+ *   get:
+ *     summary: Obtener detalle de una venta por ID
+ *     tags: [Gestión de Ventas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la venta
+ *     responses:
+ *       200:
+ *         description: Detalle completo de la venta con cliente, usuario y productos.
+ *       404:
+ *         description: Venta no encontrada.
+ *
+ * /api/ventas/{id}/estado:
+ *   put:
+ *     summary: Actualizar el estado de entrega de una venta
+ *     tags: [Gestión de Ventas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la venta
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - estado
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [PENDIENTE, PREPARANDO, LISTO, EN_CAMINO, ENTREGADO, CANCELADO]
+ *                 description: Nuevo estado de entrega
+ *                 example: "PREPARANDO"
+ *     responses:
+ *       200:
+ *         description: Estado de la venta actualizado exitosamente.
+ *       404:
+ *         description: Venta no encontrada.
+ *
+ * /api/ventas/{id}/cancelar:
+ *   put:
+ *     summary: Cancelar una venta
+ *     tags: [Gestión de Ventas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la venta a cancelar
+ *     responses:
+ *       200:
+ *         description: Venta cancelada exitosamente (estado cambia a CANCELADO).
+ *       404:
+ *         description: Venta no encontrada.
+ *
+ * /api/produccion:
+ *   get:
+ *     summary: Obtener todas las órdenes de producción
+ *     tags: [Gestión de Producción]
+ *     responses:
+ *       200:
+ *         description: Lista de órdenes de producción registradas.
+ *   post:
+ *     summary: Crear una nueva orden de producción
+ *     tags: [Gestión de Producción]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - platilloNombre
+ *               - cantidad
+ *             properties:
+ *               platilloNombre:
+ *                 type: string
+ *                 description: Nombre del platillo o receta a producir
+ *                 example: "Hamburguesa Especial"
+ *               cantidad:
+ *                 type: integer
+ *                 description: Cantidad de porciones a producir
+ *                 example: 20
+ *               fecha:
+ *                 type: string
+ *                 format: date
+ *                 description: Fecha planificada de producción
+ *                 example: "2026-07-31"
+ *     responses:
+ *       201:
+ *         description: Orden de producción creada exitosamente.
+ *       400:
+ *         description: Datos de la orden inválidos.
+ *
+ * /api/produccion/{id}:
+ *   delete:
+ *     summary: Eliminar una orden de producción
+ *     tags: [Gestión de Producción]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la orden de producción a eliminar
+ *     responses:
+ *       200:
+ *         description: Orden de producción eliminada exitosamente.
+ *       404:
+ *         description: Orden de producción no encontrada.
+ *
+ * /api/produccion/{id}/estado:
+ *   put:
+ *     summary: Actualizar el estado de una orden de producción
+ *     tags: [Gestión de Producción]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la orden de producción
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - estado
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [Planeada, En Proceso, Finalizada, Cancelada]
+ *                 description: Nuevo estado de la orden de producción
+ *                 example: "En Proceso"
+ *     responses:
+ *       200:
+ *         description: Estado de la orden actualizado exitosamente.
+ *       404:
+ *         description: Orden de producción no encontrada.
+ *
+ * /api/eventos:
+ *   get:
+ *     summary: Obtener la lista de todos los eventos de fichas técnicas
+ *     tags: [Gestión de Eventos]
+ *     responses:
+ *       200:
+ *         description: Lista de eventos obtenida exitosamente.
+ *   post:
+ *     summary: Crear un nuevo evento
+ *     tags: [Gestión de Eventos]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nombreEvento
+ *             properties:
+ *               nombreEvento:
+ *                 type: string
+ *                 example: "Temporada de Verano — Carne extra incluida"
+ *               descripcion:
+ *                 type: string
+ *                 example: "Evento especial de verano con ingredientes adicionales"
+ *               fechaInicio:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-01"
+ *               fechaFin:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-31"
+ *               estado:
+ *                 type: string
+ *                 example: "Activo"
+ *     responses:
+ *       201:
+ *         description: Evento creado exitosamente.
+ *
+ * /api/eventos/{id}:
+ *   get:
+ *     summary: Obtener un evento por ID
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalles del evento devueltos correctamente.
+ *       404:
+ *         description: Evento no encontrado.
+ *   put:
+ *     summary: Actualizar un evento
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombreEvento:
+ *                 type: string
+ *               descripcion:
+ *                 type: string
+ *               fechaInicio:
+ *                 type: string
+ *               fechaFin:
+ *                 type: string
+ *               estado:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Evento actualizado exitosamente.
+ *   delete:
+ *     summary: Eliminar un evento
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Evento eliminado exitosamente.
  */
+
+

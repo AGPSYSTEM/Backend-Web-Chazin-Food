@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getUsers, getUserById, createUser, updateUser, toggleUserStatus, deleteUser } = require('../controllers/userController');
+const { getUsers, getUserById, createUser, updateUser, changeUserPassword, toggleUserStatus, deleteUser } = require('../controllers/userController');
 const { registerUser, loginUser, forgotPassword, resetPassword } = require('../controllers/authController');
 
 router.post('/login', loginUser);
@@ -20,6 +20,12 @@ router.route('/:id')
   .put(updateUser)
   .delete(deleteUser);
 
+router.put('/:id/password', changeUserPassword);
+router.put('/:id/contrasena', changeUserPassword);
+router.patch('/:id/password', changeUserPassword);
+router.patch('/:id/contrasena', changeUserPassword);
+
 router.patch('/:id/estado', toggleUserStatus);
+router.put('/:id/estado', toggleUserStatus);
 
 module.exports = router;
