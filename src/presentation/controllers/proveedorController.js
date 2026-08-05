@@ -65,17 +65,6 @@ const toggleProveedorEstado = async (req, res, next) => {
   }
 };
 
-const toggleProveedorEstado = async (req, res, next) => {
-  try {
-    const { estado } = req.body;
-    const result = await ProveedorService.toggleEstado(req.params.id, estado);
-    res.json(result);
-  } catch (error) {
-    if (error.statusCode) res.status(error.statusCode);
-    next(error);
-  }
-};
-
 const deleteProveedor = async (req, res, next) => {
   try {
     const result = await ProveedorService.delete(req.params.id);
