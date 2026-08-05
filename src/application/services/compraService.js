@@ -323,9 +323,23 @@ class CompraService {
         throw error;
       }
 
-      const estadoAnterior = normalizarEstado(compra.estado);
-      const estadoSinNormalizar = (data.estado !== undefined && data.estado !== null) ? data.estado : estadoAnterior;
-      const estadoNuevo = normalizarEstado(estadoSinNormalizar);
+      const estadoAnteriorSinNormalizar = compra.estado;
+      const estadoAnterior = normalizarEstado(estadoAnteriorSinNormalizar);
+      const estadoSinNormalizarEntrada = (data.estado !== undefined && data.estado !== null)
+        ? `[recibido del frontend: ${data.estado}]`
+        : `[omitido, default=anterior]`;
+      const estadoNuevoSinNormalizar = (data.estado !== undefined && data.estado !== null) ? data.estado : estadoAnterior;
+      const estadoNuevo = normalizarEstado(estadoNuevoSinNormalizar);
+      const anteriorRecibida = esEstadoRecibida(estadoAnterior);
+      const nuevaRecibida = esEstadoRecibida(estadoNuevo);
+      const TOCARA_STOCK = anteriorRecibida || nuevaRecibida;
+
+      console.log(`==========================================================================`);
+      console.log(`[COMPRA UPDATE] #${id} - INICIO`);
+      console.log(`[COMPRA UPDATE]   - estadoAnterior (BD sin normalizar): "${estadoAnteriorSinNormalizar}" → normalizado: ${estadoAnterior}`);
+      console.log(`[COMPRA UPDATE]   - estadoNuevo  ${estadoSinNormalizarEntrada} → normalizado: ${estadoNuevo}`);
+      console.log(`[COMPRA UPDATE]   - anteriorRecibida=${anteriorRecibida} | nuevaRecibida=${nuevaRecibida} | TOCARA_STOCK=${TOCARA_STOCK}`);
+      console.log(`==========================================================================`);
 
       const detallesViejos = (compra.detalles || []).map(d => d.toJSON());
       const mapaViejo = await this._agruparCantidadesPorInsumo(detallesViejos);
@@ -350,31 +364,31 @@ class CompraService {
         }
       }
 
-      const detallesFinales = await DetalleCompraInsumo.findAll({ where: { idCompra: id }, transaction: t });
-      const mapaNuevo = await this._agruparCantidadesPorInsumo(detallesFinales);
-
-      const anteriorRecibida = esEstadoRecibida(estadoAnterior);
-      const nuevaRecibida = esEstadoRecibida(estadoNuevo);
-
-      console.log(`[COMPRA UPDATE] #${id}: ${estadoAnterior} → ${estadoNuevo} | anteriorRecibida=${anteriorRecibida} nuevaRecibida=${nuevaRecibida}`);
+      let mapaNuevo = new Map();
+      if (TOCARA_STOCK) {
+        const detallesFinales = await DetalleCompraInsumo.findAll({ where: { idCompra: id }, transaction: t });
+        mapaNuevo = await this._agruparCantidadesPorInsumo(detallesFinales);
+      }
 
       if (anteriorRecibida && nuevaRecibida) {
-        console.log(`[COMPRA UPDATE] #${id}: ajustando diferencia (sigue RECIBIDA)`);
+        console.log(`[COMPRA UPDATE] #${id}: ✅ ajustando diferencia (sigue RECIBIDA)`);
         await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo });
       } else if (!anteriorRecibida && nuevaRecibida) {
-        console.log(`[COMPRA UPDATE] #${id}: sumando TODO nuevo (pasó a RECIBIDA)`);
+        console.log(`[COMPRA UPDATE] #${id}: ✅ sumando TODO nuevo (pasó a RECIBIDA)`);
         await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo });
       } else if (anteriorRecibida && !nuevaRecibida) {
-        console.log(`[COMPRA UPDATE] #${id}: restando TODO viejo (salió de RECIBIDA)`);
+        console.log(`[COMPRA UPDATE] #${id}: ✅ restando TODO viejo (salió de RECIBIDA)`);
         await this._aplicarDiferenciaStock(id, mapaViejo, new Map(), { estadoFinalCompraNormalizado: estadoNuevo });
       } else {
-        console.log(`[COMPRA UPDATE] #${id}: SIN CAMBIO DE STOCK (estado nunca fue/será RECIBIDA)`);
+        console.log(`[COMPRA UPDATE] #${id}: ⛔ GUARDIA TOTAL ACTIVADA - SIN CAMBIO DE STOCK (estado anterior y nuevo NO SON RECIBIDA). Se omiten cálculos.`);
       }
 
       await t.commit();
+      console.log(`[COMPRA UPDATE] #${id}: commit OK (FIN)`);
       return this.getById(id);
     } catch (err) {
       try { await t.rollback(); } catch (_) {}
+      console.error(`[COMPRA UPDATE] #${id}: ERROR - rollback:`, err.message);
       throw err;
     }
   }
