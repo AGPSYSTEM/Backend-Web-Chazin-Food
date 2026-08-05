@@ -1,6 +1,32 @@
 const { Compra, DetalleCompraInsumo, Proveedor, Insumo, sequelize } = require('../../persistence/models');
 const TrazabilidadService = require('./trazabilidadService');
 
+const ESTADO_RECIBIDA = 'RECIBIDA';
+const ESTADO_PENDIENTE = 'PENDIENTE';
+const ESTADO_CANCELADA = 'CANCELADA';
+
+function normalizarEstado(estado) {
+  const e = String(estado || '').trim().toUpperCase();
+  if (e === ESTADO_RECIBIDA) return ESTADO_RECIBIDA;
+  if (e === ESTADO_PENDIENTE) return ESTADO_PENDIENTE;
+  if (e === ESTADO_CANCELADA) return ESTADO_CANCELADA;
+  if (e === 'COMPLETADA') return ESTADO_RECIBIDA;
+  if (e === 'ANULADA') return ESTADO_CANCELADA;
+  return estado;
+}
+
+function esEstadoRecibida(estado) {
+  return normalizarEstado(estado) === ESTADO_RECIBIDA;
+}
+
+function esEstadoPendiente(estado) {
+  return normalizarEstado(estado) === ESTADO_PENDIENTE;
+}
+
+function esEstadoCancelada(estado) {
+  return normalizarEstado(estado) === ESTADO_CANCELADA;
+}
+
 class CompraService {
   static async getAll() {
     const compras = await Compra.findAll({
@@ -71,11 +97,12 @@ class CompraService {
   }
 
   static async create(data) {
+    const estadoNormalizado = normalizarEstado(data.estado || ESTADO_RECIBIDA);
     const compra = await Compra.create({
       idProveedor: data.idProveedor,
       fechaCompra: data.fechaCompra || new Date(),
       total: data.total,
-      estado: data.estado || 'RECIBIDA'
+      estado: estadoNormalizado
     });
 
     if (data.detalles && data.detalles.length > 0) {
@@ -88,9 +115,7 @@ class CompraService {
       }));
       await DetalleCompraInsumo.bulkCreate(detalles);
 
-      const esRecibida = (data.estado || 'RECIBIDA') === 'RECIBIDA';
-
-      if (esRecibida) {
+      if (esEstadoRecibida(estadoNormalizado)) {
         const mapaAgrupado = new Map();
         for (const d of data.detalles) {
           const idIns = Number(d.idInsumo);
@@ -187,16 +212,18 @@ class CompraService {
       error.statusCode = 404;
       throw error;
     }
-    const estadoAnterior = c.estado;
-    const estadoNuevo = estado;
+    const estadoAnterior = normalizarEstado(c.estado);
+    const estadoNuevo = normalizarEstado(estado);
 
     if (estadoAnterior !== estadoNuevo) {
-      if (estadoAnterior === 'RECIBIDA' && estadoNuevo === 'CANCELADA') {
+      if (esEstadoRecibida(estadoAnterior) && esEstadoCancelada(estadoNuevo)) {
         await this._ajustarStockPorCompra(c, -1);
-      } else if (estadoAnterior === 'PENDIENTE' && estadoNuevo === 'RECIBIDA') {
+      } else if (esEstadoPendiente(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
         await this._ajustarStockPorCompra(c, +1);
-      } else if (estadoAnterior === 'CANCELADA' && estadoNuevo === 'RECIBIDA') {
+      } else if (esEstadoCancelada(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
         await this._ajustarStockPorCompra(c, +1);
+      } else if (esEstadoRecibida(estadoAnterior) && esEstadoPendiente(estadoNuevo)) {
+        await this._ajustarStockPorCompra(c, -1);
       }
     }
 
@@ -252,8 +279,9 @@ class CompraService {
         throw error;
       }
 
-      const estadoAnterior = compra.estado;
-      const estadoNuevo = (data.estado !== undefined && data.estado !== null) ? data.estado : estadoAnterior;
+      const estadoAnterior = normalizarEstado(compra.estado);
+      const estadoSinNormalizar = (data.estado !== undefined && data.estado !== null) ? data.estado : estadoAnterior;
+      const estadoNuevo = normalizarEstado(estadoSinNormalizar);
 
       const detallesViejos = (compra.detalles || []).map(d => d.toJSON());
       const mapaViejo = await this._agruparCantidadesPorInsumo(detallesViejos);
@@ -281,8 +309,8 @@ class CompraService {
       const detallesFinales = await DetalleCompraInsumo.findAll({ where: { idCompra: id }, transaction: t });
       const mapaNuevo = await this._agruparCantidadesPorInsumo(detallesFinales);
 
-      const anteriorRecibida = estadoAnterior === 'RECIBIDA';
-      const nuevaRecibida = estadoNuevo === 'RECIBIDA';
+      const anteriorRecibida = esEstadoRecibida(estadoAnterior);
+      const nuevaRecibida = esEstadoRecibida(estadoNuevo);
 
       if (anteriorRecibida && nuevaRecibida) {
         await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo);
