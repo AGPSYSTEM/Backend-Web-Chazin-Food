@@ -15,6 +15,7 @@ class VentaService {
 
     const clienteObj = v.cliente || {};
     const usuarioObj = v.usuario || {};
+    const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `PED-${String(v.idVenta).padStart(3, '0')}`;
     const clienteNombre = 
       (numeroVenta === "PED-001" ? "Juan García" :
        numeroVenta === "PED-002" ? "María López" :
@@ -22,8 +23,6 @@ class VentaService {
        numeroVenta === "PED-004" ? "Ana Martínez" :
        obsData.clienteNombre) ||
       (usuarioObj.nombre ? `${usuarioObj.nombre} ${usuarioObj.apellidos || ''}`.trim() : "Cliente General");
-
-    const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `PED-${String(v.idVenta).padStart(3, '0')}`;
     const horario = obsData.horario || "12:30 – 12:48";
     const tipoEntrega = obsData.tipoEntrega || "Domicilio";
     const metodoPago = obsData.metodoPago || "Efectivo";
@@ -188,7 +187,7 @@ class VentaService {
     const venta = await Venta.create({
       idCliente: data.idCliente || 1,
       idUsuario: data.idUsuario || 1,
-      idDescuento: data.idDescuento || null,
+      idDescuento: data.idDescuento || 1,
       subtotal: data.subtotal || 28000,
       descuentoAplicado: data.descuentoAplicado || 0,
       total: data.total || 33320,
