@@ -618,7 +618,7 @@ User.belongsTo(Role, { foreignKey: 'idRol', as: 'rolInfo' });
 Role.hasMany(User, { foreignKey: 'idRol' });
 
 User.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'clienteInfo' });
-Cliente.belongsTo(User, { foreignKey: 'idUsuario' });
+Cliente.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
 
 Role.belongsToMany(Permiso, { through: RolPermiso, foreignKey: 'idRol', otherKey: 'idPermiso', as: 'permisos' });
 Permiso.belongsToMany(Role, { through: RolPermiso, foreignKey: 'idPermiso', otherKey: 'idRol' });

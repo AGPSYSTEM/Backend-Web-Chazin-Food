@@ -14,115 +14,78 @@ class VentaService {
     }
 
     const clienteObj = v.cliente || {};
-    const usuarioObj = v.usuario || {};
+    const clienteUser = clienteObj.usuario || clienteObj.clienteInfo || v.usuario || {};
+    
+    // Dynamically derive client name from DB relationships without hardcoded strings
+    const clienteNombre = obsData.clienteNombre || 
+      (clienteUser.nombre ? `${clienteUser.nombre} ${clienteUser.apellidos || ''}`.trim() : null) ||
+      (v.idCliente ? `Cliente #${v.idCliente}` : "Cliente General");
+
     const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `PED-${String(v.idVenta).padStart(3, '0')}`;
-    const clienteNombre = 
-      (numeroVenta === "PED-001" ? "Juan García" :
-       numeroVenta === "PED-002" ? "María López" :
-       numeroVenta === "PED-003" ? "Carlos Pérez" :
-       numeroVenta === "PED-004" ? "Ana Martínez" :
-       obsData.clienteNombre) ||
-      (usuarioObj.nombre ? `${usuarioObj.nombre} ${usuarioObj.apellidos || ''}`.trim() : "Cliente General");
-    const horario = obsData.horario || "12:30 – 12:48";
+    
+    // Dynamic format of date/time
+    let horario = obsData.horario;
+    if (!horario && v.fechaVenta) {
+      const d = new Date(v.fechaVenta);
+      const hStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      horario = `${hStr} – ${hStr}`;
+    }
+    horario = horario || "12:30 – 12:48";
+
     const tipoEntrega = obsData.tipoEntrega || "Domicilio";
     const metodoPago = obsData.metodoPago || "Efectivo";
     const estadoPago = obsData.estadoPago || "Pagado";
 
-    // Sample product details mapping per order code
+    // Dynamic products from db details or order metadata
     let productos = [];
-    if (numeroVenta === "PED-001") {
+    if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
+      productos = obsData.productos;
+    } else if (v.detalles && v.detalles.length > 0) {
+      productos = v.detalles.map(d => {
+        let pName = `Producto #${d.idVariante}`;
+        let pAdiciones = [];
+        if (d.observaciones) {
+          try {
+            const parsedObs = typeof d.observaciones === 'string' && d.observaciones.startsWith('{')
+              ? JSON.parse(d.observaciones)
+              : { nombre: d.observaciones };
+            pName = parsedObs.nombre || parsedObs.nombreProducto || pName;
+            pAdiciones = parsedObs.adiciones || [];
+          } catch (e) {
+            pName = d.observaciones;
+          }
+        }
+        return {
+          id: d.idDetalleVenta || d.idVariante,
+          nombre: pName,
+          cantidad: d.cantidad,
+          precioUnitario: parseFloat(d.precioUnitario || 0),
+          total: parseFloat(d.subtotal || 0),
+          adiciones: pAdiciones
+        };
+      });
+    } else {
+      // Basic fallback structure if details table has no items
       productos = [
         {
           id: 1,
-          nombre: "Hamburguesa Especial",
+          nombre: "Pedido de Venta",
           cantidad: 1,
-          precioUnitario: 15000,
-          total: 15000,
-          adiciones: ["+ Queso Extra", "+ Salsa BBQ"]
-        },
-        {
-          id: 2,
-          nombre: "Coca Cola",
-          cantidad: 1,
-          precioUnitario: 3000,
-          total: 3000,
-          adiciones: []
-        },
-        {
-          id: 3,
-          nombre: "Papas Fritas",
-          cantidad: 2,
-          precioUnitario: 5000,
-          total: 10000,
-          adiciones: []
-        }
-      ];
-    } else if (numeroVenta === "PED-002") {
-      productos = [
-        {
-          id: 4,
-          nombre: "Combo Familiar",
-          cantidad: 1,
-          precioUnitario: 32000,
-          total: 32000,
-          adiciones: []
-        },
-        {
-          id: 5,
-          nombre: "Gaseosa Coca Cola 500ml",
-          cantidad: 1,
-          precioUnitario: 8500,
-          total: 8500,
-          adiciones: []
-        }
-      ];
-    } else if (numeroVenta === "PED-003") {
-      productos = [
-        {
-          id: 6,
-          nombre: "Perro Caliente Especial",
-          cantidad: 1,
-          precioUnitario: 12000,
-          total: 12000,
-          adiciones: []
-        },
-        {
-          id: 7,
-          nombre: "Papas Fritas",
-          cantidad: 1,
-          precioUnitario: 9000,
-          total: 9000,
-          adiciones: []
-        }
-      ];
-    } else {
-      productos = [
-        {
-          id: 8,
-          nombre: "Hamburguesa Doble Carne",
-          cantidad: 1,
-          precioUnitario: 18000,
-          total: 18000,
-          adiciones: []
-        },
-        {
-          id: 9,
-          nombre: "Pizza Hawaiana Mediana",
-          cantidad: 1,
-          precioUnitario: 17000,
-          total: 17000,
+          precioUnitario: parseFloat(v.subtotal || 0),
+          total: parseFloat(v.subtotal || 0),
           adiciones: []
         }
       ];
     }
 
-    const subtotal = parseFloat(v.subtotal) || 28000;
-    const total = parseFloat(v.total) || 33320;
+    const subtotal = parseFloat(v.subtotal) || 0;
+    const total = parseFloat(v.total) || 0;
     const iva = Math.round(subtotal * 0.19);
 
     return {
       id: v.idVenta,
       idVenta: v.idVenta,
+      idDescuento: v.idDescuento || 1,
       numeroVenta,
       codigoPedido: numeroVenta,
       clienteNombre,
@@ -149,7 +112,11 @@ class VentaService {
   static async getAll() {
     const ventas = await Venta.findAll({
       include: [
-        { model: Cliente, as: 'cliente' },
+        { 
+          model: Cliente, 
+          as: 'cliente',
+          include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
+        },
         { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
         { model: DetalleVentaProducto, as: 'detalles' }
       ],
@@ -161,7 +128,11 @@ class VentaService {
   static async getById(id) {
     const v = await Venta.findByPk(id, {
       include: [
-        { model: Cliente, as: 'cliente' },
+        { 
+          model: Cliente, 
+          as: 'cliente',
+          include: [{ model: User, attributes: ['idUsuario', 'nombre', 'apellidos'] }]
+        },
         { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
         { model: DetalleVentaProducto, as: 'detalles' }
       ]
@@ -181,16 +152,17 @@ class VentaService {
       metodoPago: data.metodoPago || "Efectivo",
       estadoPago: data.estadoPago || "Pagado",
       codigoPedido: data.codigoPedido || data.numeroVenta || `PED-${String(Date.now()).slice(-3)}`,
-      clienteNombre: data.clienteNombre || "Cliente General"
+      clienteNombre: data.clienteNombre || null,
+      productos: data.productos || []
     });
 
     const venta = await Venta.create({
       idCliente: data.idCliente || 1,
       idUsuario: data.idUsuario || 1,
       idDescuento: data.idDescuento || 1,
-      subtotal: data.subtotal || 28000,
+      subtotal: data.subtotal || 0,
       descuentoAplicado: data.descuentoAplicado || 0,
-      total: data.total || 33320,
+      total: data.total || 0,
       estadoEntrega: data.estadoEntrega || 'PENDIENTE',
       observaciones: obsStr
     });
@@ -200,9 +172,9 @@ class VentaService {
         idVenta: venta.idVenta,
         idVariante: d.idVariante || 1,
         cantidad: d.cantidad || 1,
-        precioUnitario: d.precioUnitario || 10000,
-        subtotal: d.subtotal || 10000,
-        observaciones: d.observaciones || null
+        precioUnitario: d.precioUnitario || 0,
+        subtotal: d.subtotal || 0,
+        observaciones: d.observaciones || d.nombre || null
       }));
       await DetalleVentaProducto.bulkCreate(detalles);
     }
@@ -217,7 +189,7 @@ class VentaService {
       error.statusCode = 404;
       throw error;
     }
-    // Normalize state strings from frontend ('Pendiente', 'En Preparación', 'Listo', 'Completada')
+
     let estadoEnum = estado;
     if (estado === 'Pendiente') estadoEnum = 'PENDIENTE';
     else if (estado === 'En Preparación') estadoEnum = 'PREPARANDO';
