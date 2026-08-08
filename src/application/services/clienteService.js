@@ -3,48 +3,32 @@ const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure
 const bcrypt = require('bcryptjs');
 
 class ClienteService {
-  static async getAll() {
-    const clientes = await Cliente.findAll({
-      order: [['idCliente', 'ASC']],
-      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono'] }]
-    });
+  static formatCliente(c) {
+    let meta = {};
+    let cleanDireccion = c.direccion || '';
 
-    return clientes.map(c => ({
-      id: c.idCliente,
-      idCliente: c.idCliente,
-      idUsuario: c.idUsuario,
-      direccion: c.direccion || '',
-      nombre: c.usuario ? c.usuario.nombre : 'Cliente',
-      apellidos: c.usuario ? c.usuario.apellidos : '',
-      email: c.usuario ? c.usuario.email : '',
-      telefono: c.usuario ? c.usuario.telefono : '',
-      estado: c.estado === 0 ? 'Inactivo' : 'Activo',
-      usuario: c.usuario ? {
-        id: c.usuario.idUsuario,
-        nombre: c.usuario.nombre,
-        apellidos: c.usuario.apellidos,
-        email: c.usuario.email,
-        telefono: c.usuario.telefono
-      } : null
-    }));
-  }
-
-  static async getById(id) {
-    const c = await Cliente.findByPk(id, {
-      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono'] }]
-    });
-
-    if (!c) {
-      const error = new Error('Cliente no encontrado');
-      error.statusCode = 404;
-      throw error;
+    if (c.direccion) {
+      try {
+        if (c.direccion.trim().startsWith('{')) {
+          meta = JSON.parse(c.direccion);
+          cleanDireccion = meta.direccion !== undefined ? meta.direccion : c.direccion;
+        }
+      } catch (e) {
+        meta = {};
+      }
     }
+
+    const tipo = meta.tipo || (c.esVip ? 'VIP' : 'Regular');
+    const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
+    const descuentoPorcentaje = meta.descuentoPorcentaje !== undefined ? meta.descuentoPorcentaje : defaultDesc;
 
     return {
       id: c.idCliente,
       idCliente: c.idCliente,
       idUsuario: c.idUsuario,
-      direccion: c.direccion || '',
+      direccion: cleanDireccion,
+      tipo,
+      descuentoPorcentaje,
       nombre: c.usuario ? c.usuario.nombre : 'Cliente',
       apellidos: c.usuario ? c.usuario.apellidos : '',
       email: c.usuario ? c.usuario.email : '',
@@ -58,6 +42,29 @@ class ClienteService {
         telefono: c.usuario.telefono
       } : null
     };
+  }
+
+  static async getAll() {
+    const clientes = await Cliente.findAll({
+      order: [['idCliente', 'ASC']],
+      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono'] }]
+    });
+
+    return clientes.map(c => this.formatCliente(c));
+  }
+
+  static async getById(id) {
+    const c = await Cliente.findByPk(id, {
+      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono'] }]
+    });
+
+    if (!c) {
+      const error = new Error('Cliente no encontrado');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return this.formatCliente(c);
   }
 
   static async create(data) {
@@ -81,9 +88,19 @@ class ClienteService {
       idUsuario = user.idUsuario;
     }
 
+    const tipo = data.tipo || 'Nuevo';
+    const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
+    const descPorcent = data.descuentoPorcentaje !== undefined ? data.descuentoPorcentaje : defaultDesc;
+
+    const direccionMeta = JSON.stringify({
+      direccion: data.direccion || '',
+      tipo,
+      descuentoPorcentaje: descPorcent
+    });
+
     const cliente = await Cliente.create({
       idUsuario: idUsuario,
-      direccion: data.direccion || '',
+      direccion: direccionMeta,
       estado: data.estado === 'Inactivo' || data.estado === 0 ? 0 : 1
     });
 
@@ -102,7 +119,28 @@ class ClienteService {
       throw error;
     }
 
-    if (data.direccion !== undefined) c.direccion = data.direccion;
+    let existingMeta = {};
+    if (c.direccion && c.direccion.trim().startsWith('{')) {
+      try {
+        existingMeta = JSON.parse(c.direccion);
+      } catch (e) {
+        existingMeta = {};
+      }
+    } else {
+      existingMeta = { direccion: c.direccion || '' };
+    }
+
+    const newDireccionStr = data.direccion !== undefined ? data.direccion : existingMeta.direccion || '';
+    const newTipo = data.tipo !== undefined ? data.tipo : existingMeta.tipo || 'Regular';
+    const defaultDesc = newTipo === 'VIP' ? 15 : newTipo === 'Frecuente' ? 10 : newTipo === 'Regular' ? 5 : 0;
+    const newDesc = data.descuentoPorcentaje !== undefined ? data.descuentoPorcentaje : (existingMeta.descuentoPorcentaje !== undefined ? existingMeta.descuentoPorcentaje : defaultDesc);
+
+    c.direccion = JSON.stringify({
+      direccion: newDireccionStr,
+      tipo: newTipo,
+      descuentoPorcentaje: newDesc
+    });
+
     if (data.idUsuario !== undefined) c.idUsuario = data.idUsuario;
     if (data.estado !== undefined) c.estado = data.estado === 'Inactivo' || data.estado === 0 ? 0 : 1;
     await c.save();
@@ -127,7 +165,6 @@ class ClienteService {
     }
 
     await c.destroy();
-    // Resequence remaining IDs consecutively and reset AUTO_INCREMENT to 1 if empty
     await resequenceTableIds('cliente', 'idCliente', [{ table: 'venta', column: 'idCliente' }]);
 
     return { message: 'Cliente eliminado exitosamente' };
