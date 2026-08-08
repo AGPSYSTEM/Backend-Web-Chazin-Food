@@ -367,10 +367,11 @@ const Product = sequelize.define('producto', {
     }
   },
   idCategoriaProducto: {
-    type: DataTypes.INTEGER
+    type: DataTypes.INTEGER,
+    allowNull: false
   },
   nombre: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(120),
     allowNull: false
   },
   precio: {
@@ -378,17 +379,17 @@ const Product = sequelize.define('producto', {
     defaultValue: 0
   },
   descripcion: {
-    type: DataTypes.STRING
+    type: DataTypes.TEXT
   },
   imagen: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING(255)
   },
   stock: {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
   categoria: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING(100)
   },
   adiciones: {
     type: DataTypes.TEXT
@@ -738,6 +739,271 @@ const Evento = sequelize.define('evento', {
   }
 }, { tableName: 'evento', timestamps: false });
 
+const Adicion = sequelize.define('adicion', {
+  idAdicion: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idAdicion'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idAdicion;
+    }
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  nombre: {
+    type: DataTypes.STRING(100),
+    allowNull: false
+  },
+  descripcion: {
+    type: DataTypes.STRING(255)
+  },
+  imagen: {
+    type: DataTypes.STRING(255)
+  },
+  precio: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'adicion', timestamps: false });
+
+const Variante = sequelize.define('variante', {
+  idVariante: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idVariante'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idVariante;
+    }
+  },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  nombre: {
+    type: DataTypes.STRING(80),
+    allowNull: false
+  },
+  precio: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'variante', timestamps: false });
+
+const Descuento = sequelize.define('descuento', {
+  idDescuento: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idDescuento'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idDescuento;
+    }
+  },
+  idEvento: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  nombreDescuento: {
+    type: DataTypes.STRING(120),
+    allowNull: false
+  },
+  tipoDescuento: {
+    type: DataTypes.ENUM('PORCENTAJE', 'VALOR FIJO'),
+    allowNull: false
+  },
+  porcentaje: {
+    type: DataTypes.DECIMAL(5, 2)
+  },
+  valorFijo: {
+    type: DataTypes.DECIMAL(10, 2)
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'descuento', timestamps: false });
+
+const Pago = sequelize.define('pago', {
+  idPago: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idPago'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idPago;
+    }
+  },
+  idVenta: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  metodoPago: {
+    type: DataTypes.ENUM('EFECTIVO', 'TARJETA', 'NEQUI', 'DAVIPLATA', 'TRANSFERENCIA'),
+    allowNull: false
+  },
+  referenciaExterna: {
+    type: DataTypes.STRING(120)
+  },
+  monto: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  },
+  fechaPago: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  estado: {
+    type: DataTypes.ENUM('PENDIENTE', 'APROBADO', 'RECHAZADO'),
+    defaultValue: 'APROBADO'
+  }
+}, { tableName: 'pago', timestamps: false });
+
+const Devolucion = sequelize.define('devolucion', {
+  idDevolucion: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idDevolucion'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idDevolucion;
+    }
+  },
+  idVenta: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  motivo: {
+    type: DataTypes.STRING(255),
+    allowNull: false
+  },
+  descripcion: {
+    type: DataTypes.TEXT
+  },
+  valorDevuelto: {
+    type: DataTypes.DECIMAL(12, 2)
+  },
+  fecha: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  estado: {
+    type: DataTypes.ENUM('PENDIENTE', 'ACEPTADA', 'RECHAZADA'),
+    defaultValue: 'PENDIENTE'
+  }
+}, { tableName: 'devolucion', timestamps: false });
+
+const DetalleVentaAdicion = sequelize.define('detalleventaadicion', {
+  idDetalleVentaAdicion: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  idDetalleVenta: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idAdicion: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  cantidad: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1
+  },
+  precio: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  subtotal: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false
+  }
+}, { tableName: 'detalleventaadicion', timestamps: false });
+
+const Pedido = sequelize.define('pedido', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  clienteId: {
+    type: DataTypes.INTEGER
+  },
+  items: {
+    type: DataTypes.TEXT
+  },
+  total: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  estado: {
+    type: DataTypes.STRING,
+    defaultValue: 'pendiente'
+  },
+  metodoPago: {
+    type: DataTypes.STRING,
+    defaultValue: 'efectivo'
+  },
+  fechaCreacion: {
+    type: DataTypes.DATE
+  }
+}, { tableName: 'pedido', timestamps: false });
+
+// Additional Relationships
+Adicion.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+Insumo.hasMany(Adicion, { foreignKey: 'idInsumo' });
+
+Variante.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+Product.hasMany(Variante, { foreignKey: 'idProducto', as: 'variantes' });
+
+FichaTecnica.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
+
+Descuento.belongsTo(Evento, { foreignKey: 'idEvento', as: 'evento' });
+Evento.hasMany(Descuento, { foreignKey: 'idEvento' });
+
+Venta.belongsTo(Descuento, { foreignKey: 'idDescuento', as: 'descuento' });
+
+Pago.belongsTo(Venta, { foreignKey: 'idVenta', as: 'venta' });
+Venta.hasMany(Pago, { foreignKey: 'idVenta', as: 'pagos' });
+
+Devolucion.belongsTo(Venta, { foreignKey: 'idVenta', as: 'venta' });
+Venta.hasMany(Devolucion, { foreignKey: 'idVenta', as: 'devoluciones' });
+
+DetalleVentaAdicion.belongsTo(DetalleVentaProducto, { foreignKey: 'idDetalleVenta', as: 'detalleVenta' });
+DetalleVentaProducto.hasMany(DetalleVentaAdicion, { foreignKey: 'idDetalleVenta', as: 'adiciones' });
+DetalleVentaAdicion.belongsTo(Adicion, { foreignKey: 'idAdicion', as: 'adicion' });
+
+DetalleVentaProducto.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
+
+Pedido.belongsTo(Cliente, { foreignKey: 'clienteId', as: 'cliente' });
+
 module.exports = {
   sequelize,
   Role,
@@ -761,5 +1027,13 @@ module.exports = {
   DetalleFichaInsumo,
   Compra,
   DetalleCompraInsumo,
-  Evento
+  Evento,
+  Adicion,
+  Variante,
+  Descuento,
+  Pago,
+  Devolucion,
+  DetalleVentaAdicion,
+  Pedido
 };
+
