@@ -71,9 +71,9 @@ class UserService {
   }
 
   static async createUser(userData) {
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
     const finalEmail = email || correo;
-    const finalPassword = contrasena || contraseña || '123456';
+    const finalPassword = contrasena || contraseña || password || '123456';
     const finalApellido = apellidos || apellido || '';
     const finalRolId = idRol || rol_id || 1;
 
@@ -125,7 +125,7 @@ class UserService {
       throw error;
     }
 
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
     
     if (nombre) user.nombre = nombre;
     if (apellidos !== undefined || apellido !== undefined) user.apellidos = apellidos || apellido || '';
@@ -135,9 +135,9 @@ class UserService {
     if (idRol || rol_id) user.idRol = idRol || rol_id;
     if (estado) user.estado = estado;
 
-    if (contrasena || contraseña) {
+    if (contrasena || contraseña || password) {
       const salt = await bcrypt.genSalt(10);
-      user.contrasena = await bcrypt.hash(contrasena || contraseña, salt);
+      user.contrasena = await bcrypt.hash(contrasena || contraseña || password, salt);
     }
 
     await user.save();
