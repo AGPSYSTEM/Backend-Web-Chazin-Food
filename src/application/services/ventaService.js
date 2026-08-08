@@ -199,24 +199,33 @@ class VentaService {
 
     if (data.detalles && data.detalles.length > 0) {
       let fallbackVarianteId = 1;
+      let validVarianteIds = new Set();
       try {
         const { sequelize } = require('../../persistence/models');
-        const [rows] = await sequelize.query('SELECT idVariante FROM variante LIMIT 1');
-        if (rows && rows[0] && rows[0].idVariante) {
+        const [rows] = await sequelize.query('SELECT idVariante FROM variante');
+        if (rows && rows.length > 0) {
+          rows.forEach(r => validVarianteIds.add(r.idVariante));
           fallbackVarianteId = rows[0].idVariante;
         }
       } catch (e) {
         console.warn('Fallback variante lookup:', e.message);
       }
 
-      const detalles = data.detalles.map(d => ({
-        idVenta: venta.idVenta,
-        idVariante: d.idVariante || fallbackVarianteId,
-        cantidad: d.cantidad || 1,
-        precioUnitario: d.precioUnitario || d.precio || 0,
-        subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
-        observaciones: d.observaciones || d.nombre || null
-      }));
+      const detalles = data.detalles.map(d => {
+        let varianteId = d.idVariante || fallbackVarianteId;
+        // If the requested idVariante doesn't exist in the variante table, use fallback
+        if (!validVarianteIds.has(varianteId)) {
+          varianteId = fallbackVarianteId;
+        }
+        return {
+          idVenta: venta.idVenta,
+          idVariante: varianteId,
+          cantidad: d.cantidad || 1,
+          precioUnitario: d.precioUnitario || d.precio || 0,
+          subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
+          observaciones: d.observaciones || d.nombre || null
+        };
+      });
       await DetalleVentaProducto.bulkCreate(detalles);
     }
 
