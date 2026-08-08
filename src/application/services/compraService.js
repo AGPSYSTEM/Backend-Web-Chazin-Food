@@ -1,4 +1,34 @@
-const { Compra, DetalleCompraInsumo, Proveedor, Insumo } = require('../../persistence/models');
+const { Compra, DetalleCompraInsumo, Proveedor, Insumo, sequelize } = require('../../persistence/models');
+const TrazabilidadService = require('./trazabilidadService');
+
+const ESTADO_RECIBIDA = 'RECIBIDA';
+const ESTADO_PENDIENTE = 'PENDIENTE';
+const ESTADO_CANCELADA = 'CANCELADA';
+
+function normalizarEstado(estado) {
+  const e = String(estado || '').trim().toUpperCase();
+  if (e === ESTADO_RECIBIDA) return ESTADO_RECIBIDA;
+  if (e === ESTADO_PENDIENTE) return ESTADO_PENDIENTE;
+  if (e === ESTADO_CANCELADA) return ESTADO_CANCELADA;
+  if (e === 'COMPLETADA') return ESTADO_RECIBIDA;
+  if (e === 'ANULADA') return ESTADO_CANCELADA;
+  if (e === 'PENDIENTE' || e === 'PENDIENTES' || e === 'PEND') return ESTADO_PENDIENTE;
+  if (e === 'RECIBIDA' || e === 'RECIBIDO' || e === 'REC') return ESTADO_RECIBIDA;
+  if (e === 'CANCELADA' || e === 'CANCELADO' || e === 'ANULADA' || e === 'ANULADO') return ESTADO_CANCELADA;
+  return ESTADO_PENDIENTE;
+}
+
+function esEstadoRecibida(estado) {
+  return normalizarEstado(estado) === ESTADO_RECIBIDA;
+}
+
+function esEstadoPendiente(estado) {
+  return normalizarEstado(estado) === ESTADO_PENDIENTE;
+}
+
+function esEstadoCancelada(estado) {
+  return normalizarEstado(estado) === ESTADO_CANCELADA;
+}
 
 class CompraService {
   static async getAll() {
@@ -70,10 +100,29 @@ class CompraService {
   }
 
   static async create(data) {
+    const estadoEntrada = data.estado !== undefined && data.estado !== null ? data.estado : "(NO ENVIADO, default PENDIENTE)";
+
+    // SALVAGUARDA ABSOLUTA: Al CREAR una compra, el estado SIEMPRE será PENDIENTE.
+    // Bajo NINGUNA circunstancia se permite crear una compra directamente en RECIBIDA.
+    // Para sumar stock, el usuario DEBE marcarla como Recibida vía updateEstado()
+    // (botón "Marcar como Recibida" en la UI).
+    const _estadoPropuesto = normalizarEstado(data.estado !== undefined && data.estado !== null ? data.estado : ESTADO_PENDIENTE);
+    const estadoNormalizado = ESTADO_PENDIENTE;
+
+    console.log(`==========================================================================`);
+    console.log(`[COMPRA CREATE] NUEVA COMPRA solicitada`);
+    console.log(`[COMPRA CREATE]   - estadoEntrada (lo que llegó del frontend): ${estadoEntrada}`);
+    console.log(`[COMPRA CREATE]   - _estadoPropuesto tras normalizar: ${_estadoPropuesto}`);
+    console.log(`[COMPRA CREATE]   - estadoNormalizado (FORZADO a PENDIENTE por seguridad): ${estadoNormalizado}`);
+    console.log(`[COMPRA CREATE]   - ⛔ NOTA: el stock de insumos NO se actualizará al crear. Se requiere marcar la compra como RECIBIDA manualmente luego.`);
+    console.log(`[COMPRA CREATE]   - Cantidad de detalles: ${(data.detalles || []).length}`);
+    console.log(`==========================================================================`);
+
     const compra = await Compra.create({
       idProveedor: data.idProveedor,
+      fechaCompra: data.fechaCompra || new Date(),
       total: data.total,
-      estado: data.estado || 'RECIBIDA'
+      estado: estadoNormalizado
     });
 
     if (data.detalles && data.detalles.length > 0) {
@@ -85,9 +134,90 @@ class CompraService {
         subtotal: d.subtotal || (d.cantidad * d.precioUnitario)
       }));
       await DetalleCompraInsumo.bulkCreate(detalles);
+      console.log(`[COMPRA CREATE] #${compra.idCompra}: ${detalles.length} detalle(s) guardado(s). Stock de insumos: INTOCADO (estado=PENDIENTE).`);
     }
 
     return this.getById(compra.idCompra);
+  }
+
+  static async _ajustarStockPorCompra(compra, signo) {
+    if (!compra || !compra.idCompra) return;
+
+    const estadoNormalizado = normalizarEstado(compra.estado);
+    if (signo > 0 && !esEstadoRecibida(estadoNormalizado)) {
+      console.warn(`[COMPRA STOCK] BLOQUEADO ajuste +(sumar) para compra #${compra.idCompra}: estado=${estadoNormalizado} se requiere RECIBIDA.`);
+      return;
+    }
+
+    const idCompra = Number(compra.idCompra);
+    const compraCompleta = await Compra.findByPk(idCompra, {
+      include: [
+        { model: Proveedor, as: 'proveedor', attributes: ['idProveedor', 'nombre'] },
+        { model: DetalleCompraInsumo, as: 'detalles' }
+      ]
+    });
+    if (!compraCompleta) return;
+
+    const detalles = compraCompleta.detalles || [];
+    if (!detalles.length) return;
+
+    const proveedor = compraCompleta.proveedor;
+    const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${compraCompleta.idProveedor}`;
+    const numeroFactura = `COMP-${String(idCompra).padStart(4, '0')}`;
+
+    const mapaAgrupado = new Map();
+    for (const d of detalles) {
+      const idIns = Number(d.idInsumo);
+      if (!mapaAgrupado.has(idIns)) {
+        mapaAgrupado.set(idIns, {
+          idInsumo: idIns,
+          cantidadTotal: 0,
+          precioUnitario: parseFloat(d.precioUnitario) || 0,
+          subtotalTotal: 0
+        });
+      }
+      const e = mapaAgrupado.get(idIns);
+      const cantNum = parseFloat(d.cantidad) || 0;
+      e.cantidadTotal += cantNum;
+      e.precioUnitario = parseFloat(d.precioUnitario) || e.precioUnitario;
+      e.subtotalTotal += parseFloat(d.subtotal || (cantNum * e.precioUnitario)) || 0;
+    }
+
+    const operacion = signo > 0 ? "SUMAR" : "RESTAR";
+    const tipoMovimiento = signo > 0 ? 'Entrada' : 'Salida';
+    const motivoAjuste = signo > 0
+      ? `Compra ${numeroFactura} marcada como Recibida — Proveedor: ${proveedorNombre}`
+      : `Reversa por anulación/cambio de estado de compra ${numeroFactura} — Proveedor: ${proveedorNombre}`;
+
+    for (const [idIns, entry] of mapaAgrupado.entries()) {
+      try {
+        const cantidadAjuste = signo * entry.cantidadTotal;
+        console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${idCompra} (estado=${estadoNormalizado}): ${cantidadAjuste >= 0 ? "+" : ""}${cantidadAjuste}`);
+        await Insumo.update(
+          { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${cantidadAjuste}`) },
+          { where: { idInsumo: idIns } }
+        );
+        try {
+          const insumo = await Insumo.findByPk(idIns);
+          if (insumo) {
+            await TrazabilidadService.create({
+              tipo: 'compra',
+              entidadNombre: insumo.nombre,
+              detalle: `${signo > 0 ? "Reabastecimiento" : "Reversa"} por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')} | Estado final: ${estadoNormalizado}`,
+              idInsumo: idIns,
+              tipoMovimiento: tipoMovimiento,
+              cantidad: Math.abs(cantidadAjuste),
+              motivo: motivoAjuste,
+              skipStockUpdate: true
+            });
+          }
+        } catch (tzErr) {
+          console.warn(`[COMPRA STOCK] Error registrando trazabilidad para insumo #${idIns}:`, tzErr.message);
+        }
+      } catch (err) {
+        console.warn(`Advertencia al ajustar stock insumo #${idIns}:`, err.message);
+      }
+    }
   }
 
   static async updateEstado(id, estado) {
@@ -97,13 +227,168 @@ class CompraService {
       error.statusCode = 404;
       throw error;
     }
-    c.estado = estado;
+    const estadoAnterior = normalizarEstado(c.estado);
+    const estadoNuevo = normalizarEstado(estado);
+    console.log(`[COMPRA UPDATE_ESTADO] #${id}: ${estadoAnterior} → ${estadoNuevo}`);
+
+    if (estadoAnterior !== estadoNuevo) {
+      if (esEstadoRecibida(estadoAnterior) && esEstadoCancelada(estadoNuevo)) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición RECIBIDA→CANCELADA (resta stock)`);
+        await this._ajustarStockPorCompra(c, -1);
+      } else if (esEstadoPendiente(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición PENDIENTE→RECIBIDA (suma stock)`);
+        const compraValidada = { ...c.toJSON ? c.toJSON() : c, estado: estadoNuevo };
+        await this._ajustarStockPorCompra(compraValidada, +1);
+      } else if (esEstadoCancelada(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición CANCELADA→RECIBIDA (suma stock)`);
+        const compraValidada = { ...c.toJSON ? c.toJSON() : c, estado: estadoNuevo };
+        await this._ajustarStockPorCompra(compraValidada, +1);
+      } else if (esEstadoRecibida(estadoAnterior) && esEstadoPendiente(estadoNuevo)) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición RECIBIDA→PENDIENTE (resta stock)`);
+        await this._ajustarStockPorCompra(c, -1);
+      } else {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición ${estadoAnterior}→${estadoNuevo} sin impacto en stock`);
+      }
+    } else {
+      console.log(`[COMPRA UPDATE_ESTADO] #${id}: estado no cambió (${estadoNuevo}) - sin acción`);
+    }
+
+    c.estado = estadoNuevo;
     await c.save();
     return this.getById(id);
   }
 
   static async cancelar(id) {
     return this.updateEstado(id, 'CANCELADA');
+  }
+
+  static async _agruparCantidadesPorInsumo(detalles) {
+    const mapa = new Map();
+    for (const d of (detalles || [])) {
+      const idIns = Number(d.idInsumo);
+      if (!mapa.has(idIns)) {
+        mapa.set(idIns, 0);
+      }
+      mapa.set(idIns, mapa.get(idIns) + (parseFloat(d.cantidad) || 0));
+    }
+    return mapa;
+  }
+
+  static async _aplicarDiferenciaStock(idCompra, mapaViejo, mapaNuevo, opts = {}) {
+    const { estadoFinalCompraNormalizado, estadoInicialCompraNormalizado } = opts;
+    const idsInsumos = new Set([...mapaViejo.keys(), ...mapaNuevo.keys()]);
+    for (const idIns of idsInsumos) {
+      const viejo = mapaViejo.get(idIns) || 0;
+      const nuevo = mapaNuevo.get(idIns) || 0;
+      const diff = nuevo - viejo;
+      if (Math.abs(diff) < 0.0001) continue;
+
+      const finalEsRecibida = estadoFinalCompraNormalizado !== undefined ? esEstadoRecibida(estadoFinalCompraNormalizado) : undefined;
+      const inicialEsRecibida = estadoInicialCompraNormalizado !== undefined ? esEstadoRecibida(estadoInicialCompraNormalizado) : undefined;
+
+      if (diff > 0 && finalEsRecibida === false) {
+        console.warn(`[COMPRA STOCK] BLOQUEADO diff +(sumar) insumo #${idIns} compra #${idCompra}: diff=${diff} estadoFinal=${estadoFinalCompraNormalizado} necesita RECIBIDA.`);
+        continue;
+      }
+      if (diff < 0 && inicialEsRecibida === false) {
+        console.warn(`[COMPRA STOCK] BLOQUEADO diff -(restar) insumo #${idIns} compra #${idCompra}: diff=${diff} estadoInicial=${estadoInicialCompraNormalizado} debe haber sido RECIBIDA para permitir reversa.`);
+        continue;
+      }
+
+      try {
+        const operacion = diff > 0 ? "SUMAR" : "RESTAR";
+        console.log(`[COMPRA STOCK] DIF ${operacion} insumo #${idIns} compra #${idCompra} (estadoFinal=${estadoFinalCompraNormalizado || "N/A"}): diff=${diff} (anterior=${viejo}, nuevo=${nuevo})`);
+        await Insumo.update(
+          { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${diff}`) },
+          { where: { idInsumo: idIns } }
+        );
+      } catch (err) {
+        console.warn(`Advertencia al ajustar diferencia stock insumo #${idIns} diff=${diff}:`, err.message);
+      }
+    }
+  }
+
+  static async update(id, data) {
+    const t = await sequelize.transaction();
+    try {
+      const compra = await Compra.findByPk(id, {
+        include: [{ model: DetalleCompraInsumo, as: 'detalles' }],
+        transaction: t
+      });
+      if (!compra) {
+        const error = new Error('Compra no encontrada');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const estadoAnteriorSinNormalizar = compra.estado;
+      const estadoAnterior = normalizarEstado(estadoAnteriorSinNormalizar);
+      const estadoSinNormalizarEntrada = (data.estado !== undefined && data.estado !== null)
+        ? `[recibido del frontend: ${data.estado}]`
+        : `[omitido, default=anterior]`;
+      const estadoNuevoSinNormalizar = (data.estado !== undefined && data.estado !== null) ? data.estado : estadoAnterior;
+      const estadoNuevo = normalizarEstado(estadoNuevoSinNormalizar);
+      const anteriorRecibida = esEstadoRecibida(estadoAnterior);
+      const nuevaRecibida = esEstadoRecibida(estadoNuevo);
+      const TOCARA_STOCK = anteriorRecibida || nuevaRecibida;
+
+      console.log(`==========================================================================`);
+      console.log(`[COMPRA UPDATE] #${id} - INICIO`);
+      console.log(`[COMPRA UPDATE]   - estadoAnterior (BD sin normalizar): "${estadoAnteriorSinNormalizar}" → normalizado: ${estadoAnterior}`);
+      console.log(`[COMPRA UPDATE]   - estadoNuevo  ${estadoSinNormalizarEntrada} → normalizado: ${estadoNuevo}`);
+      console.log(`[COMPRA UPDATE]   - anteriorRecibida=${anteriorRecibida} | nuevaRecibida=${nuevaRecibida} | TOCARA_STOCK=${TOCARA_STOCK}`);
+      console.log(`==========================================================================`);
+
+      const detallesViejos = (compra.detalles || []).map(d => d.toJSON());
+      const mapaViejo = await this._agruparCantidadesPorInsumo(detallesViejos);
+
+      compra.idProveedor = data.idProveedor !== undefined ? data.idProveedor : compra.idProveedor;
+      compra.fechaCompra = data.fechaCompra !== undefined ? data.fechaCompra : compra.fechaCompra;
+      compra.total = data.total !== undefined ? data.total : compra.total;
+      compra.estado = estadoNuevo;
+      await compra.save({ transaction: t });
+
+      if (data.detalles !== undefined && Array.isArray(data.detalles)) {
+        await DetalleCompraInsumo.destroy({ where: { idCompra: id }, transaction: t });
+        if (data.detalles.length > 0) {
+          const nuevosDetalles = data.detalles.map(d => ({
+            idCompra: id,
+            idInsumo: d.idInsumo,
+            cantidad: d.cantidad,
+            precioUnitario: d.precioUnitario,
+            subtotal: d.subtotal !== undefined ? d.subtotal : ((parseFloat(d.cantidad) || 0) * (parseFloat(d.precioUnitario) || 0))
+          }));
+          await DetalleCompraInsumo.bulkCreate(nuevosDetalles, { transaction: t });
+        }
+      }
+
+      let mapaNuevo = new Map();
+      if (TOCARA_STOCK) {
+        const detallesFinales = await DetalleCompraInsumo.findAll({ where: { idCompra: id }, transaction: t });
+        mapaNuevo = await this._agruparCantidadesPorInsumo(detallesFinales);
+      }
+
+      if (anteriorRecibida && nuevaRecibida) {
+        console.log(`[COMPRA UPDATE] #${id}: ✅ ajustando diferencia (sigue RECIBIDA)`);
+        await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
+      } else if (!anteriorRecibida && nuevaRecibida) {
+        console.log(`[COMPRA UPDATE] #${id}: ✅ sumando TODO nuevo (pasó a RECIBIDA)`);
+        await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
+      } else if (anteriorRecibida && !nuevaRecibida) {
+        console.log(`[COMPRA UPDATE] #${id}: ✅ restando TODO viejo (salió de RECIBIDA)`);
+        await this._aplicarDiferenciaStock(id, mapaViejo, new Map(), { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
+      } else {
+        console.log(`[COMPRA UPDATE] #${id}: ⛔ GUARDIA TOTAL ACTIVADA - SIN CAMBIO DE STOCK (estado anterior y nuevo NO SON RECIBIDA). Se omiten cálculos.`);
+      }
+
+      await t.commit();
+      console.log(`[COMPRA UPDATE] #${id}: commit OK (FIN)`);
+      return this.getById(id);
+    } catch (err) {
+      try { await t.rollback(); } catch (_) {}
+      console.error(`[COMPRA UPDATE] #${id}: ERROR - rollback:`, err.message);
+      throw err;
+    }
   }
 }
 
