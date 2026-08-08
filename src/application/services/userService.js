@@ -1,6 +1,19 @@
 const bcrypt = require('bcryptjs');
 const { User, Role, Cliente } = require('../../persistence/models');
 
+function getCleanDireccion(raw) {
+  if (!raw) return '';
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try {
+      const obj = JSON.parse(raw);
+      return obj.direccion !== undefined ? obj.direccion : raw;
+    } catch (e) {
+      return raw;
+    }
+  }
+  return raw;
+}
+
 class UserService {
   static async getAllUsers() {
     const users = await User.findAll({
@@ -22,7 +35,7 @@ class UserService {
       idRol: user.idRol,
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       estado: user.estado,
-      direccion: user.clienteInfo ? user.clienteInfo.direccion : '',
+      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       fechaRegistro: user.fechaRegistro
     }));
   }
@@ -52,7 +65,7 @@ class UserService {
       idRol: user.idRol,
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       estado: user.estado,
-      direccion: user.clienteInfo ? user.clienteInfo.direccion : '',
+      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       fechaRegistro: user.fechaRegistro
     };
   }
@@ -93,9 +106,11 @@ class UserService {
     });
 
     if (direccion) {
+      const cleanDir = getCleanDireccion(direccion);
+      const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
       await Cliente.create({
         idUsuario: user.idUsuario,
-        direccion
+        direccion: metaStr
       });
     }
 
@@ -128,12 +143,19 @@ class UserService {
     await user.save();
 
     if (direccion !== undefined) {
+      const cleanDir = getCleanDireccion(direccion);
       let cliente = await Cliente.findOne({ where: { idUsuario: id } });
       if (cliente) {
-        cliente.direccion = direccion;
+        let meta = {};
+        if (cliente.direccion && cliente.direccion.trim().startsWith('{')) {
+          try { meta = JSON.parse(cliente.direccion); } catch (e) { meta = {}; }
+        }
+        meta.direccion = cleanDir;
+        cliente.direccion = JSON.stringify(meta);
         await cliente.save();
       } else {
-        await Cliente.create({ idUsuario: id, direccion });
+        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
+        await Cliente.create({ idUsuario: id, direccion: metaStr });
       }
     }
 
