@@ -91,7 +91,7 @@ class VentaService {
     return {
       id: v.idVenta,
       idVenta: v.idVenta,
-      idDescuento: v.idDescuento || 1,
+      idDescuento: v.idDescuento || null,
       numeroVenta,
       codigoPedido: numeroVenta,
       clienteNombre,
@@ -189,7 +189,7 @@ class VentaService {
     const venta = await Venta.create({
       idCliente: finalClienteId,
       idUsuario: finalUsuarioId,
-      idDescuento: data.idDescuento || 1,
+      idDescuento: data.idDescuento || null,
       subtotal: data.subtotal || data.total || 0,
       descuentoAplicado: data.descuentoAplicado || 0,
       total: data.total || 0,
