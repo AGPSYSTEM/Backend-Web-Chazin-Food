@@ -520,11 +520,51 @@ const FichaTecnica = sequelize.define('fichatecnica', {
       return this.idFichaTecnica;
     }
   },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   idVariante: {
     type: DataTypes.INTEGER,
-    allowNull: false
+    allowNull: true
+  },
+  tipo: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'PRODUCTO'
   },
   descripcion: {
+    type: DataTypes.TEXT
+  },
+  procedimiento: {
+    type: DataTypes.TEXT
+  },
+  tiempoPreparacion: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  rendimiento: {
+    type: DataTypes.STRING(100)
+  },
+  especificaciones: {
+    type: DataTypes.TEXT
+  },
+  caracteristicas: {
+    type: DataTypes.TEXT
+  },
+  informacionNutricional: {
+    type: DataTypes.TEXT
+  },
+  condicionesAlmacenamiento: {
+    type: DataTypes.TEXT
+  },
+  vidaUtil: {
+    type: DataTypes.STRING(100)
+  },
+  observaciones: {
     type: DataTypes.TEXT
   },
   fechaCreacion: {
@@ -550,6 +590,10 @@ const DetalleFichaInsumo = sequelize.define('detallefichainsumo', {
   cantidad: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
+  },
+  unidadMedida: {
+    type: DataTypes.STRING(30),
+    allowNull: true
   }
 }, { tableName: 'detallefichainsumo', timestamps: false });
 
@@ -613,42 +657,12 @@ const DetalleCompraInsumo = sequelize.define('detallecomprainsumo', {
 }, { tableName: 'detallecomprainsumo', timestamps: false });
 
 
-const Order = sequelize.define('pedido', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  clienteId: {
-    type: DataTypes.INTEGER
-  },
-  items: {
-    type: DataTypes.TEXT
-  },
-  total: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false
-  },
-  estado: {
-    type: DataTypes.STRING,
-    defaultValue: 'pendiente'
-  },
-  metodoPago: {
-    type: DataTypes.STRING,
-    defaultValue: 'efectivo'
-  },
-  fechaCreacion: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
-  }
-}, { tableName: 'pedido', timestamps: false });
-
 // Relationships / Associations
 User.belongsTo(Role, { foreignKey: 'idRol', as: 'rolInfo' });
 Role.hasMany(User, { foreignKey: 'idRol' });
 
 User.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'clienteInfo' });
-Cliente.belongsTo(User, { foreignKey: 'idUsuario' });
+Cliente.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
 
 Role.belongsToMany(Permiso, { through: RolPermiso, foreignKey: 'idRol', otherKey: 'idPermiso', as: 'permisos' });
 Permiso.belongsToMany(Role, { through: RolPermiso, foreignKey: 'idPermiso', otherKey: 'idRol' });
@@ -669,8 +683,6 @@ DetalleInsumoPreparadoInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'in
 Trazabilidad.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
 Trazabilidad.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
 
-Order.belongsTo(User, { foreignKey: 'clienteId', as: 'cliente' });
-
 Product.belongsTo(CategoriaProducto, { foreignKey: 'idCategoriaProducto', as: 'categoriaProducto' });
 CategoriaProducto.hasMany(Product, { foreignKey: 'idCategoriaProducto' });
 
@@ -682,6 +694,8 @@ DetalleVentaProducto.belongsTo(Venta, { foreignKey: 'idVenta' });
 FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles' });
 DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica' });
 DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+FichaTecnica.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo' });
 
 Compra.belongsTo(Proveedor, { foreignKey: 'idProveedor', as: 'proveedor' });
 Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
@@ -689,6 +703,40 @@ Compra.hasMany(DetalleCompraInsumo, { foreignKey: 'idCompra', as: 'detalles' });
 DetalleCompraInsumo.belongsTo(Compra, { foreignKey: 'idCompra' });
 DetalleCompraInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
 
+
+const Evento = sequelize.define('evento', {
+  idEvento: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idEvento'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idEvento;
+    }
+  },
+  nombreEvento: {
+    type: DataTypes.STRING(120),
+    allowNull: false
+  },
+  descripcion: {
+    type: DataTypes.TEXT
+  },
+  fechaInicio: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
+  fechaFin: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'evento', timestamps: false });
 
 module.exports = {
   sequelize,
@@ -706,12 +754,12 @@ module.exports = {
   DetalleInsumoPreparadoInsumo,
   Trazabilidad,
   Product,
-  Order,
   CategoriaProducto,
   Venta,
   DetalleVentaProducto,
   FichaTecnica,
   DetalleFichaInsumo,
   Compra,
-  DetalleCompraInsumo
+  DetalleCompraInsumo,
+  Evento
 };

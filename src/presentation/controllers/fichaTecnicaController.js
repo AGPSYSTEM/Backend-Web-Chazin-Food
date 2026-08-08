@@ -18,6 +18,42 @@ const getFichaById = async (req, res, next) => {
   }
 };
 
+const getFichaByProducto = async (req, res, next) => {
+  try {
+    const ficha = await FichaTecnicaService.getByProductoId(req.params.idProducto);
+    res.json(ficha || {});
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getFichaByInsumo = async (req, res, next) => {
+  try {
+    const ficha = await FichaTecnicaService.getByInsumoId(req.params.idInsumo);
+    res.json(ficha || {});
+  } catch (error) {
+    next(error);
+  }
+};
+
+const saveFichaByProducto = async (req, res, next) => {
+  try {
+    const ficha = await FichaTecnicaService.saveForProducto(req.params.idProducto, req.body);
+    res.json(ficha);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const saveFichaByInsumo = async (req, res, next) => {
+  try {
+    const ficha = await FichaTecnicaService.saveForInsumo(req.params.idInsumo, req.body);
+    res.json(ficha);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createFicha = async (req, res, next) => {
   try {
     const ficha = await FichaTecnicaService.create(req.body);
@@ -45,4 +81,14 @@ const deleteFicha = async (req, res, next) => {
   }
 };
 
-module.exports = { getFichas, getFichaById, createFicha, updateFicha, deleteFicha };
+module.exports = {
+  getFichas,
+  getFichaById,
+  getFichaByProducto,
+  getFichaByInsumo,
+  saveFichaByProducto,
+  saveFichaByInsumo,
+  createFicha,
+  updateFicha,
+  deleteFicha
+};

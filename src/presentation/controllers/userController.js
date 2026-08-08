@@ -51,6 +51,19 @@ const toggleUserStatus = async (req, res, next) => {
   }
 };
 
+const changeUserPassword = async (req, res, next) => {
+  try {
+    const { password, contrasena, contraseña } = req.body;
+    const updatedUser = await UserService.updateUser(req.params.id, {
+      contrasena: password || contrasena || contraseña
+    });
+    res.json(updatedUser);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 const deleteUser = async (req, res, next) => {
   try {
     const result = await UserService.deleteUser(req.params.id);
@@ -66,6 +79,7 @@ module.exports = {
   getUserById,
   createUser,
   updateUser,
+  changeUserPassword,
   toggleUserStatus,
   deleteUser,
 };

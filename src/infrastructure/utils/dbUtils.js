@@ -23,4 +23,37 @@ async function resetAutoIncrement(tableName, primaryKeyColumn = 'id') {
   }
 }
 
-module.exports = { resetAutoIncrement };
+/**
+ * Resequences primary key IDs consecutively (1, 2, 3...) when a row is deleted.
+ * Also updates foreign key references in child tables.
+ * Finally resets AUTO_INCREMENT to MAX + 1 (or 1 if empty).
+ */
+async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables = []) {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [rows] = await sequelize.query(`SELECT \`${primaryKeyColumn}\` FROM \`${tableName}\` ORDER BY \`${primaryKeyColumn}\` ASC`);
+    
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    
+    let newId = 1;
+    for (const r of rows) {
+      const oldId = r[primaryKeyColumn];
+      if (oldId !== newId) {
+        await sequelize.query(`UPDATE \`${tableName}\` SET \`${primaryKeyColumn}\` = ? WHERE \`${primaryKeyColumn}\` = ?`, { replacements: [newId, oldId] });
+        for (const fkItem of fkTables) {
+          const table = typeof fkItem === 'string' ? fkItem : fkItem.table;
+          const column = typeof fkItem === 'string' ? primaryKeyColumn : fkItem.column;
+          await sequelize.query(`UPDATE \`${table}\` SET \`${column}\` = ? WHERE \`${column}\` = ?`, { replacements: [newId, oldId] });
+        }
+      }
+      newId++;
+    }
+    
+    await sequelize.query(`ALTER TABLE \`${tableName}\` AUTO_INCREMENT = ${newId};`);
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  } catch (err) {
+    console.warn(`Error resequencing IDs for ${tableName}:`, err.message);
+  }
+}
+
+module.exports = { resetAutoIncrement, resequenceTableIds };

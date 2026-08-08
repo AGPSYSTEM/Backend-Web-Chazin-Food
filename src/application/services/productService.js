@@ -54,14 +54,21 @@ class ProductService {
 
   static async createProduct(data) {
     const { nombre, precio, descripcion, imagen, stock, categoria, adiciones } = data;
-    if (!nombre || precio === undefined) {
+    if (!nombre || !nombre.trim() || precio === undefined) {
       const error = new Error('Nombre y precio del producto son obligatorios');
       error.statusCode = 400;
       throw error;
     }
 
+    const existing = await Product.findOne({ where: { nombre: nombre.trim() } });
+    if (existing) {
+      const error = new Error('Ya existe un producto registrado con ese nombre');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const product = await Product.create({
-      nombre,
+      nombre: nombre.trim(),
       precio,
       descripcion: descripcion || '',
       imagen: imagen || '',
@@ -82,7 +89,7 @@ class ProductService {
     }
 
     const { nombre, precio, descripcion, imagen, stock, categoria, adiciones } = data;
-    if (nombre !== undefined) p.nombre = nombre;
+    if (nombre !== undefined) p.nombre = nombre.trim();
     if (precio !== undefined) p.precio = precio;
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
@@ -102,6 +109,8 @@ class ProductService {
       throw error;
     }
     await p.destroy();
+    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+    await resetAutoIncrement('producto', 'idProducto');
     return { message: 'Producto eliminado correctamente' };
   }
 }
