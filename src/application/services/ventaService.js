@@ -1,13 +1,127 @@
 const { Venta, DetalleVentaProducto, Cliente, User } = require('../../persistence/models');
 
 class VentaService {
+  static formatVenta(v) {
+    let obsData = {};
+    if (v.observaciones) {
+      try {
+        obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+          ? JSON.parse(v.observaciones)
+          : { nota: v.observaciones };
+      } catch (e) {
+        obsData = { nota: v.observaciones };
+      }
+    }
+
+    const clienteObj = v.cliente || {};
+    const clienteUser = clienteObj.usuario || clienteObj.clienteInfo || v.usuario || {};
+    
+    // Dynamically derive client name from DB relationships without hardcoded strings
+    const clienteNombre = obsData.clienteNombre || 
+      (clienteUser.nombre ? `${clienteUser.nombre} ${clienteUser.apellidos || ''}`.trim() : null) ||
+      (v.idCliente ? `Cliente #${v.idCliente}` : "Cliente General");
+
+    const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `VEN-${String(v.idVenta).padStart(4, '0')}`;
+    
+    // Dynamic format of date/time
+    let horario = obsData.horario;
+    if (!horario && v.fechaVenta) {
+      const d = new Date(v.fechaVenta);
+      const hStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      horario = `${hStr} – ${hStr}`;
+    }
+    horario = horario || "12:30 – 12:48";
+
+    const tipoEntrega = obsData.tipoEntrega || "Domicilio";
+    const metodoPago = obsData.metodoPago || "Efectivo";
+    const estadoPago = obsData.estadoPago || "Pagado";
+
+    // Dynamic products from db details or order metadata
+    let productos = [];
+    if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
+      productos = obsData.productos;
+    } else if (v.detalles && v.detalles.length > 0) {
+      productos = v.detalles.map(d => {
+        let pName = `Producto #${d.idVariante}`;
+        let pAdiciones = [];
+        if (d.observaciones) {
+          try {
+            const parsedObs = typeof d.observaciones === 'string' && d.observaciones.startsWith('{')
+              ? JSON.parse(d.observaciones)
+              : { nombre: d.observaciones };
+            pName = parsedObs.nombre || parsedObs.nombreProducto || pName;
+            pAdiciones = parsedObs.adiciones || [];
+          } catch (e) {
+            pName = d.observaciones;
+          }
+        }
+        return {
+          id: d.idDetalleVenta || d.idVariante,
+          nombre: pName,
+          cantidad: d.cantidad,
+          precioUnitario: parseFloat(d.precioUnitario || 0),
+          total: parseFloat(d.subtotal || 0),
+          adiciones: pAdiciones
+        };
+      });
+    } else {
+      productos = [
+        {
+          id: 1,
+          nombre: "Pedido de Venta",
+          cantidad: 1,
+          precioUnitario: parseFloat(v.subtotal || 0),
+          total: parseFloat(v.subtotal || 0),
+          adiciones: []
+        }
+      ];
+    }
+
+    const subtotal = parseFloat(v.subtotal) || 0;
+    const total = parseFloat(v.total) || 0;
+    const iva = Math.round(subtotal * 0.19);
+
+    let estadoStr = 'Pendiente';
+    if (v.estadoEntrega === 'PREPARANDO') estadoStr = 'En Preparación';
+    else if (v.estadoEntrega === 'LISTO') estadoStr = 'Listo';
+    else if (v.estadoEntrega === 'ENTREGADO') estadoStr = 'Completada';
+    else if (v.estadoEntrega === 'CANCELADO') estadoStr = 'Anulada';
+    else if (v.estadoEntrega) estadoStr = v.estadoEntrega;
+
+    return {
+      id: v.idVenta,
+      idVenta: v.idVenta,
+      idDescuento: v.idDescuento || 1,
+      numeroVenta,
+      codigoPedido: numeroVenta,
+      clienteNombre,
+      cliente: clienteNombre,
+      idCliente: v.idCliente,
+      idUsuario: v.idUsuario,
+      fecha: v.fechaVenta,
+      fechaVenta: v.fechaVenta,
+      horario,
+      tipoEntrega,
+      metodoPago,
+      estadoPago,
+      estadoEntrega: v.estadoEntrega,
+      estado: estadoStr,
+      subtotal,
+      iva,
+      total,
+      observaciones: v.observaciones,
+      productos,
+      detalles: v.detalles || []
+    };
+  }
+
   static async getAll() {
     const ventas = await Venta.findAll({
       include: [
         { 
           model: Cliente, 
           as: 'cliente',
-          include: [{ model: User, attributes: ['idUsuario', 'nombre', 'apellidos'] }]
+          include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
         },
         { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
         { model: DetalleVentaProducto, as: 'detalles' }
@@ -15,40 +129,7 @@ class VentaService {
       order: [['idVenta', 'DESC']]
     });
 
-    return ventas.map(v => {
-      let nameStr = 'Cliente General';
-      if (v.cliente && v.cliente.User) {
-        nameStr = `${v.cliente.User.nombre} ${v.cliente.User.apellidos || ''}`.trim();
-      } else if (v.usuario) {
-        nameStr = `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim();
-      }
-
-      let estadoStr = 'Pendiente';
-      if (v.estadoEntrega === 'PREPARANDO') estadoStr = 'En Preparación';
-      else if (v.estadoEntrega === 'LISTO' || v.estadoEntrega === 'ENTREGADO') estadoStr = 'Completada';
-      else if (v.estadoEntrega === 'CANCELADO') estadoStr = 'Anulada';
-      else if (v.estadoEntrega) estadoStr = v.estadoEntrega;
-
-      return {
-        id: v.idVenta,
-        idVenta: v.idVenta,
-        numeroVenta: `VEN-${String(v.idVenta).padStart(4, '0')}`,
-        idCliente: v.idCliente,
-        idUsuario: v.idUsuario,
-        fechaVenta: v.fechaVenta,
-        fecha: v.fechaVenta,
-        subtotal: Number(v.subtotal || 0),
-        descuentoAplicado: Number(v.descuentoAplicado || 0),
-        total: Number(v.total || 0),
-        estadoEntrega: v.estadoEntrega,
-        estado: estadoStr,
-        observaciones: v.observaciones,
-        clienteNombre: nameStr,
-        cliente: nameStr,
-        usuario: v.usuario ? `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim() : null,
-        detalles: v.detalles || []
-      };
-    });
+    return ventas.map(v => this.formatVenta(v));
   }
 
   static async getById(id) {
@@ -57,7 +138,7 @@ class VentaService {
         { 
           model: Cliente, 
           as: 'cliente',
-          include: [{ model: User, attributes: ['idUsuario', 'nombre', 'apellidos'] }]
+          include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
         },
         { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
         { model: DetalleVentaProducto, as: 'detalles' }
@@ -68,39 +149,7 @@ class VentaService {
       error.statusCode = 404;
       throw error;
     }
-
-    let nameStr = 'Cliente General';
-    if (v.cliente && v.cliente.User) {
-      nameStr = `${v.cliente.User.nombre} ${v.cliente.User.apellidos || ''}`.trim();
-    } else if (v.usuario) {
-      nameStr = `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim();
-    }
-
-    let estadoStr = 'Pendiente';
-    if (v.estadoEntrega === 'PREPARANDO') estadoStr = 'En Preparación';
-    else if (v.estadoEntrega === 'LISTO' || v.estadoEntrega === 'ENTREGADO') estadoStr = 'Completada';
-    else if (v.estadoEntrega === 'CANCELADO') estadoStr = 'Anulada';
-    else if (v.estadoEntrega) estadoStr = v.estadoEntrega;
-
-    return {
-      id: v.idVenta,
-      idVenta: v.idVenta,
-      numeroVenta: `VEN-${String(v.idVenta).padStart(4, '0')}`,
-      idCliente: v.idCliente,
-      idUsuario: v.idUsuario,
-      fechaVenta: v.fechaVenta,
-      fecha: v.fechaVenta,
-      subtotal: Number(v.subtotal || 0),
-      descuentoAplicado: Number(v.descuentoAplicado || 0),
-      total: Number(v.total || 0),
-      estadoEntrega: v.estadoEntrega,
-      estado: estadoStr,
-      observaciones: v.observaciones,
-      clienteNombre: nameStr,
-      cliente: nameStr,
-      usuario: v.usuario ? `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim() : null,
-      detalles: v.detalles || []
-    };
+    return this.formatVenta(v);
   }
 
   static async create(data) {
@@ -125,15 +174,27 @@ class VentaService {
       finalUsuarioId = firstUser ? firstUser.idUsuario : 1;
     }
 
+    const obsStr = typeof data.observaciones === 'string' && !data.observaciones.startsWith('{')
+      ? data.observaciones
+      : JSON.stringify({
+          horario: data.horario || "12:30 – 12:48",
+          tipoEntrega: data.tipoEntrega || "Domicilio",
+          metodoPago: data.metodoPago || "Efectivo",
+          estadoPago: data.estadoPago || "Pagado",
+          codigoPedido: data.codigoPedido || data.numeroVenta || `VEN-${String(Date.now()).slice(-4)}`,
+          clienteNombre: data.clienteNombre || null,
+          productos: data.productos || []
+        });
+
     const venta = await Venta.create({
       idCliente: finalClienteId,
       idUsuario: finalUsuarioId,
-      idDescuento: data.idDescuento || null,
+      idDescuento: data.idDescuento || 1,
       subtotal: data.subtotal || data.total || 0,
       descuentoAplicado: data.descuentoAplicado || 0,
       total: data.total || 0,
       estadoEntrega: data.estadoEntrega || 'PENDIENTE',
-      observaciones: data.observaciones || null
+      observaciones: obsStr
     });
 
     if (data.detalles && data.detalles.length > 0) {
@@ -169,13 +230,15 @@ class VentaService {
       error.statusCode = 404;
       throw error;
     }
-    let mappedEstado = estado;
-    if (estado === 'Pendiente') mappedEstado = 'PENDIENTE';
-    else if (estado === 'En Preparación') mappedEstado = 'PREPARANDO';
-    else if (estado === 'Completada') mappedEstado = 'ENTREGADO';
-    else if (estado === 'Anulada') mappedEstado = 'CANCELADO';
 
-    v.estadoEntrega = mappedEstado;
+    let estadoEnum = estado;
+    if (estado === 'Pendiente') estadoEnum = 'PENDIENTE';
+    else if (estado === 'En Preparación') estadoEnum = 'PREPARANDO';
+    else if (estado === 'Listo') estadoEnum = 'LISTO';
+    else if (estado === 'Completada' || estado === 'Entregado') estadoEnum = 'ENTREGADO';
+    else if (estado === 'Anulada' || estado === 'CANCELADO') estadoEnum = 'CANCELADO';
+
+    v.estadoEntrega = estadoEnum;
     await v.save();
     return this.getById(id);
   }
