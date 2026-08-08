@@ -1,9 +1,9 @@
-const { Cliente, User, Role } = require('../../persistence/models');
+const { Cliente, User, Role, Venta, DetalleVentaProducto } = require('../../persistence/models');
 const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 const bcrypt = require('bcryptjs');
 
 class ClienteService {
-  static formatCliente(c) {
+  static async formatCliente(c) {
     let meta = {};
     let cleanDireccion = c.direccion || '';
 
@@ -22,24 +22,74 @@ class ClienteService {
     const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
     const descuentoPorcentaje = meta.descuentoPorcentaje !== undefined ? meta.descuentoPorcentaje : defaultDesc;
 
+    // Fetch real DB transactions for this client
+    let transacciones = [];
+    let comprasCount = 0;
+    let totalGastadoSum = 0;
+    let ticketPromedioVal = 0;
+
+    try {
+      const ventasDB = await Venta.findAll({
+        where: { idCliente: c.idCliente },
+        order: [['idVenta', 'DESC']],
+        include: [{ model: DetalleVentaProducto, as: 'detalles' }]
+      });
+
+      comprasCount = ventasDB.length;
+      totalGastadoSum = ventasDB.reduce((sum, v) => sum + Number(v.total || 0), 0);
+      ticketPromedioVal = comprasCount > 0 ? Math.round(totalGastadoSum / comprasCount) : 0;
+
+      transacciones = ventasDB.map(v => {
+        let prodNombre = "Pedido de Comida";
+        if (v.detalles && v.detalles.length > 0) {
+          prodNombre = v.detalles[0].observaciones || `Producto #${v.detalles[0].idVariante}`;
+          if (v.detalles.length > 1) {
+            prodNombre += ` + ${v.detalles.length - 1} más`;
+          }
+        }
+        return {
+          idTrans: v.codigoPedido || `VEN-${String(v.idVenta).padStart(4, '0')}`,
+          fecha: v.fechaVenta ? new Date(v.fechaVenta).toLocaleDateString('es-CO') : 'Reciente',
+          producto: prodNombre,
+          total: `$${Number(v.total || 0).toLocaleString('es-CO')}`
+        };
+      });
+    } catch (err) {
+      console.warn(`Error cargando ventas para cliente #${c.idCliente}:`, err.message);
+    }
+
+    // Determine state: if no user account linked, client state is Inactivo/Pendiente
+    let estadoStr = 'Activo';
+    if (!c.idUsuario || c.estado === 0 || meta.estado === 'Inactivo' || meta.estado === 0) {
+      estadoStr = 'Inactivo';
+    } else if (c.usuario && (c.usuario.estado === 'INACTIVO' || c.usuario.estado === '0' || c.usuario.estado === 0)) {
+      estadoStr = 'Inactivo';
+    }
+
     return {
       id: c.idCliente,
       idCliente: c.idCliente,
-      idUsuario: c.idUsuario,
+      idUsuario: c.idUsuario || null,
+      tieneCuenta: !!c.idUsuario && !!c.usuario,
       direccion: cleanDireccion,
       tipo,
       descuentoPorcentaje,
-      nombre: c.usuario ? c.usuario.nombre : 'Cliente',
-      apellidos: c.usuario ? c.usuario.apellidos : '',
-      email: c.usuario ? c.usuario.email : '',
-      telefono: c.usuario ? c.usuario.telefono : '',
-      estado: c.estado === 0 ? 'Inactivo' : 'Activo',
+      nombre: c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente sin cuenta'),
+      apellidos: c.usuario ? c.usuario.apellidos : (meta.apellidos || ''),
+      email: c.usuario ? c.usuario.email : (meta.email || ''),
+      telefono: c.usuario ? c.usuario.telefono : (meta.telefono || ''),
+      estado: estadoStr,
+      compras: comprasCount,
+      totalGastado: `$${totalGastadoSum.toLocaleString('es-CO')}`,
+      ticketPromedio: comprasCount > 0 ? `$${Math.round(ticketPromedioVal / 1000)}K` : '$0',
+      transacciones,
       usuario: c.usuario ? {
         id: c.usuario.idUsuario,
         nombre: c.usuario.nombre,
         apellidos: c.usuario.apellidos,
         email: c.usuario.email,
-        telefono: c.usuario.telefono
+        telefono: c.usuario.telefono,
+        estado: c.usuario.estado
       } : null
     };
   }
@@ -47,15 +97,19 @@ class ClienteService {
   static async getAll() {
     const clientes = await Cliente.findAll({
       order: [['idCliente', 'ASC']],
-      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono'] }]
+      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono', 'estado'] }]
     });
 
-    return clientes.map(c => this.formatCliente(c));
+    const result = [];
+    for (const c of clientes) {
+      result.push(await this.formatCliente(c));
+    }
+    return result;
   }
 
   static async getById(id) {
     const c = await Cliente.findByPk(id, {
-      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono'] }]
+      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono', 'estado'] }]
     });
 
     if (!c) {
@@ -68,9 +122,11 @@ class ClienteService {
   }
 
   static async create(data) {
-    let idUsuario = data.idUsuario;
+    let idUsuario = data.idUsuario || null;
+    const sinCuenta = data.sinCuenta || data.crearSinCuenta || (!data.contrasena && !idUsuario);
 
-    if (!idUsuario && data.nombre) {
+    // Only create a user if sinCuenta is false and credentials/data provided
+    if (!sinCuenta && !idUsuario && data.nombre && (data.email || data.contrasena)) {
       const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
       const defaultPass = data.contrasena || '123456';
       const salt = await bcrypt.genSalt(10);
@@ -83,7 +139,7 @@ class ClienteService {
         telefono: data.telefono ? data.telefono.trim() : '',
         contrasena: hashedPassword,
         idRol: clienteRol ? clienteRol.idRol : 3,
-        estado: 1
+        estado: 'ACTIVO'
       });
       idUsuario = user.idUsuario;
     }
@@ -92,16 +148,24 @@ class ClienteService {
     const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
     const descPorcent = data.descuentoPorcentaje !== undefined ? data.descuentoPorcentaje : defaultDesc;
 
+    // If client created without user account, it MUST be INACTIVO (0)
+    const estadoVal = (sinCuenta || !idUsuario || data.estado === 'Inactivo' || data.estado === 0) ? 0 : 1;
+
     const direccionMeta = JSON.stringify({
       direccion: data.direccion || '',
       tipo,
-      descuentoPorcentaje: descPorcent
+      descuentoPorcentaje: descPorcent,
+      nombre: data.nombre || '',
+      apellidos: data.apellidos || '',
+      email: data.email || '',
+      telefono: data.telefono || '',
+      estado: estadoVal === 0 ? 'Inactivo' : 'Activo'
     });
 
     const cliente = await Cliente.create({
       idUsuario: idUsuario,
       direccion: direccionMeta,
-      estado: data.estado === 'Inactivo' || data.estado === 0 ? 0 : 1
+      estado: estadoVal
     });
 
     await resetAutoIncrement('cliente', 'idCliente');
@@ -135,14 +199,40 @@ class ClienteService {
     const defaultDesc = newTipo === 'VIP' ? 15 : newTipo === 'Frecuente' ? 10 : newTipo === 'Regular' ? 5 : 0;
     const newDesc = data.descuentoPorcentaje !== undefined ? data.descuentoPorcentaje : (existingMeta.descuentoPorcentaje !== undefined ? existingMeta.descuentoPorcentaje : defaultDesc);
 
+    // Handle account linkage / creation upon edit if requested
+    if (data.crearCuenta && !c.idUsuario && data.email) {
+      const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
+      const defaultPass = data.contrasena || '123456';
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(defaultPass, salt);
+
+      const user = await User.create({
+        nombre: (data.nombre || existingMeta.nombre || 'Cliente').trim(),
+        apellidos: (data.apellidos || existingMeta.apellidos || '').trim(),
+        email: data.email.trim(),
+        telefono: (data.telefono || existingMeta.telefono || '').trim(),
+        contrasena: hashedPassword,
+        idRol: clienteRol ? clienteRol.idRol : 3,
+        estado: 'ACTIVO'
+      });
+      c.idUsuario = user.idUsuario;
+    } else if (data.idUsuario !== undefined) {
+      c.idUsuario = data.idUsuario;
+    }
+
+    const finalEstado = (!c.idUsuario || data.estado === 'Inactivo' || data.estado === 0) ? 0 : 1;
     c.direccion = JSON.stringify({
       direccion: newDireccionStr,
       tipo: newTipo,
-      descuentoPorcentaje: newDesc
+      descuentoPorcentaje: newDesc,
+      nombre: data.nombre !== undefined ? data.nombre : existingMeta.nombre,
+      apellidos: data.apellidos !== undefined ? data.apellidos : existingMeta.apellidos,
+      email: data.email !== undefined ? data.email : existingMeta.email,
+      telefono: data.telefono !== undefined ? data.telefono : existingMeta.telefono,
+      estado: finalEstado === 0 ? 'Inactivo' : 'Activo'
     });
 
-    if (data.idUsuario !== undefined) c.idUsuario = data.idUsuario;
-    if (data.estado !== undefined) c.estado = data.estado === 'Inactivo' || data.estado === 0 ? 0 : 1;
+    if (data.estado !== undefined) c.estado = finalEstado;
     await c.save();
 
     if (c.usuario) {
@@ -150,6 +240,9 @@ class ClienteService {
       if (data.apellidos !== undefined) c.usuario.apellidos = data.apellidos.trim();
       if (data.email !== undefined) c.usuario.email = data.email.trim();
       if (data.telefono !== undefined) c.usuario.telefono = data.telefono.trim();
+      if (data.estado !== undefined) {
+        c.usuario.estado = data.estado === 'Inactivo' || data.estado === 0 ? 'INACTIVO' : 'ACTIVO';
+      }
       await c.usuario.save();
     }
 

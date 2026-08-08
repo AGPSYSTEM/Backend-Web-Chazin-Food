@@ -111,6 +111,12 @@ class AuthService {
       throw error;
     }
 
+    if (user.estado === 'INACTIVO' || user.estado === '0' || user.estado === 0) {
+      const error = new Error('Tu usuario está inactivo. Comunícate con el administrador para activar tu cuenta.');
+      error.statusCode = 403;
+      throw error;
+    }
+
     const isMatch = await bcrypt.compare(password, user.contrasena);
     if (!isMatch) {
       const error = new Error('Credenciales inválidas');

@@ -1,4 +1,4 @@
-const { Venta, DetalleVentaProducto, Cliente, User } = require('../../persistence/models');
+const { Venta, DetalleVentaProducto, Cliente, User, Role } = require('../../persistence/models');
 
 class VentaService {
   static formatVenta(v) {
@@ -153,26 +153,55 @@ class VentaService {
   }
 
   static async create(data) {
-    let finalUsuarioId = data.idUsuario || data.userId;
-    let finalClienteId = data.idCliente;
+    let targetUserId = data.idUsuario || data.userId;
 
-    if (finalUsuarioId && !finalClienteId) {
-      let clienteObj = await Cliente.findOne({ where: { idUsuario: finalUsuarioId } });
-      if (!clienteObj) {
-        clienteObj = await Cliente.create({ idUsuario: finalUsuarioId, direccion: data.direccion || '' });
-      }
-      finalClienteId = clienteObj.idCliente;
+    // Strict Validation 1: Check user provided
+    if (!targetUserId) {
+      const error = new Error('No se especificó un usuario para realizar el pedido.');
+      error.statusCode = 400;
+      throw error;
     }
 
-    if (!finalClienteId) {
-      const firstCliente = await Cliente.findOne();
-      finalClienteId = firstCliente ? firstCliente.idCliente : 1;
+    // Strict Validation 2: Check user exists in DB
+    const userObj = await User.findByPk(targetUserId);
+    if (!userObj) {
+      const error = new Error('El usuario especificado no existe en el sistema.');
+      error.statusCode = 404;
+      throw error;
     }
 
-    if (!finalUsuarioId) {
-      const firstUser = await User.findOne();
-      finalUsuarioId = firstUser ? firstUser.idUsuario : 1;
+    // Strict Validation 3: Check user is ACTIVE
+    if (userObj.estado === 'INACTIVO' || userObj.estado === '0' || userObj.estado === 0) {
+      const error = new Error('Tu usuario está inactivo y no puedes realizar pedidos. Comunícate con el administrador para activar tu cuenta.');
+      error.statusCode = 403;
+      throw error;
     }
+
+    // Strict Validation 4 & 5: Check client linked to user
+    let clienteObj = await Cliente.findOne({ where: { idUsuario: targetUserId } });
+    
+    // Auto-associate client ONLY if this user has no client entry yet
+    if (!clienteObj) {
+      clienteObj = await Cliente.create({
+        idUsuario: targetUserId,
+        direccion: data.direccion || '',
+        estado: 1
+      });
+    }
+
+    // Strict Validation 6: Check client is ACTIVE
+    let clientMeta = {};
+    if (clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
+      try { clientMeta = JSON.parse(clienteObj.direccion); } catch (e) { clientMeta = {}; }
+    }
+
+    if (clienteObj.estado === 0 || clientMeta.estado === 'Inactivo' || clientMeta.estado === 0) {
+      const error = new Error('No puedes realizar el pedido porque tu cliente está inactivo.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const finalClienteId = clienteObj.idCliente;
 
     const obsStr = typeof data.observaciones === 'string' && !data.observaciones.startsWith('{')
       ? data.observaciones
@@ -182,13 +211,13 @@ class VentaService {
           metodoPago: data.metodoPago || "Efectivo",
           estadoPago: data.estadoPago || "Pagado",
           codigoPedido: data.codigoPedido || data.numeroVenta || `VEN-${String(Date.now()).slice(-4)}`,
-          clienteNombre: data.clienteNombre || null,
+          clienteNombre: data.clienteNombre || `${userObj.nombre} ${userObj.apellidos || ''}`.trim(),
           productos: data.productos || []
         });
 
     const venta = await Venta.create({
       idCliente: finalClienteId,
-      idUsuario: finalUsuarioId,
+      idUsuario: targetUserId,
       idDescuento: data.idDescuento || null,
       subtotal: data.subtotal || data.total || 0,
       descuentoAplicado: data.descuentoAplicado || 0,
@@ -213,7 +242,6 @@ class VentaService {
 
       const detalles = data.detalles.map(d => {
         let varianteId = d.idVariante || fallbackVarianteId;
-        // If the requested idVariante doesn't exist in the variante table, use fallback
         if (!validVarianteIds.has(varianteId)) {
           varianteId = fallbackVarianteId;
         }

@@ -100,7 +100,7 @@ const Cliente = sequelize.define('cliente', {
   },
   idUsuario: {
     type: DataTypes.INTEGER,
-    allowNull: false
+    allowNull: true
   },
   direccion: {
     type: DataTypes.STRING
