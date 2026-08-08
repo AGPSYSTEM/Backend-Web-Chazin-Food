@@ -1,10 +1,20 @@
 const { CategoriaProducto, Product } = require('../../persistence/models');
+const { Op } = require('sequelize');
 
 class CategoriaProductoService {
+  /* Obtiene todas las categorías registradas en la base de datos y
+ además cuenta cuántos productos pertenecen a cada categoría para devolver esa información al cliente*/
   static async getAll() {
     const categorias = await CategoriaProducto.findAll();
     const list = await Promise.all(categorias.map(async (cat) => {
-      const cantidad = await Product.count({ where: { idCategoriaProducto: cat.idCategoriaProducto } });
+      const cantidad = await Product.count({
+        where: {
+          [Op.or]: [
+            { idCategoriaProducto: cat.idCategoriaProducto },
+            { categoria: cat.nombre }
+          ]
+        }
+      });
       return {
         id: cat.idCategoriaProducto,
         idCategoriaProducto: cat.idCategoriaProducto,
@@ -17,6 +27,7 @@ class CategoriaProductoService {
     return list;
   }
 
+  /*Busca una categoría por su ID. Si no existe, devuelve un error 404 indicando que la categoría no fue encontrada.*/
   static async getById(id) {
     const cat = await CategoriaProducto.findByPk(id);
     if (!cat) {
@@ -24,7 +35,14 @@ class CategoriaProductoService {
       error.statusCode = 404;
       throw error;
     }
-    const cantidad = await Product.count({ where: { idCategoriaProducto: id } });
+    const cantidad = await Product.count({
+      where: {
+        [Op.or]: [
+          { idCategoriaProducto: id },
+          { categoria: cat.nombre }
+        ]
+      }
+    });
     return {
       id: cat.idCategoriaProducto,
       idCategoriaProducto: cat.idCategoriaProducto,
@@ -34,7 +52,8 @@ class CategoriaProductoService {
       cantidad
     };
   }
-
+  /*Crea una nueva categoría.
+   Antes de guardarla valida que el nombre no esté vacío y que no exista otra categoría con el mismo nombre. */
   static async create({ nombre, descripcion }) {
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre de la categoría es obligatorio');
@@ -57,7 +76,7 @@ class CategoriaProductoService {
 
     return this.getById(category.idCategoriaProducto);
   }
-
+  /*Actualiza la información de una categoría existente, como el nombre, la descripción y el estado. */
   static async update(id, data) {
     const cat = await CategoriaProducto.findByPk(id);
     if (!cat) {
@@ -75,7 +94,8 @@ class CategoriaProductoService {
     await cat.save();
     return this.getById(id);
   }
-
+  /*Elimina una categoría únicamente si no tiene productos asociados.
+   Si existen productos relacionados, genera un error para evitar inconsistencias en la base de datos. */
   static async delete(id) {
     const cat = await CategoriaProducto.findByPk(id);
     if (!cat) {
@@ -84,14 +104,25 @@ class CategoriaProductoService {
       throw error;
     }
 
-    const cantidadProductos = await Product.count({ where: { idCategoriaProducto: id } });
+    const cantidadProductos = await Product.count({
+      where: {
+        [Op.or]: [
+          { idCategoriaProducto: id },
+          { categoria: cat.nombre }
+        ]
+      }
+    });
+
     if (cantidadProductos > 0) {
-      const error = new Error('No se puede eliminar la categoría porque tiene productos asociados');
+      const error = new Error(`No se puede eliminar la categoría "${cat.nombre}" porque tiene ${cantidadProductos} producto(s) asociado(s).`);
       error.statusCode = 400;
       throw error;
     }
 
     await cat.destroy();
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+    await resequenceTableIds('categoriaproducto', 'idCategoriaProducto', ['producto']);
+
     return { message: 'Categoría de producto eliminada exitosamente' };
   }
 }

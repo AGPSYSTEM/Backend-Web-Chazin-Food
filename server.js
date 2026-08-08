@@ -46,14 +46,14 @@ app.use('/api/auth', require('./src/presentation/routes/authRoutes'));
 app.use('/api/categories', require('./src/presentation/routes/categoryRoutes'));
 app.use('/api/users', require('./src/presentation/routes/userRoutes'));
 app.use('/api/products', require('./src/presentation/routes/productRoutes'));
-app.use('/api/orders', require('./src/presentation/routes/orderRoutes'));
+app.use('/api/orders', require('./src/presentation/routes/ventaRoutes'));
 
 // Rutas en Español
 app.use('/api/autenticacion', require('./src/presentation/routes/authRoutes'));
-app.use('/api/categorias', require('./src/presentation/routes/categoryRoutes'));
+app.use('/api/categorias', require('./src/presentation/routes/categoriaProductoRoutes'));
 app.use('/api/usuarios', require('./src/presentation/routes/userRoutes'));
 app.use('/api/productos', require('./src/presentation/routes/productRoutes'));
-app.use('/api/pedidos', require('./src/presentation/routes/orderRoutes'));
+app.use('/api/pedidos', require('./src/presentation/routes/ventaRoutes'));
 app.use('/api/roles', require('./src/presentation/routes/roleRoutes'));
 app.use('/api/insumos', require('./src/presentation/routes/insumoRoutes'));
 app.use('/api/categorias-insumo', require('./src/presentation/routes/categoriaInsumoRoutes'));
@@ -67,6 +67,7 @@ app.use('/api/ventas', require('./src/presentation/routes/ventaRoutes'));
 app.use('/api/fichas-tecnicas', require('./src/presentation/routes/fichaTecnicaRoutes'));
 app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes'));
 app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
+app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
