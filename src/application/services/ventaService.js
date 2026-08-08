@@ -81,6 +81,27 @@ class VentaService {
     const total = parseFloat(v.total) || 0;
     const iva = Math.round(subtotal * 0.19);
 
+    let descuentoPorcentaje = obsData.descuentoPorcentaje || 0;
+    if (!descuentoPorcentaje && parseFloat(v.descuentoAplicado || 0) > 0 && (subtotal > 0 || total > 0)) {
+      const base = subtotal > total ? subtotal : total + parseFloat(v.descuentoAplicado);
+      descuentoPorcentaje = Math.round((parseFloat(v.descuentoAplicado) / base) * 100);
+    } else if (!descuentoPorcentaje && clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
+      try {
+        const meta = JSON.parse(clienteObj.direccion);
+        if (meta.descuentoPorcentaje) descuentoPorcentaje = parseFloat(meta.descuentoPorcentaje);
+      } catch (e) {}
+    }
+
+    let precioOriginal = subtotal > total ? subtotal : total;
+    if (descuentoPorcentaje > 0 && total > 0) {
+      if (parseFloat(v.descuentoAplicado || 0) > 0) {
+        precioOriginal = total + parseFloat(v.descuentoAplicado);
+      } else if (precioOriginal === total) {
+        precioOriginal = Math.round(total / (1 - (descuentoPorcentaje / 100)));
+      }
+    }
+    const montoDescuento = Math.max(0, precioOriginal - total);
+
     let estadoStr = 'Pendiente';
     if (v.estadoEntrega === 'PREPARANDO') estadoStr = 'En Preparación';
     else if (v.estadoEntrega === 'LISTO') estadoStr = 'Listo';
@@ -108,6 +129,10 @@ class VentaService {
       estado: estadoStr,
       subtotal,
       iva,
+      precioOriginal,
+      descuentoPorcentaje,
+      montoDescuento,
+      descuentoAplicado: parseFloat(v.descuentoAplicado || 0) || montoDescuento,
       total,
       observaciones: v.observaciones,
       productos,
