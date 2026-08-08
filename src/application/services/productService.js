@@ -1,8 +1,12 @@
-const { Product } = require('../../persistence/models');
+const { Product, CategoriaProducto } = require('../../persistence/models');
 
 class ProductService {
+  /*Obtiene todos los productos registrados junto con la información de su categoría.
+   Además, organiza los datos antes de enviarlos al cliente. */
   static async getProducts() {
-    const products = await Product.findAll();
+    const products = await Product.findAll({
+      include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
+    });
     return products.map(p => {
       let adiciones = [];
       try {
@@ -11,21 +15,26 @@ class ProductService {
         adiciones = [];
       }
       return {
-        _id: p.id,
-        id: p.id,
+        _id: p.idProducto,
+        id: p.idProducto,
+        idProducto: p.idProducto,
         nombre: p.nombre,
-        precio: parseFloat(p.precio),
+        precio: parseFloat(p.precio || 0),
         descripcion: p.descripcion || '',
         imagen: p.imagen || '',
         stock: p.stock || 0,
-        categoria: p.categoria || '',
+        idCategoriaProducto: p.idCategoriaProducto,
+        categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
+        estado: p.estado === 1 ? 'Activo' : 'Inactivo',
         adiciones
       };
     });
   }
-
+  /*Busca un producto por su ID. Si no existe, devuelve un error 404. */
   static async getProductById(id) {
-    const p = await Product.findByPk(id);
+    const p = await Product.findByPk(id, {
+      include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
+    });
     if (!p) {
       const error = new Error('Producto no encontrado');
       error.statusCode = 404;
@@ -40,22 +49,26 @@ class ProductService {
     }
 
     return {
-      _id: p.id,
-      id: p.id,
+      _id: p.idProducto,
+      id: p.idProducto,
+      idProducto: p.idProducto,
       nombre: p.nombre,
-      precio: parseFloat(p.precio),
+      precio: parseFloat(p.precio || 0),
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
       stock: p.stock || 0,
-      categoria: p.categoria || '',
+      idCategoriaProducto: p.idCategoriaProducto,
+      categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
+      estado: p.estado === 1 ? 'Activo' : 'Inactivo',
       adiciones
     };
   }
-
+  /*Crea un nuevo producto. Antes de guardarlo, valida que el nombre sea obligatorio,
+   que no exista otro producto con el mismo nombre y asigna la categoría correspondiente.*/
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones } = data;
-    if (!nombre || !nombre.trim() || precio === undefined) {
-      const error = new Error('Nombre y precio del producto son obligatorios');
+    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto } = data;
+    if (!nombre || !nombre.trim()) {
+      const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
       throw error;
     }
@@ -67,9 +80,21 @@ class ProductService {
       throw error;
     }
 
+    // Resolve category ID
+    let resolvedCatId = idCategoriaProducto;
+    if (!resolvedCatId && categoria) {
+      const catObj = await CategoriaProducto.findOne({ where: { nombre: categoria } });
+      if (catObj) resolvedCatId = catObj.idCategoriaProducto;
+    }
+    if (!resolvedCatId) {
+      const firstCat = await CategoriaProducto.findOne();
+      resolvedCatId = firstCat ? firstCat.idCategoriaProducto : 1;
+    }
+
     const product = await Product.create({
+      idCategoriaProducto: resolvedCatId,
       nombre: nombre.trim(),
-      precio,
+      precio: precio || 0,
       descripcion: descripcion || '',
       imagen: imagen || '',
       stock: stock || 0,
@@ -77,9 +102,9 @@ class ProductService {
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
     });
 
-    return this.getProductById(product.id);
+    return this.getProductById(product.idProducto);
   }
-
+  /*Actualiza la información de un producto, como el nombre, precio, stock, categoría, estado y demás datos. */
   static async updateProduct(id, data) {
     const p = await Product.findByPk(id);
     if (!p) {
@@ -88,19 +113,30 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones } = data;
+    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, estado, idCategoriaProducto } = data;
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (precio !== undefined) p.precio = precio;
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
     if (stock !== undefined) p.stock = stock;
-    if (categoria !== undefined) p.categoria = categoria;
+    if (estado !== undefined) {
+      p.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
+    }
+
+    if (idCategoriaProducto) {
+      p.idCategoriaProducto = idCategoriaProducto;
+    } else if (categoria !== undefined) {
+      p.categoria = categoria;
+      const catObj = await CategoriaProducto.findOne({ where: { nombre: categoria } });
+      if (catObj) p.idCategoriaProducto = catObj.idCategoriaProducto;
+    }
+
     if (adiciones !== undefined) p.adiciones = JSON.stringify(adiciones);
 
     await p.save();
     return this.getProductById(id);
   }
-
+  /*Elimina un producto de la base de datos y reinicia el autoincremento de la tabla. */
   static async deleteProduct(id) {
     const p = await Product.findByPk(id);
     if (!p) {
