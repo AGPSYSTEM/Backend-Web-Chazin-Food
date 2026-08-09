@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { User, Role, Cliente } = require('../../persistence/models');
+const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
   if (!raw) return '';
@@ -114,6 +115,16 @@ class UserService {
       });
     }
 
+    // Send welcome email if requested
+    if (userData.enviarCorreoBienvenida || userData.notificarEmail) {
+      EmailService.sendWelcomeEmail({
+        email: user.email,
+        nombre: user.nombre,
+        apellidos: user.apellidos,
+        password: finalPassword
+      }).catch(err => console.error('Background welcome email error:', err.message));
+    }
+
     return this.getUserById(user.idUsuario);
   }
 
@@ -126,6 +137,7 @@ class UserService {
     }
 
     const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const isPasswordOnly = Boolean((contrasena || contraseña || password) && !nombre && !email && !correo && !telefono && !idRol && !estado);
     
     if (nombre) user.nombre = nombre;
     if (apellidos !== undefined || apellido !== undefined) user.apellidos = apellidos || apellido || '';
@@ -156,6 +168,24 @@ class UserService {
       } else {
         const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
         await Cliente.create({ idUsuario: id, direccion: metaStr });
+      }
+    }
+
+    // Send notification email if requested
+    if (userData.notificarEmail || userData.notificarCambios) {
+      if (isPasswordOnly || contrasena || contraseña || password) {
+        EmailService.sendPasswordChangedEmail({
+          email: user.email,
+          nombre: user.nombre,
+          apellidos: user.apellidos
+        }).catch(err => console.error('Background password email error:', err.message));
+      } else {
+        EmailService.sendUserUpdatedEmail({
+          email: user.email,
+          nombre: user.nombre,
+          apellidos: user.apellidos,
+          modifiedFields: 'Nombre, Teléfono, Rol o Estado'
+        }).catch(err => console.error('Background user update email error:', err.message));
       }
     }
 
