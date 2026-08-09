@@ -171,8 +171,8 @@ class UserService {
       }
     }
 
-    // Send notification email if requested
-    if (userData.notificarEmail || userData.notificarCambios) {
+    // Send notification email unless explicitly set to false
+    if (userData.notificarEmail !== false && userData.notificarEmail !== 0) {
       if (isPasswordOnly || contrasena || contraseña || password) {
         EmailService.sendPasswordChangedEmail({
           email: user.email,

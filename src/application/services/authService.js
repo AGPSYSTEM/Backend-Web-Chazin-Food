@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User, Role, Cliente, Permiso } = require('../../persistence/models');
+const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
   if (!raw) return '';
@@ -87,6 +88,14 @@ class AuthService {
         console.warn('Advertencia al crear registro de cliente:', err.message);
       }
     }
+
+    // Send welcome email upon registration
+    EmailService.sendWelcomeEmail({
+      email: user.email,
+      nombre: user.nombre,
+      apellidos: user.apellidos,
+      password: finalPassword
+    }).catch(err => console.error('Background welcome email error in register:', err.message));
 
     const role = await Role.findByPk(user.idRol);
 
