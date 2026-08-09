@@ -1,3 +1,5 @@
+const { Venta, DetalleVentaProducto } = require('../../persistence/models');
+
 // In-memory store for production orders initialized with sample data matching the reference mockup
 let ordenesProduccion = [
   {
@@ -173,7 +175,79 @@ let ordenesProduccion = [
 
 class ProduccionService {
   static async getAll() {
-    return ordenesProduccion;
+    let salesOrders = [];
+    try {
+      const ventas = await Venta.findAll({
+        include: [{ model: DetalleVentaProducto, as: 'detalles' }],
+        order: [['idVenta', 'DESC']]
+      });
+
+      salesOrders = ventas.map(v => {
+        let obsObj = {};
+        try {
+          obsObj = typeof v.observaciones === 'string' ? JSON.parse(v.observaciones) : (v.observaciones || {});
+        } catch (e) {
+          obsObj = {};
+        }
+
+        const codigo = v.codigoPedido || obsObj.codigoPedido || `VEN-${v.idVenta}`;
+        const clienteNombre = v.clienteNombre || obsObj.clienteNombre || 'Cliente General';
+
+        let platilloNombre = "Pedido General";
+        let cantidadTotal = 0;
+        let prodsList = [];
+
+        if (obsObj.productos && Array.isArray(obsObj.productos) && obsObj.productos.length > 0) {
+          prodsList = obsObj.productos;
+          platilloNombre = obsObj.productos.map(p => `${p.nombre || 'Producto'} (x${p.cantidad || 1})`).join(', ');
+          cantidadTotal = obsObj.productos.reduce((sum, p) => sum + (Number(p.cantidad) || 1), 0);
+        } else if (v.detalles && v.detalles.length > 0) {
+          platilloNombre = v.detalles.map(d => `${d.observaciones || 'Producto'} (x${d.cantidad || 1})`).join(', ');
+          cantidadTotal = v.detalles.reduce((sum, d) => sum + (Number(d.cantidad) || 1), 0);
+        } else {
+          cantidadTotal = 1;
+        }
+
+        let estadoStr = "En Cola";
+        const est = (v.estadoEntrega || 'PENDIENTE').toUpperCase();
+        if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') estadoStr = "En Preparación";
+        else if (est === 'LISTO') estadoStr = "Listo";
+        else if (est === 'ENTREGADO' || est === 'DESPACHADO') estadoStr = "Despachado";
+        else if (est === 'CANCELADO' || est === 'ANULADA') estadoStr = "Anulada";
+        else estadoStr = "En Cola";
+
+        let fechaStr = new Date().toISOString().split("T")[0];
+        let horaStr = "10:00";
+        if (v.fechaCreacion || v.createdAt) {
+          const d = new Date(v.fechaCreacion || v.createdAt);
+          fechaStr = d.toISOString().split("T")[0];
+          horaStr = d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+        }
+
+        return {
+          id: `VEN-${v.idVenta}`,
+          idVenta: v.idVenta,
+          codigo: codigo,
+          platilloNombre: platilloNombre,
+          imagen: "🍔",
+          cantidad: cantidadTotal,
+          responsable: clienteNombre,
+          cocinero: "Cocina Central",
+          tiempo: "15 min",
+          fecha: fechaStr,
+          horaInicio: horaStr,
+          prioridad: est === 'PENDIENTE' ? "Alta" : "Normal",
+          estado: estadoStr,
+          alerta: est === 'PENDIENTE',
+          observaciones: obsObj.especificaciones || v.observaciones || "",
+          ingredientes: prodsList.map(p => ({ nombre: p.nombre || 'Producto', cantidad: `${p.cantidad || 1} unidad(es)` }))
+        };
+      });
+    } catch (err) {
+      console.warn('Error al cargar ventas en ProduccionService:', err.message);
+    }
+
+    return [...salesOrders, ...ordenesProduccion];
   }
 
   static async create(data) {
@@ -203,6 +277,33 @@ class ProduccionService {
   }
 
   static async updateEstado(id, nuevoEstado) {
+    let idVentaNum = null;
+    if (typeof id === 'string' && id.startsWith('VEN-')) {
+      idVentaNum = Number(id.replace('VEN-', ''));
+    } else if (typeof id === 'number' || !isNaN(Number(id))) {
+      const matchV = await Venta.findByPk(Number(id));
+      if (matchV) idVentaNum = Number(id);
+    }
+
+    if (idVentaNum) {
+      try {
+        const v = await Venta.findByPk(idVentaNum);
+        if (v) {
+          let estadoEnum = 'PENDIENTE';
+          if (nuevoEstado === 'En Preparación') estadoEnum = 'PREPARANDO';
+          else if (nuevoEstado === 'Listo') estadoEnum = 'LISTO';
+          else if (nuevoEstado === 'Despachado' || nuevoEstado === 'Entregado') estadoEnum = 'ENTREGADO';
+          else if (nuevoEstado === 'Anulada' || nuevoEstado === 'CANCELADO') estadoEnum = 'CANCELADO';
+
+          v.estadoEntrega = estadoEnum;
+          await v.save();
+          return { id, estado: nuevoEstado, message: "Estado actualizado en MySQL" };
+        }
+      } catch (e) {
+        console.warn('Error actualizando estado de venta en produccion:', e.message);
+      }
+    }
+
     const numericId = Number(id);
     const index = ordenesProduccion.findIndex((o) => String(o.id) === String(id) || o.id === numericId);
     if (index !== -1) {
