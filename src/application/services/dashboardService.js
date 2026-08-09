@@ -144,21 +144,38 @@ class DashboardService {
 
   static async getProductosPopulares() {
     try {
-      const productos = await Product.findAll({
-        where: { estado: 1 },
-        order: [['idProducto', 'ASC']],
-        limit: 5,
-        raw: true
-      }).catch(() => []);
+      // Real query: count how many units of each product were sold
+      const [results] = await sequelize.query(`
+        SELECT p.nombre, SUM(dv.cantidad) as totalVendido
+        FROM detalleventaproducto dv
+        JOIN variante v ON dv.idVariante = v.idVariante
+        JOIN producto p ON v.idProducto = p.idProducto
+        GROUP BY p.idProducto, p.nombre
+        ORDER BY totalVendido DESC
+        LIMIT 5
+      `).catch(() => [[]]);
 
-      if (productos.length === 0) return [];
+      if (!results || results.length === 0) {
+        // Fallback: return active products with 0 ventas
+        const productos = await Product.findAll({
+          where: { estado: 1 },
+          order: [['idProducto', 'ASC']],
+          limit: 5,
+          raw: true
+        }).catch(() => []);
+        return productos.map(p => ({
+          id: p.idProducto,
+          nombre: p.nombre,
+          ventas: 0,
+          ingresos: 0
+        }));
+      }
 
-      // Query sales count per product
-      return productos.map(p => ({
-        id: p.idProducto,
-        nombre: p.nombre,
-        ventas: Math.max(1, Math.round((p.precio ? 200000 / p.precio : 10))),
-        ingresos: parseFloat(p.precio || 0) * 10
+      return results.map((r, i) => ({
+        id: i + 1,
+        nombre: r.nombre,
+        ventas: parseInt(r.totalVendido) || 0,
+        ingresos: 0
       }));
     } catch (error) {
       console.error('Error in getProductosPopulares:', error);
