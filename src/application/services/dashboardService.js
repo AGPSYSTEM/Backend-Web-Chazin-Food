@@ -22,7 +22,7 @@ class DashboardService {
       const totalVentasSum = todasVentas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
       const ventasTotal = totalVentasActual > 0 ? totalVentasActual : totalVentasSum;
 
-      let ventasVariacion = 12.5;
+      let ventasVariacion = 0;
       if (totalVentasAnterior > 0) {
         ventasVariacion = parseFloat((((totalVentasActual - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1));
       }
@@ -32,7 +32,7 @@ class DashboardService {
       const pedidosTotalAnterior = ventasMesAnterior.length;
       const pedidosTotal = todasVentas.length;
 
-      let pedidosVariacion = 8.2;
+      let pedidosVariacion = 0;
       if (pedidosTotalAnterior > 0) {
         pedidosVariacion = parseFloat((((pedidosTotalActual - pedidosTotalAnterior) / pedidosTotalAnterior) * 100).toFixed(1));
       }
@@ -61,8 +61,8 @@ class DashboardService {
         pedidosVariacion,
         clientesTotal,
         clientesActivos,
-        clientesVariacion: 15.3,
-        productosTotal: productosTotal || 68,
+        clientesVariacion: 0,
+        productosTotal,
         insumosBajoStock
       };
     } catch (error) {
