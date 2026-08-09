@@ -144,37 +144,56 @@ class DashboardService {
 
   static async getProductosPopulares() {
     try {
-      // Real query: count how many units of each product were sold
-      const [results] = await sequelize.query(`
-        SELECT p.nombre, SUM(dv.cantidad) as totalVendido
+      // Consultar los detalles de venta reales
+      const [rows] = await sequelize.query(`
+        SELECT dv.observaciones, dv.cantidad, p.nombre as productoNombre
         FROM detalleventaproducto dv
-        JOIN variante v ON dv.idVariante = v.idVariante
-        JOIN producto p ON v.idProducto = p.idProducto
-        GROUP BY p.idProducto, p.nombre
-        ORDER BY totalVendido DESC
-        LIMIT 5
+        LEFT JOIN variante var ON dv.idVariante = var.idVariante
+        LEFT JOIN producto p ON var.idProducto = p.idProducto
       `).catch(() => [[]]);
 
-      if (!results || results.length === 0) {
-        // Fallback: return active products with 0 ventas
-        const productos = await Product.findAll({
-          where: { estado: 1 },
-          order: [['idProducto', 'ASC']],
-          limit: 5,
-          raw: true
-        }).catch(() => []);
-        return productos.map(p => ({
-          id: p.idProducto,
-          nombre: p.nombre,
-          ventas: 0,
-          ingresos: 0
-        }));
+      if (!rows || rows.length === 0) {
+        return [];
       }
 
-      return results.map((r, i) => ({
+      const productCounts = {};
+      rows.forEach(r => {
+        let pName = null;
+        if (r.observaciones) {
+          try {
+            const parsed = typeof r.observaciones === 'string' && r.observaciones.startsWith('{')
+              ? JSON.parse(r.observaciones)
+              : { nombre: r.observaciones };
+            pName = parsed.nombre || parsed.nombreProducto || (typeof r.observaciones === 'string' ? r.observaciones : null);
+          } catch (e) {
+            pName = typeof r.observaciones === 'string' ? r.observaciones : null;
+          }
+        }
+        if (!pName && r.productoNombre) {
+          pName = r.productoNombre;
+        }
+
+        if (!pName || pName === "Pedido de Venta" || pName === "Producto General" || pName.startsWith("Producto #")) return;
+
+        // Limpiar adiciones entre paréntesis (ej: "Pollo Broaster (+Salsa...)" -> "Pollo Broaster")
+        const nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").trim();
+        if (!nombreLimpio || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
+
+        const key = nombreLimpio.toLowerCase();
+        if (!productCounts[key]) {
+          productCounts[key] = { nombre: nombreLimpio, ventas: 0 };
+        }
+        productCounts[key].ventas += (parseInt(r.cantidad) || 1);
+      });
+
+      const sorted = Object.values(productCounts)
+        .sort((a, b) => b.ventas - a.ventas)
+        .slice(0, 5);
+
+      return sorted.map((p, i) => ({
         id: i + 1,
-        nombre: r.nombre,
-        ventas: parseInt(r.totalVendido) || 0,
+        nombre: p.nombre,
+        ventas: p.ventas,
         ingresos: 0
       }));
     } catch (error) {
@@ -202,6 +221,31 @@ class DashboardService {
       }));
     } catch (error) {
       console.error('Error in getAlertasStock:', error);
+      return [];
+    }
+  }
+
+  static async getVentasRecientes() {
+    try {
+      const VentaService = require('./ventaService');
+      const { Venta, Cliente, User, DetalleVentaProducto } = require('../../persistence/models');
+      const ventas = await Venta.findAll({
+        include: [
+          { 
+            model: Cliente, 
+            as: 'cliente',
+            include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
+          },
+          { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
+          { model: DetalleVentaProducto, as: 'detalles' }
+        ],
+        order: [['idVenta', 'DESC']],
+        limit: 5
+      });
+
+      return ventas.map(v => VentaService.formatVenta(v));
+    } catch (error) {
+      console.error('Error in getVentasRecientes:', error);
       return [];
     }
   }

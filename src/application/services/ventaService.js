@@ -23,17 +23,46 @@ class VentaService {
 
     const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `VEN-${String(v.idVenta).padStart(4, '0')}`;
     
-    // Dynamic format of date/time
+    // Dynamic format of date/time (Formato 12 horas con AM/PM)
     let horario = obsData.horario;
     if (!horario && v.fechaVenta) {
       const d = new Date(v.fechaVenta);
-      const hStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      horario = `${hStr} – ${hStr}`;
+      let h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+      horario = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
     }
-    horario = horario || "12:30 – 12:48";
+    // Si el horario guardado es en formato 24h (ej: "23:56"), convertirlo a 12h AM/PM
+    if (horario && typeof horario === 'string') {
+      if (horario.includes('–')) {
+        horario = horario.split('–')[0].trim();
+      }
+      if (/^\d{1,2}:\d{2}$/.test(horario.trim())) {
+        const parts = horario.trim().split(':');
+        let h = parseInt(parts[0], 10);
+        const m = parts[1];
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        h = h ? h : 12;
+        horario = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+      }
+    }
+    horario = horario || null;
 
-    const tipoEntrega = obsData.tipoEntrega || "Domicilio";
-    const metodoPago = obsData.metodoPago || "Efectivo";
+    const tipoEntrega = obsData.tipoEntrega || (
+      (v.observaciones || "").toLowerCase().includes("recoger") || (v.observaciones || "").toLowerCase().includes("para llevar") || (v.observaciones || "").toLowerCase().includes("llevar")
+        ? "Recoger"
+        : "Domicilio"
+    );
+    const metodoPago = obsData.metodoPago || (
+      (v.observaciones || "").toLowerCase().includes("tarjeta")
+        ? "Tarjeta"
+        : (v.observaciones || "").toLowerCase().includes("transfer") || (v.observaciones || "").toLowerCase().includes("nequi") || (v.observaciones || "").toLowerCase().includes("davi")
+          ? "Transferencia"
+          : "Efectivo"
+    );
     const estadoPago = obsData.estadoPago || "Pagado";
 
     // Dynamic products from db details or order metadata
@@ -42,21 +71,22 @@ class VentaService {
       productos = obsData.productos;
     } else if (v.detalles && v.detalles.length > 0) {
       productos = v.detalles.map(d => {
-        let pName = `Producto #${d.idVariante}`;
+        let pName = null;
         let pAdiciones = [];
         if (d.observaciones) {
           try {
             const parsedObs = typeof d.observaciones === 'string' && d.observaciones.startsWith('{')
               ? JSON.parse(d.observaciones)
               : { nombre: d.observaciones };
-            pName = parsedObs.nombre || parsedObs.nombreProducto || pName;
+            pName = parsedObs.nombre || parsedObs.nombreProducto || null;
             pAdiciones = parsedObs.adiciones || [];
           } catch (e) {
-            pName = d.observaciones;
+            pName = typeof d.observaciones === 'string' ? d.observaciones : null;
           }
         }
         return {
           id: d.idDetalleVenta || d.idVariante,
+          idVariante: d.idVariante,
           nombre: pName,
           cantidad: d.cantidad,
           precioUnitario: parseFloat(d.precioUnitario || 0),
@@ -65,16 +95,8 @@ class VentaService {
         };
       });
     } else {
-      productos = [
-        {
-          id: 1,
-          nombre: "Pedido de Venta",
-          cantidad: 1,
-          precioUnitario: parseFloat(v.subtotal || 0),
-          total: parseFloat(v.subtotal || 0),
-          adiciones: []
-        }
-      ];
+      // Sin detalles reales en BD: devolver array vacío (no inventar productos ficticios)
+      productos = [];
     }
 
     const subtotal = parseFloat(v.subtotal) || 0;
@@ -85,10 +107,17 @@ class VentaService {
     if (!descuentoPorcentaje && parseFloat(v.descuentoAplicado || 0) > 0 && (subtotal > 0 || total > 0)) {
       const base = subtotal > total ? subtotal : total + parseFloat(v.descuentoAplicado);
       descuentoPorcentaje = Math.round((parseFloat(v.descuentoAplicado) / base) * 100);
-    } else if (!descuentoPorcentaje && clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
+    } else if (!descuentoPorcentaje && clienteObj && clienteObj.direccion) {
       try {
-        const meta = JSON.parse(clienteObj.direccion);
-        if (meta.descuentoPorcentaje) descuentoPorcentaje = parseFloat(meta.descuentoPorcentaje);
+        if (clienteObj.direccion.trim().startsWith('{')) {
+          const meta = JSON.parse(clienteObj.direccion);
+          if (meta.descuentoPorcentaje !== undefined) {
+            descuentoPorcentaje = parseFloat(meta.descuentoPorcentaje);
+          } else if (meta.tipo) {
+            const t = meta.tipo;
+            descuentoPorcentaje = t === 'VIP' ? 15 : t === 'Frecuente' ? 10 : t === 'Regular' ? 5 : 0;
+          }
+        }
       } catch (e) {}
     }
 
@@ -228,17 +257,29 @@ class VentaService {
 
     const finalClienteId = clienteObj.idCliente;
 
-    const obsStr = typeof data.observaciones === 'string' && !data.observaciones.startsWith('{')
-      ? data.observaciones
-      : JSON.stringify({
-          horario: data.horario || "12:30 – 12:48",
-          tipoEntrega: data.tipoEntrega || "Domicilio",
-          metodoPago: data.metodoPago || "Efectivo",
-          estadoPago: data.estadoPago || "Pagado",
-          codigoPedido: data.codigoPedido || data.numeroVenta || `VEN-${String(Date.now()).slice(-4)}`,
-          clienteNombre: data.clienteNombre || `${userObj.nombre} ${userObj.apellidos || ''}`.trim(),
-          productos: data.productos || []
-        });
+    let parsedObs = {};
+    if (typeof data.observaciones === 'string' && data.observaciones.startsWith('{')) {
+      try { parsedObs = JSON.parse(data.observaciones); } catch (e) {}
+    } else if (typeof data.observaciones === 'object' && data.observaciones !== null) {
+      parsedObs = data.observaciones;
+    }
+
+    const obsObj = {
+      horario: data.horario || parsedObs.horario || "12:30 – 12:48",
+      tipoEntrega: data.tipoEntrega || parsedObs.tipoEntrega || "Domicilio",
+      metodoPago: data.metodoPago || parsedObs.metodoPago || "Efectivo",
+      direccion: data.direccion || parsedObs.direccion || "",
+      estadoPago: data.estadoPago || parsedObs.estadoPago || "Pagado",
+      codigoPedido: data.codigoPedido || data.numeroVenta || parsedObs.codigoPedido || `VEN-${String(Date.now()).slice(-4)}`,
+      clienteNombre: data.clienteNombre || parsedObs.clienteNombre || `${userObj.nombre} ${userObj.apellidos || ''}`.trim(),
+      productos: data.productos || parsedObs.productos || [],
+      especificaciones: parsedObs.especificaciones || "",
+      efectivoConCuanto: parsedObs.efectivoConCuanto || "",
+      vueltoEfectivo: parsedObs.vueltoEfectivo || 0,
+      transferenciaReferencia: parsedObs.transferenciaReferencia || ""
+    };
+
+    const obsStr = JSON.stringify(obsObj);
 
     const venta = await Venta.create({
       idCliente: finalClienteId,

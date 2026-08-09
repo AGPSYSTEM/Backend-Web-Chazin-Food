@@ -19,7 +19,7 @@ class ClienteService {
       }
     }
 
-    const tipo = meta.tipo || (c.esVip ? 'VIP' : 'Regular');
+    const tipo = meta.tipo || (c.esVip ? 'VIP' : 'Nuevo');
     const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
     const descuentoPorcentaje = meta.descuentoPorcentaje !== undefined ? meta.descuentoPorcentaje : defaultDesc;
 
@@ -147,7 +147,7 @@ class ClienteService {
 
     const tipo = data.tipo || 'Nuevo';
     const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
-    const descPorcent = data.descuentoPorcentaje !== undefined ? data.descuentoPorcentaje : defaultDesc;
+    const descPorcent = defaultDesc;
 
     // If client created without user account, it MUST be INACTIVO (0)
     const estadoVal = (sinCuenta || !idUsuario || data.estado === 'Inactivo' || data.estado === 0) ? 0 : 1;
@@ -196,9 +196,9 @@ class ClienteService {
     }
 
     const newDireccionStr = data.direccion !== undefined ? data.direccion : existingMeta.direccion || '';
-    const newTipo = data.tipo !== undefined ? data.tipo : existingMeta.tipo || 'Regular';
+    const newTipo = data.tipo !== undefined ? data.tipo : existingMeta.tipo || 'Nuevo';
     const defaultDesc = newTipo === 'VIP' ? 15 : newTipo === 'Frecuente' ? 10 : newTipo === 'Regular' ? 5 : 0;
-    const newDesc = data.descuentoPorcentaje !== undefined ? data.descuentoPorcentaje : (existingMeta.descuentoPorcentaje !== undefined ? existingMeta.descuentoPorcentaje : defaultDesc);
+    const newDesc = defaultDesc;
 
     // Handle account linkage / creation upon edit if requested
     if (data.crearCuenta && !c.idUsuario && data.email) {
