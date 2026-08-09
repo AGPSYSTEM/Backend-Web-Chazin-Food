@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 
 class EmailService {
   static getTransporter() {
+    try { require('dotenv').config(); } catch (e) {}
     const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
     const smtpPort = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 465;
     const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
