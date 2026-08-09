@@ -1,8 +1,6 @@
 const { Product, CategoriaProducto } = require('../../persistence/models');
 
 class ProductService {
-  /*Obtiene todos los productos registrados junto con la información de su categoría.
-   Además, organiza los datos antes de enviarlos al cliente. */
   static async getProducts() {
     const products = await Product.findAll({
       include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
@@ -30,7 +28,7 @@ class ProductService {
       };
     });
   }
-  /*Busca un producto por su ID. Si no existe, devuelve un error 404. */
+
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
       include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
@@ -63,8 +61,7 @@ class ProductService {
       adiciones
     };
   }
-  /*Crea un nuevo producto. Antes de guardarlo, valida que el nombre sea obligatorio,
-   que no exista otro producto con el mismo nombre y asigna la categoría correspondiente.*/
+
   static async createProduct(data) {
     const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto } = data;
     if (!nombre || !nombre.trim()) {
@@ -104,7 +101,7 @@ class ProductService {
 
     return this.getProductById(product.idProducto);
   }
-  /*Actualiza la información de un producto, como el nombre, precio, stock, categoría, estado y demás datos. */
+
   static async updateProduct(id, data) {
     const p = await Product.findByPk(id);
     if (!p) {
@@ -136,7 +133,7 @@ class ProductService {
     await p.save();
     return this.getProductById(id);
   }
-  /*Elimina un producto de la base de datos y reinicia el autoincremento de la tabla. */
+
   static async deleteProduct(id) {
     const p = await Product.findByPk(id);
     if (!p) {

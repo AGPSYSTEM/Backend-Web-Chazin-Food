@@ -1,5 +1,5 @@
 const ProductService = require('../../application/services/productService');
-/*Obtiene todos los productos llamando al método getProducts() del servicio y devuelve la información en formato JSON. */
+
 const getProducts = async (req, res, next) => {
   try {
     const products = await ProductService.getProducts();
@@ -9,7 +9,7 @@ const getProducts = async (req, res, next) => {
     next(error);
   }
 };
-/*Busca un producto por su ID y devuelve su información. */
+
 const getProductById = async (req, res, next) => {
   try {
     const product = await ProductService.getProductById(req.params.id);
@@ -19,8 +19,7 @@ const getProductById = async (req, res, next) => {
     next(error);
   }
 };
-/*Recibe los datos enviados por el cliente, crea un nuevo producto y responde con el código HTTP 201,
- indicando que el recurso fue creado correctamente.*/
+
 const createProduct = async (req, res, next) => {
   try {
     const createdProduct = await ProductService.createProduct(req.body);
@@ -30,7 +29,7 @@ const createProduct = async (req, res, next) => {
     next(error);
   }
 };
-/*Actualiza un producto utilizando el ID recibido y los nuevos datos enviados por el cliente. */
+
 const updateProduct = async (req, res, next) => {
   try {
     const updatedProduct = await ProductService.updateProduct(req.params.id, req.body);
@@ -40,7 +39,7 @@ const updateProduct = async (req, res, next) => {
     next(error);
   }
 };
-/*Elimina un producto y devuelve un mensaje confirmando la operación." */
+
 const deleteProduct = async (req, res, next) => {
   try {
     const result = await ProductService.deleteProduct(req.params.id);

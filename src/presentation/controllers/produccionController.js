@@ -1,5 +1,5 @@
 const ProduccionService = require('../../application/services/produccionService');
-/*Obtiene todas las órdenes de producción. */
+
 const getOrdenes = async (req, res, next) => {
   try {
     const ordenes = await ProduccionService.getAll();
@@ -8,7 +8,7 @@ const getOrdenes = async (req, res, next) => {
     next(error);
   }
 };
-/*Crea una nueva orden de producción y responde con el código HTTP 201." */
+
 const createOrden = async (req, res, next) => {
   try {
     const orden = await ProduccionService.create(req.body);
@@ -17,7 +17,7 @@ const createOrden = async (req, res, next) => {
     next(error);
   }
 };
-/*Actualiza el estado de una orden de producción utilizando su ID.*/
+
 const updateEstadoOrden = async (req, res, next) => {
   try {
     const orden = await ProduccionService.updateEstado(req.params.id, req.body.estado);
@@ -26,7 +26,7 @@ const updateEstadoOrden = async (req, res, next) => {
     next(error);
   }
 };
-/*Elimina una orden de producción. */
+
 const deleteOrden = async (req, res, next) => {
   try {
     const result = await ProduccionService.delete(req.params.id);

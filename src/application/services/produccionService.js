@@ -172,12 +172,10 @@ let ordenesProduccion = [
 ];
 
 class ProduccionService {
-  /*Devuelve todas las órdenes de producción almacenadas en memoria. */
   static async getAll() {
     return ordenesProduccion;
   }
-  /*Crea una nueva orden de producción, genera un ID automáticamente,
-   asigna valores por defecto cuando es necesario y la agrega al arreglo de órdenes. */
+
   static async create(data) {
     const nextId = ordenesProduccion.length > 0 ? Math.max(...ordenesProduccion.map((o) => Number(o.id) || 0)) + 1 : 1;
     const newOrden = {
@@ -203,7 +201,7 @@ class ProduccionService {
     ordenesProduccion.push(newOrden);
     return newOrden;
   }
-  /*Busca una orden por su ID y actualiza únicamente su estado, por ejemplo de 'En Cola' a 'En Preparación' o 'Listo'. */
+
   static async updateEstado(id, nuevoEstado) {
     const numericId = Number(id);
     const index = ordenesProduccion.findIndex((o) => String(o.id) === String(id) || o.id === numericId);
@@ -213,7 +211,7 @@ class ProduccionService {
     }
     return { id, estado: nuevoEstado, message: "Estado actualizado" };
   }
-  /*Elimina una orden de producción del arreglo utilizando su ID. */
+
   static async delete(id) {
     ordenesProduccion = ordenesProduccion.filter((o) => String(o.id) !== String(id));
     return { message: "Orden de producción eliminada" };
