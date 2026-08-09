@@ -1,6 +1,7 @@
 const { Cliente, User, Role, Venta, DetalleVentaProducto } = require('../../persistence/models');
 const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 const bcrypt = require('bcryptjs');
+const EmailService = require('./emailService');
 
 class ClienteService {
   static async formatCliente(c) {
@@ -236,6 +237,7 @@ class ClienteService {
     await c.save();
 
     if (c.usuario) {
+      const nameChanged = data.nombre !== undefined || data.apellidos !== undefined;
       if (data.nombre !== undefined) c.usuario.nombre = data.nombre.trim();
       if (data.apellidos !== undefined) c.usuario.apellidos = data.apellidos.trim();
       if (data.email !== undefined) c.usuario.email = data.email.trim();
@@ -244,6 +246,16 @@ class ClienteService {
         c.usuario.estado = data.estado === 'Inactivo' || data.estado === 0 ? 'INACTIVO' : 'ACTIVO';
       }
       await c.usuario.save();
+
+      // Send update notification email
+      if (data.notificarEmail !== false) {
+        EmailService.sendUserUpdatedEmail({
+          email: c.usuario.email,
+          nombre: c.usuario.nombre,
+          apellidos: c.usuario.apellidos,
+          modifiedFields: nameChanged ? 'Nombre / Apellidos' : 'Información de cuenta'
+        }).catch(err => console.error('Background email notification error in cliente update:', err.message));
+      }
     }
 
     return this.getById(id);
