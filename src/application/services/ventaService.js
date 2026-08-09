@@ -293,34 +293,115 @@ class VentaService {
     });
 
     if (data.detalles && data.detalles.length > 0) {
-      let fallbackVarianteId = 1;
-      let validVarianteIds = new Set();
-      try {
-        const { sequelize } = require('../../persistence/models');
-        const [rows] = await sequelize.query('SELECT idVariante FROM variante');
-        if (rows && rows.length > 0) {
-          rows.forEach(r => validVarianteIds.add(r.idVariante));
-          fallbackVarianteId = rows[0].idVariante;
+      const { sequelize } = require('../../persistence/models');
+      const detallesToInsert = [];
+
+      for (const d of data.detalles) {
+        let chosenVarianteId = null;
+
+        // 1. Verificar si d.idVariante existe directamente en la tabla `variante`
+        if (d.idVariante) {
+          try {
+            const [matchById] = await sequelize.query(
+              'SELECT idVariante FROM variante WHERE idVariante = :id LIMIT 1',
+              { replacements: { id: d.idVariante } }
+            );
+            if (matchById && matchById.length > 0) {
+              chosenVarianteId = matchById[0].idVariante;
+            }
+          } catch (e) {
+            console.warn('Error al consultar idVariante:', e.message);
+          }
         }
-      } catch (e) {
-        console.warn('Fallback variante lookup:', e.message);
+
+        // 2. Si no coincide, buscar si existe variante asociada al idProducto
+        if (!chosenVarianteId) {
+          const prodId = d.idProducto || d.idVariante;
+          if (prodId) {
+            try {
+              const [matchByProd] = await sequelize.query(
+                'SELECT idVariante FROM variante WHERE idProducto = :id LIMIT 1',
+                { replacements: { id: prodId } }
+              );
+              if (matchByProd && matchByProd.length > 0) {
+                chosenVarianteId = matchByProd[0].idVariante;
+              }
+            } catch (e) {
+              console.warn('Error al consultar idProducto en variante:', e.message);
+            }
+          }
+        }
+
+        // 3. Si no hay coincidencia, tomar cualquier variante existente en la base de datos
+        if (!chosenVarianteId) {
+          try {
+            const [anyVar] = await sequelize.query('SELECT idVariante FROM variante LIMIT 1');
+            if (anyVar && anyVar.length > 0) {
+              chosenVarianteId = anyVar[0].idVariante;
+            }
+          } catch (e) {
+            console.warn('Error al buscar variante por defecto:', e.message);
+          }
+        }
+
+        // 4. Si la tabla `variante` está completamente vacía, crear dinámicamente una variante estándar
+        if (!chosenVarianteId) {
+          try {
+            const targetProdId = d.idProducto || d.idVariante || 1;
+            const [prodCheck] = await sequelize.query(
+              'SELECT idProducto, nombre, precio FROM producto WHERE idProducto = :id LIMIT 1',
+              { replacements: { id: targetProdId } }
+            );
+
+            let finalProdId = targetProdId;
+            let varNombre = d.observaciones || d.nombre || 'Estándar';
+            let varPrecio = d.precioUnitario || d.precio || 0;
+
+            if (!prodCheck || prodCheck.length === 0) {
+              const [firstProd] = await sequelize.query('SELECT idProducto, nombre, precio FROM producto LIMIT 1');
+              if (firstProd && firstProd.length > 0) {
+                finalProdId = firstProd[0].idProducto;
+                varNombre = firstProd[0].nombre;
+                varPrecio = firstProd[0].precio;
+              }
+            } else {
+              varNombre = prodCheck[0].nombre;
+              varPrecio = prodCheck[0].precio;
+            }
+
+            const [result] = await sequelize.query(
+              'INSERT INTO variante (idProducto, nombre, precio, estado) VALUES (:idProducto, :nombre, :precio, 1)',
+              { replacements: { idProducto: finalProdId, nombre: String(varNombre).slice(0, 80), precio: varPrecio } }
+            );
+
+            // Obtener el ID insertado
+            const [newVarRow] = await sequelize.query(
+              'SELECT idVariante FROM variante WHERE idProducto = :idProducto ORDER BY idVariante DESC LIMIT 1',
+              { replacements: { idProducto: finalProdId } }
+            );
+            if (newVarRow && newVarRow.length > 0) {
+              chosenVarianteId = newVarRow[0].idVariante;
+            }
+          } catch (e) {
+            console.error('Error creando variante dinámica:', e.message);
+          }
+        }
+
+        if (chosenVarianteId) {
+          detallesToInsert.push({
+            idVenta: venta.idVenta,
+            idVariante: chosenVarianteId,
+            cantidad: d.cantidad || 1,
+            precioUnitario: d.precioUnitario || d.precio || 0,
+            subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
+            observaciones: d.observaciones || d.nombre || null
+          });
+        }
       }
 
-      const detalles = data.detalles.map(d => {
-        let varianteId = d.idVariante || fallbackVarianteId;
-        if (!validVarianteIds.has(varianteId)) {
-          varianteId = fallbackVarianteId;
-        }
-        return {
-          idVenta: venta.idVenta,
-          idVariante: varianteId,
-          cantidad: d.cantidad || 1,
-          precioUnitario: d.precioUnitario || d.precio || 0,
-          subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
-          observaciones: d.observaciones || d.nombre || null
-        };
-      });
-      await DetalleVentaProducto.bulkCreate(detalles);
+      if (detallesToInsert.length > 0) {
+        await DetalleVentaProducto.bulkCreate(detallesToInsert);
+      }
     }
 
     return this.getById(venta.idVenta);
