@@ -53,9 +53,10 @@ const toggleUserStatus = async (req, res, next) => {
 
 const changeUserPassword = async (req, res, next) => {
   try {
-    const { password, contrasena, contraseña } = req.body;
+    const { password, contrasena, contraseña, notificarEmail, notificarCambios } = req.body;
     const updatedUser = await UserService.updateUser(req.params.id, {
-      contrasena: password || contrasena || contraseña
+      contrasena: password || contrasena || contraseña,
+      notificarEmail: notificarEmail !== undefined ? notificarEmail : notificarCambios
     });
     res.json(updatedUser);
   } catch (error) {
