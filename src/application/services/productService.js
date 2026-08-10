@@ -108,6 +108,15 @@ class ProductService {
       error.statusCode = 404;
       throw error;
     }
+
+    // Delete associated ficha técnica and its details
+    const { FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
+    const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
+    if (ficha) {
+      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+      await ficha.destroy();
+    }
+
     await p.destroy();
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('producto', 'idProducto');
