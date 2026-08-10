@@ -56,4 +56,21 @@ async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables =
   }
 }
 
-module.exports = { resetAutoIncrement, resequenceTableIds };
+/**
+ * Resequences all core system tables so IDs remain strictly continuous (1, 2, 3...)
+ */
+async function resequenceAllCoreTables() {
+  try {
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [{ table: 'detallefichainsumo', column: 'idFichaTecnica' }]);
+    await resequenceTableIds('insumo', 'idInsumo', [{ table: 'detallefichainsumo', column: 'idInsumo' }, { table: 'detallecomprainsumo', column: 'idInsumo' }]);
+    await resequenceTableIds('producto', 'idProducto', [{ table: 'fichatecnica', column: 'idProducto' }, { table: 'variante', column: 'idProducto' }]);
+    await resequenceTableIds('proveedor', 'idProveedor', [{ table: 'insumo', column: 'idProveedor' }, { table: 'compra', column: 'idProveedor' }]);
+    await resequenceTableIds('categoriainsumo', 'idCategoriaInsumo', [{ table: 'insumo', column: 'idCategoriaInsumo' }]);
+    await resequenceTableIds('categoriaproducto', 'idCategoriaProducto', [{ table: 'producto', column: 'idCategoriaProducto' }]);
+  } catch (err) {
+    console.warn('Error resequencing core tables:', err.message);
+  }
+}
+
+module.exports = { resetAutoIncrement, resequenceTableIds, resequenceAllCoreTables };
+

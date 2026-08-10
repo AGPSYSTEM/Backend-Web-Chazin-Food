@@ -12,10 +12,13 @@ const { sequelize } = require('./src/persistence/models');
 const { errorHandler } = require('./src/infrastructure/middlewares/errorMiddleware');
 const { swaggerUi, swaggerSpec } = require('./src/infrastructure/swagger/swagger');
 
+const { resequenceAllCoreTables } = require('./src/infrastructure/utils/dbUtils');
+
 // Connect to Database via Sequelize
 connectDB();
-sequelize.sync().then(() => {
+sequelize.sync().then(async () => {
   console.log('Modelos de Sequelize sincronizados correctamente.');
+  await resequenceAllCoreTables();
 }).catch((err) => {
   console.error('Sincronización opcional de Sequelize diferida:', err.message);
 });
