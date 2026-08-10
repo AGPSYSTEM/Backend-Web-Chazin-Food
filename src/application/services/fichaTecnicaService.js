@@ -1,4 +1,5 @@
-const { FichaTecnica, DetalleFichaInsumo, Insumo, Product } = require('../../persistence/models');
+const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante } = require('../../persistence/models');
+const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 
 class FichaTecnicaService {
   static formatFicha(f) {
@@ -22,6 +23,7 @@ class FichaTecnicaService {
       fechaCreacion: f.fechaCreacion,
       producto: f.producto || null,
       insumoInfo: f.insumoInfo || null,
+      variante: f.variante || null,
       detalles: (f.detalles || []).map(d => ({
         idDetalleFicha: d.idDetalleFicha,
         idInsumo: d.idInsumo,
@@ -41,9 +43,10 @@ class FichaTecnicaService {
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
         },
         { model: Product, as: 'producto', attributes: ['idProducto', 'nombre'] },
-        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre'] }
+        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre'] },
+        { model: Variante, as: 'variante', attributes: ['idVariante', 'nombre', 'precio'] }
       ],
-      order: [['idFichaTecnica', 'DESC']]
+      order: [['idFichaTecnica', 'ASC']]
     });
     return fichas.map(f => this.formatFicha(f));
   }
@@ -57,7 +60,8 @@ class FichaTecnicaService {
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
         },
         { model: Product, as: 'producto' },
-        { model: Insumo, as: 'insumoInfo' }
+        { model: Insumo, as: 'insumoInfo' },
+        { model: Variante, as: 'variante' }
       ]
     });
     if (!f) return null;
@@ -72,7 +76,8 @@ class FichaTecnicaService {
           model: DetalleFichaInsumo,
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
-        }
+        },
+        { model: Variante, as: 'variante' }
       ]
     });
     return f ? this.formatFicha(f) : null;
@@ -86,17 +91,37 @@ class FichaTecnicaService {
           model: DetalleFichaInsumo,
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
-        }
+        },
+        { model: Variante, as: 'variante' }
       ]
     });
     return f ? this.formatFicha(f) : null;
   }
 
+  static async resolveVarianteId(idProducto, idInsumo, inputVarianteId) {
+    if (inputVarianteId) return parseInt(inputVarianteId);
+    if (idProducto) {
+      const v = await Variante.findOne({ where: { idProducto } });
+      if (v) return v.idVariante;
+    }
+    if (idInsumo) {
+      const ins = await Insumo.findByPk(idInsumo);
+      if (ins) {
+        const v = await Variante.findOne({ where: { nombre: ins.nombre } });
+        if (v) return v.idVariante;
+      }
+    }
+    return null;
+  }
+
   static async saveForProducto(idProducto, data) {
     let f = await FichaTecnica.findOne({ where: { idProducto } });
+    const resolvedVarianteId = await this.resolveVarianteId(idProducto, null, data.idVariante);
+
     if (!f) {
       f = await FichaTecnica.create({
         idProducto,
+        idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
@@ -110,6 +135,7 @@ class FichaTecnicaService {
       });
     } else {
       await f.update({
+        idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
         rendimiento: data.rendimiento !== undefined ? data.rendimiento : f.rendimiento,
@@ -136,14 +162,21 @@ class FichaTecnicaService {
       }
     }
 
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
+
     return this.getById(f.idFichaTecnica);
   }
 
   static async saveForInsumo(idInsumo, data) {
     let f = await FichaTecnica.findOne({ where: { idInsumo } });
+    const resolvedVarianteId = await this.resolveVarianteId(null, idInsumo, data.idVariante);
+
     if (!f) {
       f = await FichaTecnica.create({
         idInsumo,
+        idVariante: resolvedVarianteId,
         tipo: 'INSUMO',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
@@ -157,6 +190,7 @@ class FichaTecnicaService {
       });
     } else {
       await f.update({
+        idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
         rendimiento: data.rendimiento !== undefined ? data.rendimiento : f.rendimiento,
@@ -183,6 +217,10 @@ class FichaTecnicaService {
       }
     }
 
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
+
     return this.getById(f.idFichaTecnica);
   }
 
@@ -193,8 +231,11 @@ class FichaTecnicaService {
     if (data.idInsumo) {
       return this.saveForInsumo(data.idInsumo, data);
     }
+
+    const resolvedVarianteId = await this.resolveVarianteId(null, null, data.idVariante);
+
     const ficha = await FichaTecnica.create({
-      idVariante: data.idVariante || null,
+      idVariante: resolvedVarianteId,
       tipo: data.tipo || 'PRODUCTO',
       procedimiento: data.procedimiento || data.descripcion || null,
       tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
@@ -218,6 +259,10 @@ class FichaTecnicaService {
       await DetalleFichaInsumo.bulkCreate(detalles);
     }
 
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
+
     return this.getById(ficha.idFichaTecnica);
   }
 
@@ -229,6 +274,7 @@ class FichaTecnicaService {
       throw error;
     }
 
+    if (data.idVariante !== undefined) f.idVariante = data.idVariante;
     if (data.procedimiento !== undefined) f.procedimiento = data.procedimiento;
     if (data.tiempoPreparacion !== undefined) f.tiempoPreparacion = Number(data.tiempoPreparacion);
     if (data.rendimiento !== undefined) f.rendimiento = data.rendimiento;
@@ -267,8 +313,14 @@ class FichaTecnicaService {
     }
     await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: id } });
     await f.destroy();
+
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
+
     return { message: 'Ficha técnica eliminada exitosamente' };
   }
 }
 
 module.exports = FichaTecnicaService;
+
