@@ -123,6 +123,7 @@ class FichaTecnicaService {
         idProducto,
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
+        descripcion: data.caracteristicas || data.descripcion || '',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
         rendimiento: data.rendimiento || '',
@@ -136,6 +137,7 @@ class FichaTecnicaService {
     } else {
       await f.update({
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
+        descripcion: data.caracteristicas !== undefined ? data.caracteristicas : (data.descripcion !== undefined ? data.descripcion : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
         rendimiento: data.rendimiento !== undefined ? data.rendimiento : f.rendimiento,
@@ -178,6 +180,7 @@ class FichaTecnicaService {
         idInsumo,
         idVariante: resolvedVarianteId,
         tipo: 'INSUMO',
+        descripcion: data.caracteristicas || data.descripcion || '',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
         rendimiento: data.rendimiento || '',
@@ -191,6 +194,7 @@ class FichaTecnicaService {
     } else {
       await f.update({
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
+        descripcion: data.caracteristicas !== undefined ? data.caracteristicas : (data.descripcion !== undefined ? data.descripcion : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
         rendimiento: data.rendimiento !== undefined ? data.rendimiento : f.rendimiento,
