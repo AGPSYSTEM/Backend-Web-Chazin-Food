@@ -1,4 +1,4 @@
-const { Insumo, CategoriaInsumo, Proveedor } = require('../../persistence/models');
+const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
 
 function formatInsumo(i) {
   const catNombre = i.categoria ? i.categoria.nombre : 'Sin categoría';
@@ -166,6 +166,14 @@ class InsumoService {
     }
     insumo.estado = 0;
     await insumo.save();
+
+    // Delete associated ficha técnica and its details
+    const ficha = await FichaTecnica.findOne({ where: { idInsumo } });
+    if (ficha) {
+      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+      await ficha.destroy();
+    }
+
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('insumo', 'idInsumo');
     return { message: 'Insumo movido a la papelera' };
@@ -190,6 +198,14 @@ class InsumoService {
       error.statusCode = 404;
       throw error;
     }
+
+    // Delete associated ficha técnica and its details
+    const ficha = await FichaTecnica.findOne({ where: { idInsumo } });
+    if (ficha) {
+      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+      await ficha.destroy();
+    }
+
     await insumo.destroy();
 
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
