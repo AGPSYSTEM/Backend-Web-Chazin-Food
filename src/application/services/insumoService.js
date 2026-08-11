@@ -167,13 +167,6 @@ class InsumoService {
     insumo.estado = 0;
     await insumo.save();
 
-    // Delete associated ficha técnica and its details
-    const ficha = await FichaTecnica.findOne({ where: { idInsumo } });
-    if (ficha) {
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
-      await ficha.destroy();
-    }
-
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('insumo', 'idInsumo');
     return { message: 'Insumo movido a la papelera' };
@@ -192,26 +185,37 @@ class InsumoService {
   }
 
   static async hardDelete(idInsumo) {
-    const insumo = await Insumo.findByPk(idInsumo);
+    const id = parseInt(idInsumo, 10);
+    const insumo = await Insumo.findByPk(id);
     if (!insumo) {
       const error = new Error('Insumo no encontrado');
       error.statusCode = 404;
       throw error;
     }
 
-    // Delete associated ficha técnica and its details
-    const ficha = await FichaTecnica.findOne({ where: { idInsumo } });
-    if (ficha) {
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
-      await ficha.destroy();
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+
+    // Delete ALL associated fichas técnicas de este insumo (pueden haber múltiples)
+    const fichas = await FichaTecnica.findAll({ where: { idInsumo: id } });
+    if (fichas && fichas.length > 0) {
+      for (const ficha of fichas) {
+        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+        await ficha.destroy();
+      }
     }
+
+    // Eliminar también cualquier referencia a este insumo como ingrediente en detalles de otras fichas
+    await DetalleFichaInsumo.destroy({ where: { idInsumo: id } });
 
     await insumo.destroy();
 
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('insumo', 'idInsumo');
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
 
-    return { message: 'Insumo eliminado físicamente' };
+    return { message: 'Insumo y su ficha técnica eliminados físicamente' };
   }
 }
 
