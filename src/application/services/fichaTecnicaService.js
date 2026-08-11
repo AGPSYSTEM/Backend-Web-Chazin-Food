@@ -182,8 +182,8 @@ class FichaTecnicaService {
     return this.getById(f.idFichaTecnica);
   }
 
-  static async saveForInsumo(idInsumo, data) {
-    let f = await FichaTecnica.findOne({ where: { idInsumo } });
+  static async saveForInsumo(idInsumo, data, options = {}) {
+    let f = await FichaTecnica.findOne({ where: { idInsumo }, transaction: options.transaction });
     const resolvedVarianteId = await this.resolveVarianteId(null, idInsumo, data.idVariante);
 
     if (!f) {
@@ -202,7 +202,7 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
         observaciones: data.observaciones || ''
-      });
+      }, { transaction: options.transaction });
     } else {
       await f.update({
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
@@ -216,12 +216,15 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
         observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones
-      });
+      }, { transaction: options.transaction });
     }
 
     if (Array.isArray(data.detalles || data.insumos)) {
       const inputDetalles = data.detalles || data.insumos;
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: f.idFichaTecnica } });
+      await DetalleFichaInsumo.destroy({
+        where: { idFichaTecnica: f.idFichaTecnica },
+        transaction: options.transaction
+      });
       if (inputDetalles.length > 0) {
         const payload = inputDetalles.map(d => ({
           idFichaTecnica: f.idFichaTecnica,
@@ -229,11 +232,11 @@ class FichaTecnicaService {
           cantidad: Number(d.cantidad || 1),
           unidadMedida: d.unidadMedida || 'und'
         }));
-        await DetalleFichaInsumo.bulkCreate(payload);
+        await DetalleFichaInsumo.bulkCreate(payload, { transaction: options.transaction });
       }
     }
 
-    return this.getById(f.idFichaTecnica);
+    return options.skipReload ? f : this.getById(f.idFichaTecnica);
   }
 
   static async create(data) {

@@ -72,7 +72,7 @@ class InsumoService {
       nombre, idCategoriaInsumo, stock, stockMinimo,
       fechaExpedicion, fechaVencimiento, unidadMedida,
       precioUnitario, idProveedor, descripcion,
-      categoria, proveedor
+      categoria, proveedor, fichaTecnica
     } = insumoData;
 
     if (!nombre || !nombre.trim()) {
@@ -98,21 +98,36 @@ class InsumoService {
       throw error;
     }
 
-    const insumo = await Insumo.create({
-      nombre: nombre.trim(),
-      idCategoriaInsumo: idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null,
-      stock: stock !== undefined && stock !== null ? parseFloat(stock) : 0,
-      stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0,
-      fechaExpedicion: fechaExpedicion || null,
-      fechaVencimiento: fechaVencimiento || null,
-      unidadMedida: unidadMedida || 'und',
-      precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? parseFloat(precioUnitario) : 0,
-      idProveedor: idProveedor ? parseInt(idProveedor) : null,
-      descripcion: descripcion || '',
-      estado: 1
-    });
+    const transaction = await database.sequelize.transaction();
+    try {
+      const insumo = await Insumo.create({
+        nombre: nombre.trim(),
+        idCategoriaInsumo: idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null,
+        stock: stock !== undefined && stock !== null ? parseFloat(stock) : 0,
+        stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0,
+        fechaExpedicion: fechaExpedicion || null,
+        fechaVencimiento: fechaVencimiento || null,
+        unidadMedida: unidadMedida || 'und',
+        precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? parseFloat(precioUnitario) : 0,
+        idProveedor: idProveedor ? parseInt(idProveedor) : null,
+        descripcion: descripcion || '',
+        estado: 1
+      }, { transaction });
 
-    return this.getById(insumo.idInsumo);
+      if (fichaTecnica) {
+        const FichaTecnicaService = require('./fichaTecnicaService');
+        await FichaTecnicaService.saveForInsumo(insumo.idInsumo, fichaTecnica, {
+          transaction,
+          skipReload: true
+        });
+      }
+
+      await transaction.commit();
+      return this.getById(insumo.idInsumo);
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   }
 
   static async update(idInsumo, insumoData) {
