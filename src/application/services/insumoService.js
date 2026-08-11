@@ -1,4 +1,5 @@
 const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
+const database = require('../../persistence/config/db');
 
 function formatInsumo(i) {
   const catNombre = i.categoria ? i.categoria.nombre : 'Sin categoría';
@@ -158,18 +159,28 @@ class InsumoService {
   }
 
   static async softDelete(idInsumo) {
-    const insumo = await Insumo.findByPk(idInsumo);
-    if (!insumo) {
-      const error = new Error('Insumo no encontrado');
-      error.statusCode = 404;
+    const transaction = await database.sequelize.transaction();
+
+    try {
+      const insumo = await Insumo.findByPk(idInsumo, { transaction });
+      if (!insumo) {
+        const error = new Error('Insumo no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      insumo.estado = 0;
+      await insumo.save({ transaction });
+
+      const FichaTecnicaService = require('./fichaTecnicaService');
+      await FichaTecnicaService.deleteByInsumoId(idInsumo, { transaction });
+
+      await transaction.commit();
+      return { message: 'Insumo movido a la papelera y ficha técnica eliminada' };
+    } catch (error) {
+      await transaction.rollback();
       throw error;
     }
-    insumo.estado = 0;
-    await insumo.save();
-
-    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
-    await resetAutoIncrement('insumo', 'idInsumo');
-    return { message: 'Insumo movido a la papelera' };
   }
 
   static async restore(idInsumo) {

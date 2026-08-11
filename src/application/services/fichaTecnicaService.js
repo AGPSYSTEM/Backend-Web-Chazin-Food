@@ -1,6 +1,5 @@
 const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante } = require('../../persistence/models');
 const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
-const { FichaTecnica, DetalleFichaInsumo, Insumo, Product } = require('../../persistence/models');
 
 class FichaTecnicaService {
   static formatFicha(f) {
@@ -43,16 +42,24 @@ class FichaTecnicaService {
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
         },
-        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre'] },
-        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre'] },
+        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] },
+        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] },
         { model: Variante, as: 'variante', attributes: ['idVariante', 'nombre', 'precio'] }
       ],
       order: [['idFichaTecnica', 'ASC']]
-        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre'] }
-      ],
-      order: [['idFichaTecnica', 'DESC']]
     });
-    return fichas.map(f => this.formatFicha(f));
+
+    const filtered = fichas.filter(f => {
+      const insumoActivo = f.insumoInfo === null || f.insumoInfo === undefined
+        ? true
+        : (f.insumoInfo.estado === null || f.insumoInfo.estado === undefined || f.insumoInfo.estado === 1);
+      const productoActivo = f.producto === null || f.producto === undefined
+        ? true
+        : (f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1);
+      return insumoActivo && productoActivo;
+    });
+
+    return filtered.map(f => this.formatFicha(f));
   }
 
   static async getById(id) {
@@ -66,7 +73,6 @@ class FichaTecnicaService {
         { model: Product, as: 'producto' },
         { model: Insumo, as: 'insumoInfo' },
         { model: Variante, as: 'variante' }
-        { model: Insumo, as: 'insumoInfo' }
       ]
     });
     if (!f) return null;
@@ -82,9 +88,13 @@ class FichaTecnicaService {
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
         },
-        { model: Variante, as: 'variante' }
+        { model: Variante, as: 'variante' },
+        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] }
       ]
     });
+    if (f && f.producto && (f.producto.estado !== null && f.producto.estado !== undefined && f.producto.estado !== 1)) {
+      return null;
+    }
     return f ? this.formatFicha(f) : null;
   }
 
@@ -97,10 +107,13 @@ class FichaTecnicaService {
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
         },
-        { model: Variante, as: 'variante' }
-        }
+        { model: Variante, as: 'variante' },
+        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] }
       ]
     });
+    if (f && f.insumoInfo && (f.insumoInfo.estado !== null && f.insumoInfo.estado !== undefined && f.insumoInfo.estado !== 1)) {
+      return null;
+    }
     return f ? this.formatFicha(f) : null;
   }
 
@@ -113,18 +126,6 @@ class FichaTecnicaService {
     }
     // For insumos, idVariante defaults to 0 (No Aplica / Sin Variante) so it is never NULL in DB
     return 0;
-  static async getByInsumoId(idInsumo) {
-    const f = await FichaTecnica.findOne({
-      where: { idInsumo },
-      include: [
-        {
-          model: DetalleFichaInsumo,
-          as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
-        }
-      ]
-    });
-    return f ? this.formatFicha(f) : null;
   }
 
   static async saveForProducto(idProducto, data) {
@@ -138,10 +139,6 @@ class FichaTecnicaService {
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
         descripcion: data.caracteristicas || data.descripcion || '',
-    if (!f) {
-      f = await FichaTecnica.create({
-        idProducto,
-        tipo: 'PRODUCTO',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
         rendimiento: data.rendimiento || '',
@@ -181,10 +178,6 @@ class FichaTecnicaService {
         await DetalleFichaInsumo.bulkCreate(payload);
       }
     }
-
-    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
-      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
-    ]);
 
     return this.getById(f.idFichaTecnica);
   }
@@ -200,10 +193,6 @@ class FichaTecnicaService {
         idVariante: resolvedVarianteId,
         tipo: 'INSUMO',
         descripcion: data.caracteristicas || data.descripcion || '',
-    if (!f) {
-      f = await FichaTecnica.create({
-        idInsumo,
-        tipo: 'INSUMO',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
         rendimiento: data.rendimiento || '',
@@ -243,10 +232,6 @@ class FichaTecnicaService {
         await DetalleFichaInsumo.bulkCreate(payload);
       }
     }
-
-    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
-      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
-    ]);
 
     return this.getById(f.idFichaTecnica);
   }
@@ -263,8 +248,6 @@ class FichaTecnicaService {
 
     const ficha = await FichaTecnica.create({
       idVariante: resolvedVarianteId,
-    const ficha = await FichaTecnica.create({
-      idVariante: data.idVariante || null,
       tipo: data.tipo || 'PRODUCTO',
       procedimiento: data.procedimiento || data.descripcion || null,
       tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
@@ -287,10 +270,6 @@ class FichaTecnicaService {
       }));
       await DetalleFichaInsumo.bulkCreate(detalles);
     }
-
-    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
-      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
-    ]);
 
     return this.getById(ficha.idFichaTecnica);
   }
@@ -349,7 +328,21 @@ class FichaTecnicaService {
 
     return { message: 'Ficha técnica eliminada exitosamente' };
   }
+
+  static async deleteByInsumoId(idInsumo, options = {}) {
+    const fichas = await FichaTecnica.findAll({
+      where: { idInsumo },
+      transaction: options.transaction
+    });
+
+    for (const ficha of fichas) {
+      await DetalleFichaInsumo.destroy({
+        where: { idFichaTecnica: ficha.idFichaTecnica },
+        transaction: options.transaction
+      });
+      await ficha.destroy({ transaction: options.transaction });
+    }
+  }
 }
 
 module.exports = FichaTecnicaService;
-

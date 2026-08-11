@@ -1038,4 +1038,3 @@ module.exports = {
   DetalleVentaAdicion,
   Pedido
 };
-
