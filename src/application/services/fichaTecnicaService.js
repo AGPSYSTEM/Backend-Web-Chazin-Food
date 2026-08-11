@@ -99,19 +99,14 @@ class FichaTecnicaService {
   }
 
   static async resolveVarianteId(idProducto, idInsumo, inputVarianteId) {
-    if (inputVarianteId) return parseInt(inputVarianteId);
+    if (inputVarianteId !== undefined && inputVarianteId !== null) return parseInt(inputVarianteId);
     if (idProducto) {
       const v = await Variante.findOne({ where: { idProducto } });
       if (v) return v.idVariante;
+      return 1;
     }
-    if (idInsumo) {
-      const ins = await Insumo.findByPk(idInsumo);
-      if (ins) {
-        const v = await Variante.findOne({ where: { nombre: ins.nombre } });
-        if (v) return v.idVariante;
-      }
-    }
-    return null;
+    // For insumos, idVariante defaults to 0 (No Aplica / Sin Variante) so it is never NULL in DB
+    return 0;
   }
 
   static async saveForProducto(idProducto, data) {
