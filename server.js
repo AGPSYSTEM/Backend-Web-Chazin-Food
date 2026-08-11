@@ -13,12 +13,17 @@ const { sequelize } = require('./src/persistence/models');
 const { errorHandler } = require('./src/infrastructure/middlewares/errorMiddleware');
 const { swaggerUi, swaggerSpec } = require('./src/infrastructure/swagger/swagger');
 
-const { resequenceAllCoreTables, ensureFichaTecnicaTrashSchema } = require('./src/infrastructure/utils/dbUtils');
+const {
+  resequenceAllCoreTables,
+  ensureFichaTecnicaTrashSchema,
+  ensureFichaTecnicaInsumoVariantZero
+} = require('./src/infrastructure/utils/dbUtils');
 
 // Connect to Database via Sequelize
 connectDB();
 sequelize.sync().then(async () => {
   await ensureFichaTecnicaTrashSchema();
+  await ensureFichaTecnicaInsumoVariantZero();
   console.log('Modelos de Sequelize sincronizados correctamente.');
   await resequenceAllCoreTables();
 }).catch((err) => {

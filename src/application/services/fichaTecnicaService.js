@@ -121,15 +121,15 @@ class FichaTecnicaService {
   }
 
   static async resolveVarianteId(idProducto, idInsumo, inputVarianteId) {
+    // 0 es el valor técnico reservado para fichas de insumos sin variante.
+    if (idInsumo) return 0;
     if (inputVarianteId !== undefined && inputVarianteId !== null) return parseInt(inputVarianteId);
     if (idProducto) {
       const v = await Variante.findOne({ where: { idProducto } });
       if (v) return v.idVariante;
       return 1;
     }
-    // Las fichas de insumos no tienen variante. La columna admite NULL y 0 no
-    // corresponde a ninguna variante válida (tiene una llave foránea).
-    return null;
+    return 0;
   }
 
   static async saveForProducto(idProducto, data) {
@@ -289,7 +289,11 @@ class FichaTecnicaService {
       throw error;
     }
 
-    if (data.idVariante !== undefined) f.idVariante = data.idVariante;
+    if (f.idInsumo) {
+      f.idVariante = 0;
+    } else if (data.idVariante !== undefined) {
+      f.idVariante = data.idVariante;
+    }
     if (data.procedimiento !== undefined) f.procedimiento = data.procedimiento;
     if (data.tiempoPreparacion !== undefined) f.tiempoPreparacion = Number(data.tiempoPreparacion);
     if (data.rendimiento !== undefined) f.rendimiento = data.rendimiento;
