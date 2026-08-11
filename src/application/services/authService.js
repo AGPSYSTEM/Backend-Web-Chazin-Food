@@ -1,6 +1,20 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User, Role, Cliente, Permiso } = require('../../persistence/models');
+const EmailService = require('./emailService');
+
+function getCleanDireccion(raw) {
+  if (!raw) return '';
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try {
+      const obj = JSON.parse(raw);
+      return obj.direccion !== undefined ? obj.direccion : raw;
+    } catch (e) {
+      return raw;
+    }
+  }
+  return raw;
+}
 
 class AuthService {
   static generateToken(id) {
@@ -64,14 +78,24 @@ class AuthService {
 
     if (direccion) {
       try {
+        const cleanDir = getCleanDireccion(direccion);
+        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
         await Cliente.create({
           idUsuario: user.idUsuario,
-          direccion
+          direccion: metaStr
         });
       } catch (err) {
         console.warn('Advertencia al crear registro de cliente:', err.message);
       }
     }
+
+    // Send welcome email upon registration
+    EmailService.sendWelcomeEmail({
+      email: user.email,
+      nombre: user.nombre,
+      apellidos: user.apellidos,
+      password: finalPassword
+    }).catch(err => console.error('Background welcome email error in register:', err.message));
 
     const role = await Role.findByPk(user.idRol);
 
@@ -111,6 +135,12 @@ class AuthService {
       throw error;
     }
 
+    if (user.estado === 'INACTIVO' || user.estado === '0' || user.estado === 0) {
+      const error = new Error('Tu usuario está inactivo. Comunícate con el administrador para activar tu cuenta.');
+      error.statusCode = 403;
+      throw error;
+    }
+
     const isMatch = await bcrypt.compare(password, user.contrasena);
     if (!isMatch) {
       const error = new Error('Credenciales inválidas');
@@ -119,7 +149,7 @@ class AuthService {
     }
 
     const rolNombre = user.rolInfo ? user.rolInfo.nombre : 'Usuario';
-    const direccion = user.clienteInfo ? user.clienteInfo.direccion : '';
+    const direccion = getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : '');
     // Extract permission names from the role's associated permissions
     const permisos = user.rolInfo && user.rolInfo.permisos
       ? user.rolInfo.permisos.map(p => p.nombrePermiso)
@@ -167,7 +197,7 @@ class AuthService {
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       idRol: user.idRol,
       estado: user.estado,
-      direccion: user.clienteInfo ? user.clienteInfo.direccion : ''
+      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : '')
     };
   }
 

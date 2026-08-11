@@ -1,3 +1,4 @@
+// Environment Configuration
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -70,6 +71,7 @@ app.use('/api/ventas', require('./src/presentation/routes/ventaRoutes'));
 app.use('/api/fichas-tecnicas', require('./src/presentation/routes/fichaTecnicaRoutes'));
 app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes'));
 app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
+app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {

@@ -30,14 +30,17 @@ class TrazabilidadService {
   static async create(data) {
     const {
       tipo, entidadNombre, detalle,
-      idInsumo, tipoMovimiento, cantidad, motivo, usuarioId
+      idInsumo, tipoMovimiento, cantidad, motivo, usuarioId,
+      skipStockUpdate
     } = data || {};
 
     const finalTipo = tipo || (tipoMovimiento ? tipoMovimiento.toLowerCase() : 'crear');
     const finalEntidadNombre = entidadNombre || (idInsumo ? `Insumo #${idInsumo}` : 'Sistema');
     const finalDetalle = detalle || motivo || `${finalTipo} en trazabilidad`;
 
-    if (idInsumo && cantidad !== undefined && tipoMovimiento) {
+    // Solo actualizar stock si NO se indica skipStockUpdate
+    // (compraService ya maneja su propio ajuste de stock y pasa skipStockUpdate: true)
+    if (!skipStockUpdate && idInsumo && cantidad !== undefined && tipoMovimiento) {
       try {
         const insumo = await Insumo.findByPk(idInsumo);
         if (insumo) {

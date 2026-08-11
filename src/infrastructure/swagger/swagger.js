@@ -454,7 +454,9 @@ module.exports = {
  *           type: integer
  *     responses:
  *       200:
- *         description: Categoría eliminada.
+ *         description: Categoría eliminada exitosamente.
+ *       400:
+ *         description: No se puede eliminar la categoría porque tiene productos asociados.
  * 
  * /api/roles:
  *   get:
@@ -571,12 +573,29 @@ module.exports = {
  *               stock:
  *                 type: number
  *                 example: 50
+ *               stockMinimo:
+ *                 type: number
+ *                 example: 5
  *               unidadMedida:
  *                 type: string
  *                 example: kg
  *               precioUnitario:
  *                 type: number
  *                 example: 1200.00
+ *               idProveedor:
+ *                 type: integer
+ *                 example: 1
+ *               fechaExpedicion:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-01"
+ *               fechaVencimiento:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-12-31"
+ *               descripcion:
+ *                 type: string
+ *                 example: Harina refinada de trigo multipropósito
  *     responses:
  *       201:
  *         description: Insumo creado correctamente.
@@ -1252,5 +1271,275 @@ module.exports = {
  *       404:
  *         description: Orden de producción no encontrada.
  *
+ * /api/eventos:
+ *   get:
+ *     summary: Obtener la lista de todos los eventos de fichas técnicas
+ *     tags: [Gestión de Eventos]
+ *     responses:
+ *       200:
+ *         description: Lista de eventos obtenida exitosamente.
+ *   post:
+ *     summary: Crear un nuevo evento
+ *     tags: [Gestión de Eventos]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nombreEvento
+ *             properties:
+ *               nombreEvento:
+ *                 type: string
+ *                 example: "Temporada de Verano — Carne extra incluida"
+ *               descripcion:
+ *                 type: string
+ *                 example: "Evento especial de verano con ingredientes adicionales"
+ *               fechaInicio:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-01"
+ *               fechaFin:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-31"
+ *               estado:
+ *                 type: string
+ *                 example: "Activo"
+ *     responses:
+ *       201:
+ *         description: Evento creado exitosamente.
+ *
+ * /api/eventos/{id}:
+ *   get:
+ *     summary: Obtener un evento por ID
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalles del evento devueltos correctamente.
+ *       404:
+ *         description: Evento no encontrado.
+ *   put:
+ *     summary: Actualizar un evento
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombreEvento:
+ *                 type: string
+ *               descripcion:
+ *                 type: string
+ *               fechaInicio:
+ *                 type: string
+ *               fechaFin:
+ *                 type: string
+ *               estado:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Evento actualizado exitosamente.
+ *   delete:
+ *     summary: Eliminar un evento
+ *     tags: [Gestión de Eventos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Evento eliminado exitosamente.
+ *
+ * /api/compras:
+ *   get:
+ *     summary: Listar todas las órdenes de compra
+ *     tags: [Gestión de Compras]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de compras con su proveedor y detalles.
+ *   post:
+ *     summary: Registrar una nueva orden de compra
+ *     tags: [Gestión de Compras]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [idProveedor, total, detalles]
+ *             properties:
+ *               idProveedor:
+ *                 type: integer
+ *                 example: 1
+ *               fechaCompra:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-05"
+ *               total:
+ *                 type: number
+ *                 example: 120000
+ *               estado:
+ *                 type: string
+ *                 enum: [PENDIENTE, RECIBIDA, CANCELADA]
+ *                 example: "PENDIENTE"
+ *               detalles:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [idInsumo, cantidad, precioUnitario]
+ *                   properties:
+ *                     idInsumo:
+ *                       type: integer
+ *                       example: 3
+ *                     cantidad:
+ *                       type: number
+ *                       example: 10
+ *                     precioUnitario:
+ *                       type: number
+ *                       example: 12000
+ *     responses:
+ *       201:
+ *         description: Compra registrada. Si el estado es RECIBIDA se reabastece el stock de los insumos.
+ *
+ * /api/compras/{id}:
+ *   get:
+ *     summary: Obtener detalle completo de una compra
+ *     tags: [Gestión de Compras]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalle de la compra con proveedor e insumos.
+ *       404:
+ *         description: Compra no encontrada.
+ *   put:
+ *     summary: Editar una orden de compra (solo editable efectivamente si está PENDIENTE)
+ *     tags: [Gestión de Compras]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Permite cambiar proveedor, fecha, estado e insumos.
+ *       Internamente ajusta el stock de los insumos según el cambio de estado:
+ *       - Si PENDIENTE → RECIBIDA: suma los nuevos detalles al stock
+ *       - Si RECIBIDA → CANCELADA: resta los detalles originales del stock
+ *       - Si RECIBIDA y se modifican cantidades/insumos: aplica la diferencia (nuevo - viejo)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idProveedor:
+ *                 type: integer
+ *                 example: 2
+ *               fechaCompra:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-08-06"
+ *               total:
+ *                 type: number
+ *                 example: 200000
+ *               estado:
+ *                 type: string
+ *                 enum: [PENDIENTE, RECIBIDA, CANCELADA]
+ *               detalles:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [idInsumo, cantidad, precioUnitario]
+ *                   properties:
+ *                     idInsumo:
+ *                       type: integer
+ *                     cantidad:
+ *                       type: number
+ *                     precioUnitario:
+ *                       type: number
+ *                     subtotal:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Compra actualizada correctamente con ajuste de stock si corresponde.
+ *       404:
+ *         description: Compra no encontrada.
+ *
+ * /api/compras/{id}/estado:
+ *   put:
+ *     summary: Cambiar solo el estado de una compra (PENDIENTE, RECIBIDA, CANCELADA)
+ *     tags: [Gestión de Compras]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [estado]
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [PENDIENTE, RECIBIDA, CANCELADA]
+ *                 example: "RECIBIDA"
+ *     responses:
+ *       200:
+ *         description: Estado actualizado. Ajusta stock según la transición de estado.
+ *
+ * /api/compras/{id}/cancelar:
+ *   put:
+ *     summary: Cancelar una compra (atajo para estado = CANCELADA)
+ *     tags: [Gestión de Compras]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Compra cancelada. Si estaba RECIBIDA se descuenta del stock.
  */
+
 

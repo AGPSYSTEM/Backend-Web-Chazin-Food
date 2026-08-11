@@ -27,4 +27,22 @@ const getProductosPopulares = async (req, res, next) => {
   }
 };
 
-module.exports = { getStats, getVentasChart, getProductosPopulares };
+const getAlertasStock = async (req, res, next) => {
+  try {
+    const data = await DashboardService.getAlertasStock();
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getVentasRecientes = async (req, res, next) => {
+  try {
+    const data = await DashboardService.getVentasRecientes();
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getStats, getVentasChart, getProductosPopulares, getAlertasStock, getVentasRecientes };

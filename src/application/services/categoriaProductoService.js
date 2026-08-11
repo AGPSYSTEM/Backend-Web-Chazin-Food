@@ -1,10 +1,18 @@
 const { CategoriaProducto, Product } = require('../../persistence/models');
+const { Op } = require('sequelize');
 
 class CategoriaProductoService {
   static async getAll() {
     const categorias = await CategoriaProducto.findAll();
     const list = await Promise.all(categorias.map(async (cat) => {
-      const cantidad = await Product.count({ where: { idCategoriaProducto: cat.idCategoriaProducto } });
+      const cantidad = await Product.count({
+        where: {
+          [Op.or]: [
+            { idCategoriaProducto: cat.idCategoriaProducto },
+            { categoria: cat.nombre }
+          ]
+        }
+      });
       return {
         id: cat.idCategoriaProducto,
         idCategoriaProducto: cat.idCategoriaProducto,
@@ -24,7 +32,14 @@ class CategoriaProductoService {
       error.statusCode = 404;
       throw error;
     }
-    const cantidad = await Product.count({ where: { idCategoriaProducto: id } });
+    const cantidad = await Product.count({
+      where: {
+        [Op.or]: [
+          { idCategoriaProducto: id },
+          { categoria: cat.nombre }
+        ]
+      }
+    });
     return {
       id: cat.idCategoriaProducto,
       idCategoriaProducto: cat.idCategoriaProducto,
@@ -84,9 +99,17 @@ class CategoriaProductoService {
       throw error;
     }
 
-    const cantidadProductos = await Product.count({ where: { idCategoriaProducto: id } });
+    const cantidadProductos = await Product.count({
+      where: {
+        [Op.or]: [
+          { idCategoriaProducto: id },
+          { categoria: cat.nombre }
+        ]
+      }
+    });
+
     if (cantidadProductos > 0) {
-      const error = new Error('No se puede eliminar la categoría porque tiene productos asociados');
+      const error = new Error(`No se puede eliminar la categoría "${cat.nombre}" porque tiene ${cantidadProductos} producto(s) asociado(s).`);
       error.statusCode = 400;
       throw error;
     }

@@ -27,6 +27,15 @@ const createCompra = async (req, res, next) => {
   }
 };
 
+const updateCompra = async (req, res, next) => {
+  try {
+    const compra = await CompraService.update(req.params.id, req.body);
+    res.json(compra);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateEstadoCompra = async (req, res, next) => {
   try {
     const compra = await CompraService.updateEstado(req.params.id, req.body.estado);
@@ -45,4 +54,4 @@ const cancelarCompra = async (req, res, next) => {
   }
 };
 
-module.exports = { getCompras, getCompraById, createCompra, updateEstadoCompra, cancelarCompra };
+module.exports = { getCompras, getCompraById, createCompra, updateCompra, updateEstadoCompra, cancelarCompra };

@@ -1,5 +1,19 @@
 const bcrypt = require('bcryptjs');
 const { User, Role, Cliente } = require('../../persistence/models');
+const EmailService = require('./emailService');
+
+function getCleanDireccion(raw) {
+  if (!raw) return '';
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try {
+      const obj = JSON.parse(raw);
+      return obj.direccion !== undefined ? obj.direccion : raw;
+    } catch (e) {
+      return raw;
+    }
+  }
+  return raw;
+}
 
 class UserService {
   static async getAllUsers() {
@@ -22,7 +36,7 @@ class UserService {
       idRol: user.idRol,
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       estado: user.estado,
-      direccion: user.clienteInfo ? user.clienteInfo.direccion : '',
+      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       fechaRegistro: user.fechaRegistro
     }));
   }
@@ -52,15 +66,15 @@ class UserService {
       idRol: user.idRol,
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       estado: user.estado,
-      direccion: user.clienteInfo ? user.clienteInfo.direccion : '',
+      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       fechaRegistro: user.fechaRegistro
     };
   }
 
   static async createUser(userData) {
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
     const finalEmail = email || correo;
-    const finalPassword = contrasena || contraseña || '123456';
+    const finalPassword = contrasena || contraseña || password || '123456';
     const finalApellido = apellidos || apellido || '';
     const finalRolId = idRol || rol_id || 1;
 
@@ -93,10 +107,22 @@ class UserService {
     });
 
     if (direccion) {
+      const cleanDir = getCleanDireccion(direccion);
+      const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
       await Cliente.create({
         idUsuario: user.idUsuario,
-        direccion
+        direccion: metaStr
       });
+    }
+
+    // Send welcome email if requested
+    if (userData.enviarCorreoBienvenida || userData.notificarEmail) {
+      EmailService.sendWelcomeEmail({
+        email: user.email,
+        nombre: user.nombre,
+        apellidos: user.apellidos,
+        password: finalPassword
+      }).catch(err => console.error('Background welcome email error:', err.message));
     }
 
     return this.getUserById(user.idUsuario);
@@ -110,7 +136,8 @@ class UserService {
       throw error;
     }
 
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const isPasswordOnly = Boolean((contrasena || contraseña || password) && !nombre && !email && !correo && !telefono && !idRol && !estado);
     
     if (nombre) user.nombre = nombre;
     if (apellidos !== undefined || apellido !== undefined) user.apellidos = apellidos || apellido || '';
@@ -120,20 +147,45 @@ class UserService {
     if (idRol || rol_id) user.idRol = idRol || rol_id;
     if (estado) user.estado = estado;
 
-    if (contrasena || contraseña) {
+    if (contrasena || contraseña || password) {
       const salt = await bcrypt.genSalt(10);
-      user.contrasena = await bcrypt.hash(contrasena || contraseña, salt);
+      user.contrasena = await bcrypt.hash(contrasena || contraseña || password, salt);
     }
 
     await user.save();
 
     if (direccion !== undefined) {
+      const cleanDir = getCleanDireccion(direccion);
       let cliente = await Cliente.findOne({ where: { idUsuario: id } });
       if (cliente) {
-        cliente.direccion = direccion;
+        let meta = {};
+        if (cliente.direccion && cliente.direccion.trim().startsWith('{')) {
+          try { meta = JSON.parse(cliente.direccion); } catch (e) { meta = {}; }
+        }
+        meta.direccion = cleanDir;
+        cliente.direccion = JSON.stringify(meta);
         await cliente.save();
       } else {
-        await Cliente.create({ idUsuario: id, direccion });
+        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
+        await Cliente.create({ idUsuario: id, direccion: metaStr });
+      }
+    }
+
+    // Send notification email unless explicitly set to false
+    if (userData.notificarEmail !== false && userData.notificarEmail !== 0) {
+      if (isPasswordOnly || contrasena || contraseña || password) {
+        EmailService.sendPasswordChangedEmail({
+          email: user.email,
+          nombre: user.nombre,
+          apellidos: user.apellidos
+        }).catch(err => console.error('Background password email error:', err.message));
+      } else {
+        EmailService.sendUserUpdatedEmail({
+          email: user.email,
+          nombre: user.nombre,
+          apellidos: user.apellidos,
+          modifiedFields: 'Nombre, Teléfono, Rol o Estado'
+        }).catch(err => console.error('Background user update email error:', err.message));
       }
     }
 

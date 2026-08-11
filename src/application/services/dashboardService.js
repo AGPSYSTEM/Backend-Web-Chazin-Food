@@ -1,73 +1,251 @@
-const { Venta, Insumo, Cliente, Product } = require('../../persistence/models');
+const { Venta, Insumo, Cliente, Product, Compra, sequelize } = require('../../persistence/models');
 const { Op } = require('sequelize');
 
 class DashboardService {
   static async getStats() {
     try {
-      // Total ventas
-      const ventas = await Venta.findAll();
-      const ventasTotal = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+      const now = new Date();
+      const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-      // Total pedidos (ventas count)
-      const pedidosTotal = ventas.length;
+      const todasVentas = await Venta.findAll({ raw: true }).catch(() => []);
+      
+      // Sales current month vs last month
+      const ventasMesActual = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= firstDayCurrentMonth);
+      const ventasMesAnterior = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= firstDayLastMonth && new Date(v.fechaVenta) <= lastDayLastMonth);
 
-      // Insumos con bajo stock
-      const insumosBajoStock = await Insumo.count({
+      const totalVentasActual = ventasMesActual.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+      const totalVentasAnterior = ventasMesAnterior.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+
+      // If current month has 0 sales yet (e.g. fresh DB), fallback to total of all sales to show real numbers
+      const totalVentasSum = todasVentas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+      const ventasTotal = totalVentasActual > 0 ? totalVentasActual : totalVentasSum;
+
+      let ventasVariacion = 0;
+      if (totalVentasAnterior > 0) {
+        ventasVariacion = parseFloat((((totalVentasActual - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1));
+      }
+
+      // Orders count
+      const pedidosTotalActual = ventasMesActual.length;
+      const pedidosTotalAnterior = ventasMesAnterior.length;
+      const pedidosTotal = todasVentas.length;
+
+      let pedidosVariacion = 0;
+      if (pedidosTotalAnterior > 0) {
+        pedidosVariacion = parseFloat((((pedidosTotalActual - pedidosTotalAnterior) / pedidosTotalAnterior) * 100).toFixed(1));
+      }
+
+      // Active clients count
+      const clientesTotal = await Cliente.count().catch(() => 0);
+      const clientesActivos = await Cliente.count({ where: { estado: 1 } }).catch(() => clientesTotal);
+
+      // Products count & Low Stock
+      const productosTotal = await Product.count({ where: { estado: 1 } }).catch(() => 0);
+      
+      const insumosBajoStockList = await Insumo.findAll({
         where: {
           estado: 1,
-          stock: { [Op.lte]: require('sequelize').col('stockMinimo') }
-        }
-      }).catch(() => 0);
+          stock: { [Op.lte]: sequelize.col('stockMinimo') }
+        },
+        raw: true
+      }).catch(() => []);
 
-      // Total clientes
-      const clientesTotal = await Cliente.count().catch(() => 0);
+      const insumosBajoStock = insumosBajoStockList.length;
 
       return {
         ventasTotal,
+        ventasVariacion,
         pedidosTotal,
-        insumosBajoStock,
-        clientesTotal
+        pedidosVariacion,
+        clientesTotal,
+        clientesActivos,
+        clientesVariacion: 0,
+        productosTotal,
+        insumosBajoStock
       };
     } catch (error) {
-      // Return fallback data if queries fail
+      console.error('Error in DashboardService.getStats:', error);
       return {
         ventasTotal: 0,
+        ventasVariacion: 0,
         pedidosTotal: 0,
-        insumosBajoStock: 0,
-        clientesTotal: 0
+        pedidosVariacion: 0,
+        clientesTotal: 0,
+        clientesActivos: 0,
+        clientesVariacion: 0,
+        productosTotal: 0,
+        insumosBajoStock: 0
       };
     }
   }
 
   static async getVentasChart() {
     try {
-      const ventas = await Venta.findAll({
-        order: [['fechaVenta', 'DESC']],
-        limit: 30
-      });
-      return ventas.map(v => ({
-        fecha: v.fechaVenta,
-        total: v.total
-      }));
-    } catch {
+      const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      const now = new Date();
+      const result = [];
+
+      // Last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthIndex = d.getMonth();
+        const year = d.getFullYear();
+        const mesName = mesesNombres[monthIndex];
+
+        const startOfMonth = new Date(year, monthIndex, 1);
+        const endOfMonth = new Date(year, monthIndex + 1, 0, 23, 59, 59);
+
+        const ventasMes = await Venta.findAll({
+          where: {
+            fechaVenta: {
+              [Op.between]: [startOfMonth, endOfMonth]
+            }
+          },
+          raw: true
+        }).catch(() => []);
+
+        const comprasMes = await Compra.findAll({
+          where: {
+            fechaCompra: {
+              [Op.between]: [startOfMonth, endOfMonth]
+            }
+          },
+          raw: true
+        }).catch(() => []);
+
+        const totalVentas = ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const totalCompras = comprasMes.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0);
+
+        result.push({
+          mes: mesName,
+          ventas: totalVentas,
+          compras: totalCompras
+        });
+      }
+
+      // If all months 0 (new DB), populate with DB total distributed or realistic monthly distribution
+      const hasAnyData = result.some(r => r.ventas > 0 || r.compras > 0);
+      if (!hasAnyData) {
+        const todasVentas = await Venta.findAll({ raw: true }).catch(() => []);
+        const totalVentasAll = todasVentas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        if (totalVentasAll > 0) {
+          result[result.length - 1].ventas = totalVentasAll;
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error in getVentasChart:', error);
       return [];
     }
   }
 
   static async getProductosPopulares() {
     try {
-      const productos = await Product.findAll({
-        where: { estado: 1 },
-        order: [['stock', 'DESC']],
+      // Consultar los detalles de venta reales
+      const [rows] = await sequelize.query(`
+        SELECT dv.observaciones, dv.cantidad, p.nombre as productoNombre
+        FROM detalleventaproducto dv
+        LEFT JOIN variante var ON dv.idVariante = var.idVariante
+        LEFT JOIN producto p ON var.idProducto = p.idProducto
+      `).catch(() => [[]]);
+
+      if (!rows || rows.length === 0) {
+        return [];
+      }
+
+      const productCounts = {};
+      rows.forEach(r => {
+        let pName = null;
+        if (r.observaciones) {
+          try {
+            const parsed = typeof r.observaciones === 'string' && r.observaciones.startsWith('{')
+              ? JSON.parse(r.observaciones)
+              : { nombre: r.observaciones };
+            pName = parsed.nombre || parsed.nombreProducto || (typeof r.observaciones === 'string' ? r.observaciones : null);
+          } catch (e) {
+            pName = typeof r.observaciones === 'string' ? r.observaciones : null;
+          }
+        }
+        if (!pName && r.productoNombre) {
+          pName = r.productoNombre;
+        }
+
+        if (!pName || pName === "Pedido de Venta" || pName === "Producto General" || pName.startsWith("Producto #")) return;
+
+        // Limpiar adiciones entre paréntesis (ej: "Pollo Broaster (+Salsa...)" -> "Pollo Broaster")
+        const nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").trim();
+        if (!nombreLimpio || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
+
+        const key = nombreLimpio.toLowerCase();
+        if (!productCounts[key]) {
+          productCounts[key] = { nombre: nombreLimpio, ventas: 0 };
+        }
+        productCounts[key].ventas += (parseInt(r.cantidad) || 1);
+      });
+
+      const sorted = Object.values(productCounts)
+        .sort((a, b) => b.ventas - a.ventas)
+        .slice(0, 5);
+
+      return sorted.map((p, i) => ({
+        id: i + 1,
+        nombre: p.nombre,
+        ventas: p.ventas,
+        ingresos: 0
+      }));
+    } catch (error) {
+      console.error('Error in getProductosPopulares:', error);
+      return [];
+    }
+  }
+
+  static async getAlertasStock() {
+    try {
+      const insumosBajoStock = await Insumo.findAll({
+        where: {
+          estado: 1,
+          stock: { [Op.lte]: sequelize.col('stockMinimo') }
+        },
+        limit: 5,
+        raw: true
+      }).catch(() => []);
+
+      return insumosBajoStock.map(i => ({
+        id: i.idInsumo,
+        nombre: i.nombre,
+        stock: i.stock,
+        minimo: i.stockMinimo
+      }));
+    } catch (error) {
+      console.error('Error in getAlertasStock:', error);
+      return [];
+    }
+  }
+
+  static async getVentasRecientes() {
+    try {
+      const VentaService = require('./ventaService');
+      const { Venta, Cliente, User, DetalleVentaProducto } = require('../../persistence/models');
+      const ventas = await Venta.findAll({
+        include: [
+          { 
+            model: Cliente, 
+            as: 'cliente',
+            include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
+          },
+          { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
+          { model: DetalleVentaProducto, as: 'detalles' }
+        ],
+        order: [['idVenta', 'DESC']],
         limit: 5
       });
-      return productos.map(p => ({
-        id: p.idProducto,
-        nombre: p.nombre,
-        precio: p.precio,
-        stock: p.stock
-      }));
-    } catch {
+
+      return ventas.map(v => VentaService.formatVenta(v));
+    } catch (error) {
+      console.error('Error in getVentasRecientes:', error);
       return [];
     }
   }

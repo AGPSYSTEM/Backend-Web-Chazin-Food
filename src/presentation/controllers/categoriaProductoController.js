@@ -46,3 +46,4 @@ const deleteCategoria = async (req, res, next) => {
 };
 
 module.exports = { getCategorias, getCategoriaById, createCategoria, updateCategoria, deleteCategoria };
+
