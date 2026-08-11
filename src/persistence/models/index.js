@@ -692,11 +692,13 @@ Venta.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
 Venta.hasMany(DetalleVentaProducto, { foreignKey: 'idVenta', as: 'detalles' });
 DetalleVentaProducto.belongsTo(Venta, { foreignKey: 'idVenta' });
 
-FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles' });
-DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica' });
-DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles', onDelete: 'CASCADE' });
+DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica', onDelete: 'CASCADE' });
+DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo', onDelete: 'CASCADE' });
 FichaTecnica.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
-FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo' });
+FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo', onDelete: 'CASCADE' });
+Insumo.hasMany(FichaTecnica, { foreignKey: 'idInsumo', as: 'fichasTecnicas', onDelete: 'CASCADE' });
+Insumo.hasMany(DetalleFichaInsumo, { foreignKey: 'idInsumo', as: 'usosEnFichas', onDelete: 'CASCADE' });
 
 Compra.belongsTo(Proveedor, { foreignKey: 'idProveedor', as: 'proveedor' });
 Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
