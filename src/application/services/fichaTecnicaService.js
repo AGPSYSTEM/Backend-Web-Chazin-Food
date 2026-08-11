@@ -116,6 +116,7 @@ class FichaTecnicaService {
     if (!f) {
       f = await FichaTecnica.create({
         idProducto,
+        idInsumo: 0,
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
         descripcion: data.caracteristicas || data.descripcion || '',
@@ -172,6 +173,7 @@ class FichaTecnicaService {
 
     if (!f) {
       f = await FichaTecnica.create({
+        idProducto: 0,
         idInsumo,
         idVariante: resolvedVarianteId,
         tipo: 'INSUMO',
