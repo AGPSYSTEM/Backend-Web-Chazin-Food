@@ -72,5 +72,16 @@ async function resequenceAllCoreTables() {
   }
 }
 
-module.exports = { resetAutoIncrement, resequenceTableIds, resequenceAllCoreTables };
+/**
+ * Adds the logical-deletion state to technical sheets in installations created
+ * before the field existed. Existing sheets remain active by default.
+ */
+async function ensureFichaTecnicaTrashSchema() {
+  const sequelize = connectDB.sequelize;
+  const [columns] = await sequelize.query("SHOW COLUMNS FROM `fichatecnica` LIKE 'estado'");
+  if (columns.length === 0) {
+    await sequelize.query('ALTER TABLE `fichatecnica` ADD COLUMN `estado` TINYINT NOT NULL DEFAULT 1 AFTER `observaciones`');
+  }
+}
 
+module.exports = { resetAutoIncrement, resequenceTableIds, resequenceAllCoreTables, ensureFichaTecnicaTrashSchema };

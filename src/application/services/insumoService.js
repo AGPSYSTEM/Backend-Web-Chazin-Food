@@ -188,10 +188,10 @@ class InsumoService {
       await insumo.save({ transaction });
 
       const FichaTecnicaService = require('./fichaTecnicaService');
-      await FichaTecnicaService.deleteByInsumoId(idInsumo, { transaction });
+      await FichaTecnicaService.softDeleteByInsumoId(idInsumo, { transaction });
 
       await transaction.commit();
-      return { message: 'Insumo movido a la papelera y ficha técnica eliminada' };
+      return { message: 'Insumo y ficha técnica movidos a la papelera' };
     } catch (error) {
       await transaction.rollback();
       throw error;
@@ -199,15 +199,28 @@ class InsumoService {
   }
 
   static async restore(idInsumo) {
-    const insumo = await Insumo.findByPk(idInsumo);
-    if (!insumo) {
-      const error = new Error('Insumo no encontrado');
-      error.statusCode = 404;
+    const transaction = await database.sequelize.transaction();
+
+    try {
+      const insumo = await Insumo.findByPk(idInsumo, { transaction });
+      if (!insumo) {
+        const error = new Error('Insumo no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      insumo.estado = 1;
+      await insumo.save({ transaction });
+
+      const FichaTecnicaService = require('./fichaTecnicaService');
+      await FichaTecnicaService.restoreByInsumoId(idInsumo, { transaction });
+
+      await transaction.commit();
+      return this.getById(idInsumo);
+    } catch (error) {
+      await transaction.rollback();
       throw error;
     }
-    insumo.estado = 1;
-    await insumo.save();
-    return this.getById(idInsumo);
   }
 
   static async hardDelete(idInsumo) {

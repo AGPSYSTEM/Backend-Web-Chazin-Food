@@ -24,6 +24,7 @@ class FichaTecnicaService {
       producto: f.producto || null,
       insumoInfo: f.insumoInfo || null,
       variante: f.variante || null,
+      varianteNombre: f.variante?.nombre || 'No aplica',
       detalles: (f.detalles || []).map(d => ({
         idDetalleFicha: d.idDetalleFicha,
         idInsumo: d.idInsumo,
@@ -36,6 +37,7 @@ class FichaTecnicaService {
 
   static async getAll() {
     const fichas = await FichaTecnica.findAll({
+      where: { estado: 1 },
       include: [
         {
           model: DetalleFichaInsumo,
@@ -63,7 +65,8 @@ class FichaTecnicaService {
   }
 
   static async getById(id) {
-    const f = await FichaTecnica.findByPk(id, {
+    const f = await FichaTecnica.findOne({
+      where: { idFichaTecnica: id, estado: 1 },
       include: [
         {
           model: DetalleFichaInsumo,
@@ -81,7 +84,7 @@ class FichaTecnicaService {
 
   static async getByProductoId(idProducto) {
     const f = await FichaTecnica.findOne({
-      where: { idProducto },
+      where: { idProducto, estado: 1 },
       include: [
         {
           model: DetalleFichaInsumo,
@@ -100,7 +103,7 @@ class FichaTecnicaService {
 
   static async getByInsumoId(idInsumo) {
     const f = await FichaTecnica.findOne({
-      where: { idInsumo },
+      where: { idInsumo, estado: 1 },
       include: [
         {
           model: DetalleFichaInsumo,
@@ -346,6 +349,20 @@ class FichaTecnicaService {
       });
       await ficha.destroy({ transaction: options.transaction });
     }
+  }
+
+  static async softDeleteByInsumoId(idInsumo, options = {}) {
+    await FichaTecnica.update(
+      { estado: 0 },
+      { where: { idInsumo }, transaction: options.transaction }
+    );
+  }
+
+  static async restoreByInsumoId(idInsumo, options = {}) {
+    await FichaTecnica.update(
+      { estado: 1 },
+      { where: { idInsumo }, transaction: options.transaction }
+    );
   }
 }
 
