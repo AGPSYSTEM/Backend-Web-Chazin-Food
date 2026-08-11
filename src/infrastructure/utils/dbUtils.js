@@ -72,5 +72,85 @@ async function resequenceAllCoreTables() {
   }
 }
 
-module.exports = { resetAutoIncrement, resequenceTableIds, resequenceAllCoreTables };
+/**
+ * Adds the logical-deletion state to technical sheets in installations created
+ * before the field existed. Existing sheets remain active by default.
+ */
+async function ensureFichaTecnicaTrashSchema() {
+  const sequelize = connectDB.sequelize;
+  const [columns] = await sequelize.query("SHOW COLUMNS FROM `fichatecnica` LIKE 'estado'");
+  if (columns.length === 0) {
+    await sequelize.query('ALTER TABLE `fichatecnica` ADD COLUMN `estado` TINYINT NOT NULL DEFAULT 1 AFTER `observaciones`');
+  }
+}
 
+/**
+ * Creates the inactive, reserved category/product/variant with ID 0 used only
+ * by technical sheets of insumos. Keeping real rows preserves the foreign-key
+ * protection for every product variant.
+ */
+async function ensureFichaTecnicaInsumoVariantZero() {
+  const sequelize = connectDB.sequelize;
+  const transaction = await sequelize.transaction();
+  let originalSqlMode;
+
+  try {
+    const [[mode]] = await sequelize.query('SELECT @@SESSION.sql_mode AS sqlMode', { transaction });
+    originalSqlMode = mode.sqlMode || '';
+    const sqlModeWithZero = originalSqlMode.includes('NO_AUTO_VALUE_ON_ZERO')
+      ? originalSqlMode
+      : [originalSqlMode, 'NO_AUTO_VALUE_ON_ZERO'].filter(Boolean).join(',');
+    await sequelize.query('SET SESSION sql_mode = ?', { replacements: [sqlModeWithZero], transaction });
+
+    const [[category]] = await sequelize.query('SELECT nombre FROM `categoriaproducto` WHERE `idCategoriaProducto` = 0 FOR UPDATE', { transaction });
+    if (category && category.nombre !== '__SISTEMA_VARIANTE_CERO__') {
+      throw new Error('El ID 0 de categoría de producto ya está en uso');
+    }
+    if (!category) {
+      await sequelize.query(
+        "INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`, `estado`) VALUES (0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0)",
+        { transaction }
+      );
+    }
+
+    const [[product]] = await sequelize.query('SELECT nombre FROM `producto` WHERE `idProducto` = 0 FOR UPDATE', { transaction });
+    if (product && product.nombre !== '__SISTEMA_VARIANTE_CERO__') {
+      throw new Error('El ID 0 de producto ya está en uso');
+    }
+    if (!product) {
+      await sequelize.query(
+        "INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `precio`, `stock`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, 0, 0, '__SISTEMA_VARIANTE_CERO__')",
+        { transaction }
+      );
+    }
+
+    const [[variant]] = await sequelize.query('SELECT nombre, idProducto FROM `variante` WHERE `idVariante` = 0 FOR UPDATE', { transaction });
+    if (variant && (variant.nombre !== '__SISTEMA_VARIANTE_CERO__' || variant.idProducto !== 0)) {
+      throw new Error('El ID 0 de variante ya está en uso');
+    }
+    if (!variant) {
+      await sequelize.query(
+        "INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 0, 0)",
+        { transaction }
+      );
+    }
+
+    await sequelize.query("UPDATE `fichatecnica` SET `idVariante` = 0 WHERE `tipo` = 'INSUMO' AND `idVariante` IS NULL", { transaction });
+    await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction });
+    await transaction.commit();
+  } catch (error) {
+    if (originalSqlMode !== undefined) {
+      await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction }).catch(() => {});
+    }
+    await transaction.rollback();
+    throw error;
+  }
+}
+
+module.exports = {
+  resetAutoIncrement,
+  resequenceTableIds,
+  resequenceAllCoreTables,
+  ensureFichaTecnicaTrashSchema,
+  ensureFichaTecnicaInsumoVariantZero
+};

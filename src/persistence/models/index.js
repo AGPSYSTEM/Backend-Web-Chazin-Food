@@ -568,6 +568,10 @@ const FichaTecnica = sequelize.define('fichatecnica', {
   observaciones: {
     type: DataTypes.TEXT
   },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  },
   fechaCreacion: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
@@ -1038,4 +1042,3 @@ module.exports = {
   DetalleVentaAdicion,
   Pedido
 };
-
