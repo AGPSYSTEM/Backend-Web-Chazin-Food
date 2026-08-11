@@ -124,8 +124,9 @@ class FichaTecnicaService {
       if (v) return v.idVariante;
       return 1;
     }
-    // For insumos, idVariante defaults to 0 (No Aplica / Sin Variante) so it is never NULL in DB
-    return 0;
+    // Las fichas de insumos no tienen variante. La columna admite NULL y 0 no
+    // corresponde a ninguna variante válida (tiene una llave foránea).
+    return null;
   }
 
   static async saveForProducto(idProducto, data) {
