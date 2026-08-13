@@ -1,17 +1,11 @@
 const { CategoriaProducto, Product } = require('../../persistence/models');
-const { Op } = require('sequelize');
 
 class CategoriaProductoService {
   static async getAll() {
     const categorias = await CategoriaProducto.findAll();
     const list = await Promise.all(categorias.map(async (cat) => {
       const cantidad = await Product.count({
-        where: {
-          [Op.or]: [
-            { idCategoriaProducto: cat.idCategoriaProducto },
-            { categoria: cat.nombre }
-          ]
-        }
+        where: { idCategoriaProducto: cat.idCategoriaProducto }
       });
       return {
         id: cat.idCategoriaProducto,
@@ -33,12 +27,7 @@ class CategoriaProductoService {
       throw error;
     }
     const cantidad = await Product.count({
-      where: {
-        [Op.or]: [
-          { idCategoriaProducto: id },
-          { categoria: cat.nombre }
-        ]
-      }
+      where: { idCategoriaProducto: id }
     });
     return {
       id: cat.idCategoriaProducto,
@@ -100,12 +89,7 @@ class CategoriaProductoService {
     }
 
     const cantidadProductos = await Product.count({
-      where: {
-        [Op.or]: [
-          { idCategoriaProducto: id },
-          { categoria: cat.nombre }
-        ]
-      }
+      where: { idCategoriaProducto: id }
     });
 
     if (cantidadProductos > 0) {

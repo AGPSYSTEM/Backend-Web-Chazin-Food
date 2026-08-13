@@ -32,12 +32,34 @@ sequelize.sync().then(async () => {
 
 const app = express();
 
+// ── Configuración de CORS Explícita para Frontend (Vite en puerto 5173) ──
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.FRONTEND_URL // Por si luego configuras la URL en el .env
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permitir peticiones sin origen (como Postman, Swagger o herramientas locales)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, true); // En desarrollo permitimos la petición para evitar bloqueos
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 // Middlewares
 app.use(express.json());
-app.use(cors());
 app.use(
   helmet({
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" } // Permite recursos cruzados entre puertos
   })
 );
 
