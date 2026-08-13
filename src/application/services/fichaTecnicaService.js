@@ -1,16 +1,6 @@
+const { Sequelize } = require('sequelize');
 const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante } = require('../../persistence/models');
 const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
-
-/**
- * Returns the current date-time in Colombia (UTC-5) as a formatted string
- * suitable for MySQL DATETIME columns.
- */
-function colombiaNow() {
-  const d = new Date();
-  // Shift UTC to Colombia offset (UTC-5)
-  const colombiaMs = d.getTime() - (5 * 60 * 60 * 1000);
-  return new Date(colombiaMs).toISOString().slice(0, 19).replace('T', ' ');
-}
 
 class FichaTecnicaService {
   static formatFicha(f) {
@@ -163,10 +153,11 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
         observaciones: data.observaciones || '',
-        fechaCreacion: colombiaNow()
+        fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
       });
     } else {
-      await f.update({
+      const updatePayload = {
+        estado: 1,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         descripcion: data.caracteristicas !== undefined ? data.caracteristicas : (data.descripcion !== undefined ? data.descripcion : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
@@ -178,7 +169,11 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
         observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones
-      });
+      };
+      if (f.estado === 0) {
+        updatePayload.fechaCreacion = Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')");
+      }
+      await f.update(updatePayload);
     }
 
     if (Array.isArray(data.detalles || data.insumos)) {
@@ -218,10 +213,11 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
         observaciones: data.observaciones || '',
-        fechaCreacion: colombiaNow()
+        fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
       }, { transaction: options.transaction });
     } else {
-      await f.update({
+      const updatePayload = {
+        estado: 1,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         descripcion: data.caracteristicas !== undefined ? data.caracteristicas : (data.descripcion !== undefined ? data.descripcion : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
@@ -233,7 +229,11 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
         observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones
-      }, { transaction: options.transaction });
+      };
+      if (f.estado === 0) {
+        updatePayload.fechaCreacion = Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')");
+      }
+      await f.update(updatePayload, { transaction: options.transaction });
     }
 
     if (Array.isArray(data.detalles || data.insumos)) {
@@ -277,7 +277,8 @@ class FichaTecnicaService {
       informacionNutricional: data.informacionNutricional || null,
       condicionesAlmacenamiento: data.condicionesAlmacenamiento || null,
       vidaUtil: data.vidaUtil || null,
-      observaciones: data.observaciones || null
+      observaciones: data.observaciones || null,
+      fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
     });
 
     const inputDetalles = data.detalles || data.insumos || [];
