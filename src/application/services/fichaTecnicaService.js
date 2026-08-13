@@ -1,6 +1,17 @@
 const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante } = require('../../persistence/models');
 const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 
+/**
+ * Returns the current date-time in Colombia (UTC-5) as a formatted string
+ * suitable for MySQL DATETIME columns.
+ */
+function colombiaNow() {
+  const d = new Date();
+  // Shift UTC to Colombia offset (UTC-5)
+  const colombiaMs = d.getTime() - (5 * 60 * 60 * 1000);
+  return new Date(colombiaMs).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 class FichaTecnicaService {
   static formatFicha(f) {
     if (!f) return null;
@@ -151,7 +162,8 @@ class FichaTecnicaService {
         informacionNutricional: data.informacionNutricional || '',
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
-        observaciones: data.observaciones || ''
+        observaciones: data.observaciones || '',
+        fechaCreacion: colombiaNow()
       });
     } else {
       await f.update({
@@ -205,7 +217,8 @@ class FichaTecnicaService {
         informacionNutricional: data.informacionNutricional || '',
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
-        observaciones: data.observaciones || ''
+        observaciones: data.observaciones || '',
+        fechaCreacion: colombiaNow()
       }, { transaction: options.transaction });
     } else {
       await f.update({
