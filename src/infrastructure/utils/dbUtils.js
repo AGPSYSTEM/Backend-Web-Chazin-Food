@@ -31,7 +31,8 @@ async function resetAutoIncrement(tableName, primaryKeyColumn = 'id') {
 async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables = []) {
   try {
     const sequelize = connectDB.sequelize;
-    const [rows] = await sequelize.query(`SELECT \`${primaryKeyColumn}\` FROM \`${tableName}\` ORDER BY \`${primaryKeyColumn}\` ASC`);
+    // Skip reserved ID=0 rows (used by placeholder records)
+    const [rows] = await sequelize.query(`SELECT \`${primaryKeyColumn}\` FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` > 0 ORDER BY \`${primaryKeyColumn}\` ASC`);
     
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
     
@@ -147,10 +148,48 @@ async function ensureFichaTecnicaInsumoVariantZero() {
   }
 }
 
+/**
+ * Converts the legacy UTC values stored in fichatecnica.fechaCreacion to
+ * Colombia local time (UTC-5). The migration key makes this safe to run on
+ * every startup without changing the same records twice.
+ */
+async function ensureFichaTecnicaColombiaTimezone() {
+  const sequelize = connectDB.sequelize;
+  const transaction = await sequelize.transaction();
+
+  try {
+    await sequelize.query(
+      'CREATE TABLE IF NOT EXISTS `sistemamigracion` (`clave` VARCHAR(100) NOT NULL PRIMARY KEY, `fechaAplicacion` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+      { transaction }
+    );
+    const [[migration]] = await sequelize.query(
+      "SELECT `clave` FROM `sistemamigracion` WHERE `clave` = 'fichatecnica_fecha_colombia_utc5' FOR UPDATE",
+      { transaction }
+    );
+
+    if (!migration) {
+      await sequelize.query(
+        'UPDATE `fichatecnica` SET `fechaCreacion` = DATE_SUB(`fechaCreacion`, INTERVAL 5 HOUR) WHERE `fechaCreacion` IS NOT NULL',
+        { transaction }
+      );
+      await sequelize.query(
+        "INSERT INTO `sistemamigracion` (`clave`) VALUES ('fichatecnica_fecha_colombia_utc5')",
+        { transaction }
+      );
+    }
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
   resequenceAllCoreTables,
   ensureFichaTecnicaTrashSchema,
-  ensureFichaTecnicaInsumoVariantZero
+  ensureFichaTecnicaInsumoVariantZero,
+  ensureFichaTecnicaColombiaTimezone
 };
