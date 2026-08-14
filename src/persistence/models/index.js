@@ -568,6 +568,10 @@ const FichaTecnica = sequelize.define('fichatecnica', {
   observaciones: {
     type: DataTypes.TEXT
   },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  },
   fechaCreacion: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
@@ -692,11 +696,13 @@ Venta.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
 Venta.hasMany(DetalleVentaProducto, { foreignKey: 'idVenta', as: 'detalles' });
 DetalleVentaProducto.belongsTo(Venta, { foreignKey: 'idVenta' });
 
-FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles' });
-DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica' });
-DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'detalles', onDelete: 'CASCADE' });
+DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica', onDelete: 'CASCADE' });
+DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo', onDelete: 'CASCADE' });
 FichaTecnica.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
-FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo' });
+FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo', onDelete: 'CASCADE' });
+Insumo.hasMany(FichaTecnica, { foreignKey: 'idInsumo', as: 'fichasTecnicas', onDelete: 'CASCADE' });
+Insumo.hasMany(DetalleFichaInsumo, { foreignKey: 'idInsumo', as: 'usosEnFichas', onDelete: 'CASCADE' });
 
 Compra.belongsTo(Proveedor, { foreignKey: 'idProveedor', as: 'proveedor' });
 Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
@@ -718,6 +724,25 @@ const Evento = sequelize.define('evento', {
       return this.idEvento;
     }
   },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  tipoEvento: {
+    type: DataTypes.STRING(50)
+  },
+  descuento: {
+    type: DataTypes.DECIMAL(10, 2)
+  },
+  nuevoPrecio: {
+    type: DataTypes.DECIMAL(10, 2)
+  },
+  accionInsumo: {
+    type: DataTypes.STRING(20)
+  },
+  insumosAsociados: {
+    type: DataTypes.TEXT // JSON stringified array of insumos
+  },
   nombreEvento: {
     type: DataTypes.STRING(120),
     allowNull: false
@@ -727,11 +752,11 @@ const Evento = sequelize.define('evento', {
   },
   fechaInicio: {
     type: DataTypes.DATEONLY,
-    allowNull: false
+    allowNull: true
   },
   fechaFin: {
     type: DataTypes.DATEONLY,
-    allowNull: false
+    allowNull: true
   },
   estado: {
     type: DataTypes.TINYINT,
@@ -988,6 +1013,9 @@ FichaTecnica.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
 Descuento.belongsTo(Evento, { foreignKey: 'idEvento', as: 'evento' });
 Evento.hasMany(Descuento, { foreignKey: 'idEvento' });
 
+Evento.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+Product.hasMany(Evento, { foreignKey: 'idProducto', as: 'eventos' });
+
 Venta.belongsTo(Descuento, { foreignKey: 'idDescuento', as: 'descuento' });
 
 Pago.belongsTo(Venta, { foreignKey: 'idVenta', as: 'venta' });
@@ -1036,4 +1064,3 @@ module.exports = {
   DetalleVentaAdicion,
   Pedido
 };
-

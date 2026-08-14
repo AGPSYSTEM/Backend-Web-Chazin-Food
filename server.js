@@ -13,11 +13,17 @@ const { sequelize } = require('./src/persistence/models');
 const { errorHandler } = require('./src/infrastructure/middlewares/errorMiddleware');
 const { swaggerUi, swaggerSpec } = require('./src/infrastructure/swagger/swagger');
 
-const { resequenceAllCoreTables } = require('./src/infrastructure/utils/dbUtils');
+const {
+  resequenceAllCoreTables,
+  ensureFichaTecnicaTrashSchema,
+  ensureFichaTecnicaInsumoVariantZero
+} = require('./src/infrastructure/utils/dbUtils');
 
 // Connect to Database via Sequelize
 connectDB();
-sequelize.sync().then(async () => {
+sequelize.sync({ alter: true }).then(async () => {
+  await ensureFichaTecnicaTrashSchema();
+  await ensureFichaTecnicaInsumoVariantZero();
   console.log('Modelos de Sequelize sincronizados correctamente.');
   await resequenceAllCoreTables();
 }).catch((err) => {
@@ -26,12 +32,34 @@ sequelize.sync().then(async () => {
 
 const app = express();
 
+// ── Configuración de CORS Explícita para Frontend (Vite en puerto 5173) ──
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.FRONTEND_URL // Por si luego configuras la URL en el .env
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permitir peticiones sin origen (como Postman, Swagger o herramientas locales)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, true); // En desarrollo permitimos la petición para evitar bloqueos
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 // Middlewares
 app.use(express.json());
-app.use(cors());
 app.use(
   helmet({
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" } // Permite recursos cruzados entre puertos
   })
 );
 
@@ -51,6 +79,7 @@ app.use('/api/categories', require('./src/presentation/routes/categoryRoutes'));
 app.use('/api/users', require('./src/presentation/routes/userRoutes'));
 app.use('/api/products', require('./src/presentation/routes/productRoutes'));
 app.use('/api/orders', require('./src/presentation/routes/ventaRoutes'));
+app.use('/api/upload', require('./src/presentation/routes/uploadRoutes'));
 
 // Rutas en Español
 app.use('/api/autenticacion', require('./src/presentation/routes/authRoutes'));
@@ -72,6 +101,7 @@ app.use('/api/fichas-tecnicas', require('./src/presentation/routes/fichaTecnicaR
 app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes'));
 app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
 app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
+app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
@@ -85,6 +115,15 @@ const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
   console.log(`Servidor monolítico unificado escuchando en el puerto ${PORT} en modo ${process.env.NODE_ENV || 'development'}`);
+});
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ El puerto ${PORT} ya está en uso. Cierra el proceso anterior o cambia el valor de PORT.`);
+  } else {
+    console.error('❌ Error al iniciar el servidor:', error.message);
+  }
+  process.exit(1);
 });
 
 // Manejo de cierre limpio para evitar errores EADDRINUSE con nodemon
@@ -103,4 +142,3 @@ process.once('SIGUSR2', () => {
 });
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-
