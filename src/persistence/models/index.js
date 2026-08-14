@@ -724,6 +724,25 @@ const Evento = sequelize.define('evento', {
       return this.idEvento;
     }
   },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  tipoEvento: {
+    type: DataTypes.STRING(50)
+  },
+  descuento: {
+    type: DataTypes.DECIMAL(10, 2)
+  },
+  nuevoPrecio: {
+    type: DataTypes.DECIMAL(10, 2)
+  },
+  accionInsumo: {
+    type: DataTypes.STRING(20)
+  },
+  insumosAsociados: {
+    type: DataTypes.TEXT // JSON stringified array of insumos
+  },
   nombreEvento: {
     type: DataTypes.STRING(120),
     allowNull: false
@@ -733,11 +752,11 @@ const Evento = sequelize.define('evento', {
   },
   fechaInicio: {
     type: DataTypes.DATEONLY,
-    allowNull: false
+    allowNull: true
   },
   fechaFin: {
     type: DataTypes.DATEONLY,
-    allowNull: false
+    allowNull: true
   },
   estado: {
     type: DataTypes.TINYINT,
@@ -993,6 +1012,9 @@ FichaTecnica.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
 
 Descuento.belongsTo(Evento, { foreignKey: 'idEvento', as: 'evento' });
 Evento.hasMany(Descuento, { foreignKey: 'idEvento' });
+
+Evento.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+Product.hasMany(Evento, { foreignKey: 'idProducto', as: 'eventos' });
 
 Venta.belongsTo(Descuento, { foreignKey: 'idDescuento', as: 'descuento' });
 

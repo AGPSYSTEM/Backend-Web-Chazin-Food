@@ -5,12 +5,14 @@ const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 class FichaTecnicaService {
   static formatFicha(f) {
     if (!f) return null;
+
     return {
       id: f.idFichaTecnica,
       idFichaTecnica: f.idFichaTecnica,
       idProducto: f.idProducto,
       idInsumo: f.idInsumo,
       idVariante: f.idVariante,
+      varianteNombre: f.variante?.nombre || 'No aplica',
       tipo: f.tipo || (f.idInsumo ? 'INSUMO' : 'PRODUCTO'),
       procedimiento: f.procedimiento || f.descripcion || '',
       tiempoPreparacion: f.tiempoPreparacion || 0,
@@ -25,8 +27,7 @@ class FichaTecnicaService {
       producto: f.producto || null,
       insumoInfo: f.insumoInfo || null,
       variante: f.variante || null,
-      varianteNombre: f.variante?.nombre || 'No aplica',
-      detalles: (f.detalles || []).map(d => ({
+      detalles: (f.detalles || []).map((d) => ({
         idDetalleFicha: d.idDetalleFicha,
         idInsumo: d.idInsumo,
         cantidad: Number(d.cantidad || 0),
@@ -43,7 +44,7 @@ class FichaTecnicaService {
         {
           model: DetalleFichaInsumo,
           as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'estado'] }]
         },
         { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] },
         { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] },
@@ -52,17 +53,13 @@ class FichaTecnicaService {
       order: [['idFichaTecnica', 'ASC']]
     });
 
-    const filtered = fichas.filter(f => {
-      const insumoActivo = f.insumoInfo === null || f.insumoInfo === undefined
-        ? true
-        : (f.insumoInfo.estado === null || f.insumoInfo.estado === undefined || f.insumoInfo.estado === 1);
-      const productoActivo = f.producto === null || f.producto === undefined
-        ? true
-        : (f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1);
+    const filtered = fichas.filter((f) => {
+      const insumoActivo = !f.insumoInfo || f.insumoInfo.estado === null || f.insumoInfo.estado === undefined || f.insumoInfo.estado === 1;
+      const productoActivo = !f.producto || f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1;
       return insumoActivo && productoActivo;
     });
 
-    return filtered.map(f => this.formatFicha(f));
+    return filtered.map((f) => this.formatFicha(f));
   }
 
   static async getById(id) {
@@ -79,6 +76,7 @@ class FichaTecnicaService {
         { model: Variante, as: 'variante' }
       ]
     });
+
     if (!f) return null;
     return this.formatFicha(f);
   }
@@ -96,9 +94,11 @@ class FichaTecnicaService {
         { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] }
       ]
     });
-    if (f && f.producto && (f.producto.estado !== null && f.producto.estado !== undefined && f.producto.estado !== 1)) {
+
+    if (f && f.producto && f.producto.estado !== null && f.producto.estado !== undefined && f.producto.estado !== 1) {
       return null;
     }
+
     return f ? this.formatFicha(f) : null;
   }
 
@@ -115,22 +115,27 @@ class FichaTecnicaService {
         { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] }
       ]
     });
-    if (f && f.insumoInfo && (f.insumoInfo.estado !== null && f.insumoInfo.estado !== undefined && f.insumoInfo.estado !== 1)) {
+
+    if (f && f.insumoInfo && f.insumoInfo.estado !== null && f.insumoInfo.estado !== undefined && f.insumoInfo.estado !== 1) {
       return null;
     }
+
     return f ? this.formatFicha(f) : null;
   }
 
   static async resolveVarianteId(idProducto, idInsumo, inputVarianteId) {
-    // 0 es el valor técnico reservado para fichas de insumos sin variante.
-    if (idInsumo) return 0;
-    if (inputVarianteId !== undefined && inputVarianteId !== null) return parseInt(inputVarianteId);
+    if (inputVarianteId !== undefined && inputVarianteId !== null) {
+      return parseInt(inputVarianteId, 10);
+    }
+
     if (idProducto) {
       const v = await Variante.findOne({ where: { idProducto } });
       if (v) return v.idVariante;
       return 1;
     }
-    return 0;
+
+    if (idInsumo) return 0;
+    return null;
   }
 
   static async saveForProducto(idProducto, data) {
@@ -143,7 +148,7 @@ class FichaTecnicaService {
         idInsumo: 0,
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
-        descripcion: data.caracteristicas || data.descripcion || '',
+        descripcion: data.descripcion || data.caracteristicas || '',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
         rendimiento: data.rendimiento || '',
@@ -158,8 +163,14 @@ class FichaTecnicaService {
     } else {
       const updatePayload = {
         estado: 1,
+        estado: 1
+      });
+    } else {
+      await f.update({
+        idProducto,
+        idInsumo: 0,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
-        descripcion: data.caracteristicas !== undefined ? data.caracteristicas : (data.descripcion !== undefined ? data.descripcion : f.descripcion),
+        descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
         rendimiento: data.rendimiento !== undefined ? data.rendimiento : f.rendimiento,
@@ -174,21 +185,27 @@ class FichaTecnicaService {
         updatePayload.fechaCreacion = Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')");
       }
       await f.update(updatePayload);
+        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
+        estado: data.estado !== undefined ? data.estado : f.estado
+      });
     }
 
-    if (Array.isArray(data.detalles || data.insumos)) {
-      const inputDetalles = data.detalles || data.insumos;
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: f.idFichaTecnica } });
-      if (inputDetalles.length > 0) {
-        const payload = inputDetalles.map(d => ({
-          idFichaTecnica: f.idFichaTecnica,
-          idInsumo: d.idInsumo || d.id,
-          cantidad: Number(d.cantidad || 1),
-          unidadMedida: d.unidadMedida || 'und'
-        }));
-        await DetalleFichaInsumo.bulkCreate(payload);
-      }
+    const inputDetalles = data.detalles || data.insumos || [];
+    await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: f.idFichaTecnica } });
+
+    if (inputDetalles.length > 0) {
+      const payload = inputDetalles.map((d) => ({
+        idFichaTecnica: f.idFichaTecnica,
+        idInsumo: d.idInsumo || d.id,
+        cantidad: Number(d.cantidad || 1),
+        unidadMedida: d.unidadMedida || 'und'
+      }));
+      await DetalleFichaInsumo.bulkCreate(payload);
     }
+
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
 
     return this.getById(f.idFichaTecnica);
   }
@@ -203,7 +220,7 @@ class FichaTecnicaService {
         idInsumo,
         idVariante: resolvedVarianteId,
         tipo: 'INSUMO',
-        descripcion: data.caracteristicas || data.descripcion || '',
+        descripcion: data.descripcion || data.caracteristicas || '',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
         rendimiento: data.rendimiento || '',
@@ -218,8 +235,14 @@ class FichaTecnicaService {
     } else {
       const updatePayload = {
         estado: 1,
+        estado: 1
+      }, { transaction: options.transaction });
+    } else {
+      await f.update({
+        idProducto: 0,
+        idInsumo,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
-        descripcion: data.caracteristicas !== undefined ? data.caracteristicas : (data.descripcion !== undefined ? data.descripcion : f.descripcion),
+        descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
         rendimiento: data.rendimiento !== undefined ? data.rendimiento : f.rendimiento,
@@ -234,23 +257,25 @@ class FichaTecnicaService {
         updatePayload.fechaCreacion = Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')");
       }
       await f.update(updatePayload, { transaction: options.transaction });
+        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
+        estado: data.estado !== undefined ? data.estado : f.estado
+      }, { transaction: options.transaction });
     }
 
-    if (Array.isArray(data.detalles || data.insumos)) {
-      const inputDetalles = data.detalles || data.insumos;
-      await DetalleFichaInsumo.destroy({
-        where: { idFichaTecnica: f.idFichaTecnica },
-        transaction: options.transaction
-      });
-      if (inputDetalles.length > 0) {
-        const payload = inputDetalles.map(d => ({
-          idFichaTecnica: f.idFichaTecnica,
-          idInsumo: d.idInsumo || d.id,
-          cantidad: Number(d.cantidad || 1),
-          unidadMedida: d.unidadMedida || 'und'
-        }));
-        await DetalleFichaInsumo.bulkCreate(payload, { transaction: options.transaction });
-      }
+    const inputDetalles = data.detalles || data.insumos || [];
+    await DetalleFichaInsumo.destroy({
+      where: { idFichaTecnica: f.idFichaTecnica },
+      transaction: options.transaction
+    });
+
+    if (inputDetalles.length > 0) {
+      const payload = inputDetalles.map((d) => ({
+        idFichaTecnica: f.idFichaTecnica,
+        idInsumo: d.idInsumo || d.id,
+        cantidad: Number(d.cantidad || 1),
+        unidadMedida: d.unidadMedida || 'und'
+      }));
+      await DetalleFichaInsumo.bulkCreate(payload, { transaction: options.transaction });
     }
 
     return options.skipReload ? f : this.getById(f.idFichaTecnica);
@@ -260,6 +285,7 @@ class FichaTecnicaService {
     if (data.idProducto) {
       return this.saveForProducto(data.idProducto, data);
     }
+
     if (data.idInsumo) {
       return this.saveForInsumo(data.idInsumo, data);
     }
@@ -267,9 +293,12 @@ class FichaTecnicaService {
     const resolvedVarianteId = await this.resolveVarianteId(null, null, data.idVariante);
 
     const ficha = await FichaTecnica.create({
+      idProducto: data.idProducto || null,
+      idInsumo: data.idInsumo || null,
       idVariante: resolvedVarianteId,
       tipo: data.tipo || 'PRODUCTO',
-      procedimiento: data.procedimiento || data.descripcion || null,
+      descripcion: data.descripcion || data.caracteristicas || null,
+      procedimiento: data.procedimiento || null,
       tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
       rendimiento: data.rendimiento || null,
       especificaciones: data.especificaciones || null,
@@ -279,11 +308,12 @@ class FichaTecnicaService {
       vidaUtil: data.vidaUtil || null,
       observaciones: data.observaciones || null,
       fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
+      estado: 1
     });
 
     const inputDetalles = data.detalles || data.insumos || [];
     if (inputDetalles.length > 0) {
-      const detalles = inputDetalles.map(d => ({
+      const detalles = inputDetalles.map((d) => ({
         idFichaTecnica: ficha.idFichaTecnica,
         idInsumo: d.idInsumo || d.id,
         cantidad: Number(d.cantidad || 1),
@@ -291,6 +321,10 @@ class FichaTecnicaService {
       }));
       await DetalleFichaInsumo.bulkCreate(detalles);
     }
+
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
 
     return this.getById(ficha.idFichaTecnica);
   }
@@ -308,6 +342,11 @@ class FichaTecnicaService {
     } else if (data.idVariante !== undefined) {
       f.idVariante = data.idVariante;
     }
+
+    if (data.idProducto !== undefined) f.idProducto = data.idProducto;
+    if (data.idInsumo !== undefined) f.idInsumo = data.idInsumo;
+    if (data.tipo !== undefined) f.tipo = data.tipo;
+    if (data.descripcion !== undefined) f.descripcion = data.descripcion;
     if (data.procedimiento !== undefined) f.procedimiento = data.procedimiento;
     if (data.tiempoPreparacion !== undefined) f.tiempoPreparacion = Number(data.tiempoPreparacion);
     if (data.rendimiento !== undefined) f.rendimiento = data.rendimiento;
@@ -317,6 +356,7 @@ class FichaTecnicaService {
     if (data.condicionesAlmacenamiento !== undefined) f.condicionesAlmacenamiento = data.condicionesAlmacenamiento;
     if (data.vidaUtil !== undefined) f.vidaUtil = data.vidaUtil;
     if (data.observaciones !== undefined) f.observaciones = data.observaciones;
+    if (data.estado !== undefined) f.estado = data.estado;
 
     await f.save();
 
@@ -324,7 +364,7 @@ class FichaTecnicaService {
     if (Array.isArray(inputDetalles)) {
       await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: id } });
       if (inputDetalles.length > 0) {
-        const detalles = inputDetalles.map(d => ({
+        const detalles = inputDetalles.map((d) => ({
           idFichaTecnica: id,
           idInsumo: d.idInsumo || d.id,
           cantidad: Number(d.cantidad || 1),
@@ -344,6 +384,7 @@ class FichaTecnicaService {
       error.statusCode = 404;
       throw error;
     }
+
     await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: id } });
     await f.destroy();
 
