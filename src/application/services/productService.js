@@ -1,13 +1,16 @@
-const { Product, CategoriaProducto, Evento } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante } = require('../../persistence/models');
 
 class ProductService {
   static async getProducts() {
     const products = await Product.findAll({
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
         { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
       ]
     });
+
     return products.map(p => {
       let adiciones = [];
       try {
@@ -15,16 +18,19 @@ class ProductService {
       } catch (e) {
         adiciones = [];
       }
+
+      const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+
       return {
         _id: p.idProducto,
         id: p.idProducto,
         idProducto: p.idProducto,
         nombre: p.nombre,
-        precio: parseFloat(p.precio || 0),
+        precio: parseFloat((primeraVariante && primeraVariante.precio) || 0),
         descripcion: p.descripcion || '',
         imagen: p.imagen || '',
         idCategoriaProducto: p.idCategoriaProducto,
-        categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
+        categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
         estado: p.estado === 1 ? 'Activo' : 'Inactivo',
         adiciones,
         eventos: p.eventos || []
@@ -34,8 +40,10 @@ class ProductService {
 
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
         { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
       ]
     });
@@ -52,16 +60,18 @@ class ProductService {
       adiciones = [];
     }
 
+    const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+
     return {
       _id: p.idProducto,
       id: p.idProducto,
       idProducto: p.idProducto,
       nombre: p.nombre,
-      precio: parseFloat(p.precio || 0),
+      precio: parseFloat((primeraVariante && primeraVariante.precio) || 0),
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
       idCategoriaProducto: p.idCategoriaProducto,
-      categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
+      categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo',
       adiciones,
       eventos: p.eventos || []
@@ -69,7 +79,7 @@ class ProductService {
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto, estado } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -83,26 +93,40 @@ class ProductService {
       throw error;
     }
 
-    // Resolve category ID
+    const normalizedCategoria = typeof categoria === 'string' ? categoria.trim() : '';
     let resolvedCatId = idCategoriaProducto;
-    if (!resolvedCatId && categoria) {
-      const catObj = await CategoriaProducto.findOne({ where: { nombre: categoria } });
+
+    if (!resolvedCatId && normalizedCategoria) {
+      const catObj = await CategoriaProducto.findOne({ where: { nombre: normalizedCategoria } });
       if (catObj) resolvedCatId = catObj.idCategoriaProducto;
     }
+
     if (!resolvedCatId) {
       const firstCat = await CategoriaProducto.findOne();
       resolvedCatId = firstCat ? firstCat.idCategoriaProducto : 1;
     }
 
+    const normalizedEstado = estado === 'Inactivo' || estado === 0 || estado === '0' ? 0 : 1;
+
     const product = await Product.create({
       idCategoriaProducto: resolvedCatId,
       nombre: nombre.trim(),
-      precio: precio || 0,
       descripcion: descripcion || '',
       imagen: imagen || '',
       categoria: categoria || '',
+      stock: stock || 0,
+      estado: normalizedEstado,
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
     });
+
+    if (precio !== undefined && precio !== null && precio !== '') {
+      await Variante.create({
+        idProducto: product.idProducto,
+        nombre: `${nombre.trim()} - base`,
+        precio: Number(precio) || 0,
+        estado: normalizedEstado
+      });
+    }
 
     return this.getProductById(product.idProducto);
   }
@@ -117,7 +141,6 @@ class ProductService {
 
     const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
     if (nombre !== undefined) p.nombre = nombre.trim();
-    if (precio !== undefined) p.precio = precio;
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
     if (estado !== undefined) {
@@ -126,8 +149,7 @@ class ProductService {
 
     if (idCategoriaProducto) {
       p.idCategoriaProducto = idCategoriaProducto;
-    } else if (categoria !== undefined) {
-      p.categoria = categoria;
+    } else if (categoria !== undefined && categoria !== null && categoria !== '') {
       const catObj = await CategoriaProducto.findOne({ where: { nombre: categoria } });
       if (catObj) p.idCategoriaProducto = catObj.idCategoriaProducto;
     }
@@ -135,6 +157,22 @@ class ProductService {
     if (adiciones !== undefined) p.adiciones = JSON.stringify(adiciones);
 
     await p.save();
+
+    if (precio !== undefined && precio !== null && precio !== '') {
+      let variante = await Variante.findOne({ where: { idProducto: id } });
+      if (!variante) {
+        variante = await Variante.create({
+          idProducto: id,
+          nombre: `${p.nombre} - base`,
+          precio: Number(precio) || 0,
+          estado: 1
+        });
+      } else {
+        variante.precio = Number(precio) || 0;
+        await variante.save();
+      }
+    }
+
     return this.getProductById(id);
   }
 
