@@ -1,9 +1,12 @@
-const { Product, CategoriaProducto } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento } = require('../../persistence/models');
 
 class ProductService {
   static async getProducts() {
     const products = await Product.findAll({
-      include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
+      include: [
+        { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+      ]
     });
     return products.map(p => {
       let adiciones = [];
@@ -20,18 +23,21 @@ class ProductService {
         precio: parseFloat(p.precio || 0),
         descripcion: p.descripcion || '',
         imagen: p.imagen || '',
-        stock: p.stock || 0,
         idCategoriaProducto: p.idCategoriaProducto,
         categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
         estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-        adiciones
+        adiciones,
+        eventos: p.eventos || []
       };
     });
   }
 
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
-      include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
+      include: [
+        { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+      ]
     });
     if (!p) {
       const error = new Error('Producto no encontrado');
@@ -54,16 +60,16 @@ class ProductService {
       precio: parseFloat(p.precio || 0),
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
-      stock: p.stock || 0,
       idCategoriaProducto: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
       estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-      adiciones
+      adiciones,
+      eventos: p.eventos || []
     };
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -94,7 +100,6 @@ class ProductService {
       precio: precio || 0,
       descripcion: descripcion || '',
       imagen: imagen || '',
-      stock: stock || 0,
       categoria: categoria || '',
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
     });
@@ -110,12 +115,11 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, estado, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (precio !== undefined) p.precio = precio;
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
-    if (stock !== undefined) p.stock = stock;
     if (estado !== undefined) {
       p.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
     }

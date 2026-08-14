@@ -11,7 +11,13 @@ class EventoService {
       descripcion: e.descripcion || '',
       fechaInicio: e.fechaInicio,
       fechaFin: e.fechaFin,
-      estado: e.estado === 1 ? 'Activo' : 'Inactivo'
+      estado: e.estado === 1 ? 'Activo' : 'Inactivo',
+      idProducto: e.idProducto,
+      tipoEvento: e.tipoEvento,
+      descuento: e.descuento,
+      nuevoPrecio: e.nuevoPrecio,
+      accionInsumo: e.accionInsumo,
+      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : []
     }));
   }
 
@@ -30,12 +36,21 @@ class EventoService {
       descripcion: e.descripcion || '',
       fechaInicio: e.fechaInicio,
       fechaFin: e.fechaFin,
-      estado: e.estado === 1 ? 'Activo' : 'Inactivo'
+      estado: e.estado === 1 ? 'Activo' : 'Inactivo',
+      idProducto: e.idProducto,
+      tipoEvento: e.tipoEvento,
+      descuento: e.descuento,
+      nuevoPrecio: e.nuevoPrecio,
+      accionInsumo: e.accionInsumo,
+      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : []
     };
   }
 
   static async create(data) {
-    const { nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado } = data;
+    const { 
+      nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
+      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, isTemporal
+    } = data;
     const finalNombre = nombreEvento || nombre;
 
     if (!finalNombre || !finalNombre.trim()) {
@@ -48,9 +63,15 @@ class EventoService {
     const created = await Evento.create({
       nombreEvento: finalNombre.trim(),
       descripcion: descripcion || '',
-      fechaInicio: fechaInicio || today,
-      fechaFin: fechaFin || today,
-      estado: estado === 'Inactivo' || estado === 0 ? 0 : 1
+      fechaInicio: isTemporal ? fechaInicio : null,
+      fechaFin: isTemporal ? fechaFin : null,
+      estado: estado === 'Inactivo' || estado === 0 ? 0 : 1,
+      idProducto: productoId || null,
+      tipoEvento: tipoEvento || null,
+      descuento: descuento || null,
+      nuevoPrecio: nuevoPrecio || null,
+      accionInsumo: accion || null,
+      insumosAsociados: insumos ? JSON.stringify(insumos) : null
     });
 
     return this.getById(created.idEvento);
@@ -64,24 +85,36 @@ class EventoService {
       throw error;
     }
 
-    const { nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado } = data;
+    const { 
+      nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
+      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, isTemporal
+    } = data;
     const finalNombre = nombreEvento || nombre;
 
     if (finalNombre !== undefined && finalNombre.trim()) {
       e.nombreEvento = finalNombre.trim();
     }
-    if (descripcion !== undefined) {
-      e.descripcion = descripcion;
+    if (descripcion !== undefined) e.descripcion = descripcion;
+    if (isTemporal !== undefined) {
+      if (isTemporal) {
+        if (fechaInicio !== undefined) e.fechaInicio = fechaInicio;
+        if (fechaFin !== undefined) e.fechaFin = fechaFin;
+      } else {
+        e.fechaInicio = null;
+        e.fechaFin = null;
+      }
+    } else {
+       if (fechaInicio !== undefined) e.fechaInicio = fechaInicio;
+       if (fechaFin !== undefined) e.fechaFin = fechaFin;
     }
-    if (fechaInicio !== undefined) {
-      e.fechaInicio = fechaInicio;
-    }
-    if (fechaFin !== undefined) {
-      e.fechaFin = fechaFin;
-    }
-    if (estado !== undefined) {
-      e.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
-    }
+    
+    if (estado !== undefined) e.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
+    if (productoId !== undefined) e.idProducto = productoId;
+    if (tipoEvento !== undefined) e.tipoEvento = tipoEvento;
+    if (descuento !== undefined) e.descuento = descuento;
+    if (nuevoPrecio !== undefined) e.nuevoPrecio = nuevoPrecio;
+    if (accion !== undefined) e.accionInsumo = accion;
+    if (insumos !== undefined) e.insumosAsociados = insumos ? JSON.stringify(insumos) : null;
 
     await e.save();
     return this.getById(id);

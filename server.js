@@ -21,7 +21,7 @@ const {
 
 // Connect to Database via Sequelize
 connectDB();
-sequelize.sync().then(async () => {
+sequelize.sync({ alter: true }).then(async () => {
   await ensureFichaTecnicaTrashSchema();
   await ensureFichaTecnicaInsumoVariantZero();
   console.log('Modelos de Sequelize sincronizados correctamente.');
@@ -57,6 +57,7 @@ app.use('/api/categories', require('./src/presentation/routes/categoryRoutes'));
 app.use('/api/users', require('./src/presentation/routes/userRoutes'));
 app.use('/api/products', require('./src/presentation/routes/productRoutes'));
 app.use('/api/orders', require('./src/presentation/routes/ventaRoutes'));
+app.use('/api/upload', require('./src/presentation/routes/uploadRoutes'));
 
 // Rutas en Español
 app.use('/api/autenticacion', require('./src/presentation/routes/authRoutes'));
@@ -78,6 +79,7 @@ app.use('/api/fichas-tecnicas', require('./src/presentation/routes/fichaTecnicaR
 app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes'));
 app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
 app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
+app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
