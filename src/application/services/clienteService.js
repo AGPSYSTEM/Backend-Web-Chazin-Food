@@ -139,7 +139,7 @@ class ClienteService {
         email: data.email ? data.email.trim() : `cliente_${Date.now()}@chazinfood.com`,
         telefono: data.telefono ? data.telefono.trim() : '',
         contrasena: hashedPassword,
-        idRol: clienteRol ? clienteRol.idRol : 3,
+        idRol: clienteRol ? clienteRol.idRol : 4,
         estado: 'ACTIVO'
       });
       idUsuario = user.idUsuario;
@@ -213,7 +213,7 @@ class ClienteService {
         email: data.email.trim(),
         telefono: (data.telefono || existingMeta.telefono || '').trim(),
         contrasena: hashedPassword,
-        idRol: clienteRol ? clienteRol.idRol : 3,
+        idRol: clienteRol ? clienteRol.idRol : 4,
         estado: 'ACTIVO'
       });
       c.idUsuario = user.idUsuario;

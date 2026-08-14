@@ -3,7 +3,7 @@ const { Product, CategoriaProducto, Evento, Variante } = require('../../persiste
 class ProductService {
   static async getProducts() {
     const products = await Product.findAll({
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -11,36 +11,48 @@ class ProductService {
       ]
     });
 
-    return products.map(p => {
-      let adiciones = [];
-      try {
-        adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
-      } catch (e) {
-        adiciones = [];
-      }
+    return products
+      .filter(p => p.idProducto !== 0 && !p.nombre?.startsWith('__SISTEMA'))
+      .map(p => {
+        let adiciones = [];
+        try {
+          adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
+        } catch (e) {
+          adiciones = [];
+        }
 
-      const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+        const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+        const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
+          ? parseFloat(p.precio)
+          : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
 
-      return {
-        _id: p.idProducto,
-        id: p.idProducto,
-        idProducto: p.idProducto,
-        nombre: p.nombre,
-        precio: parseFloat((primeraVariante && primeraVariante.precio) || 0),
-        descripcion: p.descripcion || '',
-        imagen: p.imagen || '',
-        idCategoriaProducto: p.idCategoriaProducto,
-        categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
-        estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-        adiciones,
-        eventos: p.eventos || []
-      };
-    });
+        const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
+          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
+          : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+
+        return {
+          _id: p.idProducto,
+          id: p.idProducto,
+          idProducto: p.idProducto,
+          nombre: p.nombre,
+          precio: realPrecio,
+          descripcion: p.descripcion || '',
+          imagen: p.imagen || '',
+          stock: p.stock || 0,
+          idCategoriaProducto: p.idCategoriaProducto,
+          categoriaId: p.idCategoriaProducto,
+          categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
+          estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+          variantes,
+          adiciones,
+          eventos: p.eventos || []
+        };
+      });
   }
 
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -61,18 +73,28 @@ class ProductService {
     }
 
     const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+    const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
+      ? parseFloat(p.precio)
+      : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
+
+    const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
+      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
+      : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
 
     return {
       _id: p.idProducto,
       id: p.idProducto,
       idProducto: p.idProducto,
       nombre: p.nombre,
-      precio: parseFloat((primeraVariante && primeraVariante.precio) || 0),
+      precio: realPrecio,
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
+      stock: p.stock || 0,
       idCategoriaProducto: p.idCategoriaProducto,
+      categoriaId: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+      variantes,
       adiciones,
       eventos: p.eventos || []
     };

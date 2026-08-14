@@ -3,19 +3,23 @@ const { CategoriaProducto, Product } = require('../../persistence/models');
 class CategoriaProductoService {
   static async getAll() {
     const categorias = await CategoriaProducto.findAll();
-    const list = await Promise.all(categorias.map(async (cat) => {
-      const cantidad = await Product.count({
-        where: { idCategoriaProducto: cat.idCategoriaProducto }
-      });
-      return {
-        id: cat.idCategoriaProducto,
-        idCategoriaProducto: cat.idCategoriaProducto,
-        nombre: cat.nombre,
-        descripcion: cat.descripcion || '',
-        estado: cat.estado === 1 ? 'Activo' : 'Inactivo',
-        cantidad
-      };
-    }));
+    const list = await Promise.all(
+      categorias
+        .filter(cat => cat.idCategoriaProducto !== 0 && !cat.nombre?.startsWith('__SISTEMA'))
+        .map(async (cat) => {
+          const cantidad = await Product.count({
+            where: { idCategoriaProducto: cat.idCategoriaProducto }
+          });
+          return {
+            id: cat.idCategoriaProducto,
+            idCategoriaProducto: cat.idCategoriaProducto,
+            nombre: cat.nombre,
+            descripcion: cat.descripcion || '',
+            estado: cat.estado === 1 ? 'Activo' : 'Inactivo',
+            cantidad
+          };
+        })
+    );
     return list;
   }
 

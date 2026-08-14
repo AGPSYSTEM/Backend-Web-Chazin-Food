@@ -8,13 +8,13 @@ const connectDB = require('../../persistence/config/db');
 async function resetAutoIncrement(tableName, primaryKeyColumn = 'id') {
   try {
     const sequelize = connectDB.sequelize;
-    const [results] = await sequelize.query(`SELECT COUNT(*) as total FROM \`${tableName}\``);
+    const [results] = await sequelize.query(`SELECT COUNT(*) as total FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` > 0`);
     const total = results && results[0] ? parseInt(results[0].total || 0, 10) : 0;
     
     if (total === 0) {
       await sequelize.query(`ALTER TABLE \`${tableName}\` AUTO_INCREMENT = 1;`);
     } else if (primaryKeyColumn) {
-      const [maxRes] = await sequelize.query(`SELECT IFNULL(MAX(\`${primaryKeyColumn}\`), 0) + 1 as nextId FROM \`${tableName}\``);
+      const [maxRes] = await sequelize.query(`SELECT IFNULL(MAX(\`${primaryKeyColumn}\`), 0) + 1 as nextId FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` > 0`);
       const nextId = maxRes && maxRes[0] ? parseInt(maxRes[0].nextId || 1, 10) : 1;
       await sequelize.query(`ALTER TABLE \`${tableName}\` AUTO_INCREMENT = ${nextId};`);
     }
@@ -27,6 +27,7 @@ async function resetAutoIncrement(tableName, primaryKeyColumn = 'id') {
  * Resequences primary key IDs consecutively (1, 2, 3...) when a row is deleted.
  * Also updates foreign key references in child tables.
  * Finally resets AUTO_INCREMENT to MAX + 1 (or 1 if empty).
+ * Excludes technical records with ID <= 0 (e.g. system zero variant).
  */
 async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables = []) {
   try {
@@ -102,34 +103,62 @@ async function ensureFichaTecnicaInsumoVariantZero() {
       ? originalSqlMode
       : [originalSqlMode, 'NO_AUTO_VALUE_ON_ZERO'].filter(Boolean).join(',');
     await sequelize.query('SET SESSION sql_mode = ?', { replacements: [sqlModeWithZero], transaction });
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction });
 
-    const [[category]] = await sequelize.query('SELECT nombre FROM `categoriaproducto` WHERE `idCategoriaProducto` = 0 FOR UPDATE', { transaction });
-    if (category && category.nombre !== '__SISTEMA_VARIANTE_CERO__') {
-      throw new Error('El ID 0 de categoría de producto ya está en uso');
-    }
-    if (!category) {
+    // 1. Category
+    const [categories] = await sequelize.query(
+      "SELECT `idCategoriaProducto`, `nombre` FROM `categoriaproducto` WHERE `idCategoriaProducto` = 0 OR `nombre` = '__SISTEMA_VARIANTE_CERO__' FOR UPDATE",
+      { transaction }
+    );
+    const categoryZero = categories.find(c => Number(c.idCategoriaProducto) === 0);
+    const categoryByName = categories.find(c => c.nombre === '__SISTEMA_VARIANTE_CERO__');
+
+    if (categoryByName && Number(categoryByName.idCategoriaProducto) !== 0) {
+      await sequelize.query(
+        "UPDATE `categoriaproducto` SET `idCategoriaProducto` = 0 WHERE `nombre` = '__SISTEMA_VARIANTE_CERO__'",
+        { transaction }
+      );
+    } else if (!categoryZero && !categoryByName) {
       await sequelize.query(
         "INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`, `estado`) VALUES (0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0)",
         { transaction }
       );
     }
 
-    const [[product]] = await sequelize.query('SELECT nombre FROM `producto` WHERE `idProducto` = 0 FOR UPDATE', { transaction });
-    if (product && product.nombre !== '__SISTEMA_VARIANTE_CERO__') {
-      throw new Error('El ID 0 de producto ya está en uso');
-    }
-    if (!product) {
+    // 2. Product
+    const [products] = await sequelize.query(
+      "SELECT `idProducto`, `nombre` FROM `producto` WHERE `idProducto` = 0 OR `nombre` = '__SISTEMA_VARIANTE_CERO__' FOR UPDATE",
+      { transaction }
+    );
+    const productZero = products.find(p => Number(p.idProducto) === 0);
+    const productByName = products.find(p => p.nombre === '__SISTEMA_VARIANTE_CERO__');
+
+    if (productByName && Number(productByName.idProducto) !== 0) {
+      await sequelize.query(
+        "UPDATE `producto` SET `idProducto` = 0, `idCategoriaProducto` = 0 WHERE `nombre` = '__SISTEMA_VARIANTE_CERO__'",
+        { transaction }
+      );
+    } else if (!productZero && !productByName) {
       await sequelize.query(
         "INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `precio`, `stock`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, 0, 0, '__SISTEMA_VARIANTE_CERO__')",
         { transaction }
       );
     }
 
-    const [[variant]] = await sequelize.query('SELECT nombre, idProducto FROM `variante` WHERE `idVariante` = 0 FOR UPDATE', { transaction });
-    if (variant && (variant.nombre !== '__SISTEMA_VARIANTE_CERO__' || variant.idProducto !== 0)) {
-      throw new Error('El ID 0 de variante ya está en uso');
-    }
-    if (!variant) {
+    // 3. Variant
+    const [variants] = await sequelize.query(
+      "SELECT `idVariante`, `idProducto`, `nombre` FROM `variante` WHERE `idVariante` = 0 OR `nombre` = '__SISTEMA_VARIANTE_CERO__' FOR UPDATE",
+      { transaction }
+    );
+    const variantZero = variants.find(v => Number(v.idVariante) === 0);
+    const variantByName = variants.find(v => v.nombre === '__SISTEMA_VARIANTE_CERO__');
+
+    if (variantByName && (Number(variantByName.idVariante) !== 0 || Number(variantByName.idProducto) !== 0)) {
+      await sequelize.query(
+        "UPDATE `variante` SET `idVariante` = 0, `idProducto` = 0 WHERE `nombre` = '__SISTEMA_VARIANTE_CERO__'",
+        { transaction }
+      );
+    } else if (!variantZero && !variantByName) {
       await sequelize.query(
         "INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 0, 0)",
         { transaction }
@@ -137,12 +166,14 @@ async function ensureFichaTecnicaInsumoVariantZero() {
     }
 
     await sequelize.query("UPDATE `fichatecnica` SET `idVariante` = 0 WHERE `tipo` = 'INSUMO' AND `idVariante` IS NULL", { transaction });
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction });
     await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction });
     await transaction.commit();
   } catch (error) {
     if (originalSqlMode !== undefined) {
       await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction }).catch(() => {});
     }
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction }).catch(() => {});
     await transaction.rollback();
     throw error;
   }
