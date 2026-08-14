@@ -162,11 +162,6 @@ class FichaTecnicaService {
       });
     } else {
       const updatePayload = {
-        estado: 1,
-        estado: 1
-      });
-    } else {
-      await f.update({
         idProducto,
         idInsumo: 0,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
@@ -179,15 +174,13 @@ class FichaTecnicaService {
         informacionNutricional: data.informacionNutricional !== undefined ? data.informacionNutricional : f.informacionNutricional,
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
-        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones
+        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
+        estado: data.estado !== undefined ? data.estado : 1
       };
       if (f.estado === 0) {
         updatePayload.fechaCreacion = Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')");
       }
       await f.update(updatePayload);
-        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
-        estado: data.estado !== undefined ? data.estado : f.estado
-      });
     }
 
     const inputDetalles = data.detalles || data.insumos || [];
@@ -234,11 +227,6 @@ class FichaTecnicaService {
       }, { transaction: options.transaction });
     } else {
       const updatePayload = {
-        estado: 1,
-        estado: 1
-      }, { transaction: options.transaction });
-    } else {
-      await f.update({
         idProducto: 0,
         idInsumo,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
@@ -251,15 +239,13 @@ class FichaTecnicaService {
         informacionNutricional: data.informacionNutricional !== undefined ? data.informacionNutricional : f.informacionNutricional,
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
-        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones
+        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
+        estado: data.estado !== undefined ? data.estado : 1
       };
       if (f.estado === 0) {
         updatePayload.fechaCreacion = Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')");
       }
       await f.update(updatePayload, { transaction: options.transaction });
-        observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
-        estado: data.estado !== undefined ? data.estado : f.estado
-      }, { transaction: options.transaction });
     }
 
     const inputDetalles = data.detalles || data.insumos || [];
@@ -307,7 +293,7 @@ class FichaTecnicaService {
       condicionesAlmacenamiento: data.condicionesAlmacenamiento || null,
       vidaUtil: data.vidaUtil || null,
       observaciones: data.observaciones || null,
-      fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
+      fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')"),
       estado: 1
     });
 
