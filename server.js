@@ -93,6 +93,15 @@ const server = app.listen(PORT, () => {
   console.log(`Servidor monolítico unificado escuchando en el puerto ${PORT} en modo ${process.env.NODE_ENV || 'development'}`);
 });
 
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ El puerto ${PORT} ya está en uso. Cierra el proceso anterior o cambia el valor de PORT.`);
+  } else {
+    console.error('❌ Error al iniciar el servidor:', error.message);
+  }
+  process.exit(1);
+});
+
 // Manejo de cierre limpio para evitar errores EADDRINUSE con nodemon
 const handleShutdown = (signal) => {
   console.log(`Recibida señal ${signal}. Cerrando servidor en puerto ${PORT}...`);
