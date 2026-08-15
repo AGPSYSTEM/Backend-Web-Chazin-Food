@@ -18,12 +18,11 @@ async function migrate() {
   const [updateUsers] = await conn.query('UPDATE usuario SET idRol = 4 WHERE idRol = 3;');
   console.log(`Updated ${updateUsers.affectedRows} client users to idRol = 4`);
 
-  // 2. Safely swap names with unique key handling
-  await conn.query("UPDATE rol SET nombre = '__TEMP_VENDEDOR__' WHERE idRol = 4;");
-  await conn.query("UPDATE rol SET nombre = 'Vendedor', descripcion = 'Módulo de Punto de Venta y Gestión Comercial', estado = 1 WHERE idRol = 3;");
-  await conn.query("UPDATE rol SET nombre = 'Cliente', descripcion = 'Acceso básico para realizar pedidos', estado = 1 WHERE idRol = 4;");
+  // 2. Ensure roles 3 (Vendedor) and 4 (Cliente) exist with exact names and descriptions
+  await conn.query("INSERT INTO rol (idRol, nombre, descripcion, estado) VALUES (3, 'Vendedor', 'Módulo de Punto de Venta y Gestión Comercial', 1) ON DUPLICATE KEY UPDATE nombre='Vendedor', descripcion='Módulo de Punto de Venta y Gestión Comercial', estado=1;");
+  await conn.query("INSERT INTO rol (idRol, nombre, descripcion, estado) VALUES (4, 'Cliente', 'Acceso a compras y perfil de cliente', 1) ON DUPLICATE KEY UPDATE nombre='Cliente', descripcion='Acceso a compras y perfil de cliente', estado=1;");
 
-  console.log('Role records synchronized: ID 3 = Vendedor, ID 4 = Cliente');
+  console.log('Role records synchronized: ID 1 = Administrador, ID 2 = Cocinero, ID 3 = Vendedor, ID 4 = Cliente');
 
   // 3. Ensure permissions exist
   const targetPerms = [
@@ -43,13 +42,21 @@ async function migrate() {
     }
   }
 
-  // 4. Assign permissions to Vendedor (idRol = 3)
+  // 4. Assign permissions to Vendedor (idRol = 3) and Cliente (idRol = 4)
   await conn.query('DELETE FROM rolpermiso WHERE idRol = 3;');
   const [permRows] = await conn.query('SELECT idPermiso, nombrePermiso FROM permiso WHERE nombrePermiso IN (?);', [targetPerms]);
   for (const pr of permRows) {
     await conn.query('INSERT INTO rolpermiso (idRol, idPermiso) VALUES (3, ?);', [pr.idPermiso]);
   }
   console.log('Permissions assigned to Vendedor:', permRows.map(p => p.nombrePermiso));
+
+  const clientePerms = ['Producción', 'Productos', 'Ventas', 'Clientes'];
+  await conn.query('DELETE FROM rolpermiso WHERE idRol = 4;');
+  const [cliPermRows] = await conn.query('SELECT idPermiso, nombrePermiso FROM permiso WHERE nombrePermiso IN (?);', [clientePerms]);
+  for (const cpr of cliPermRows) {
+    await conn.query('INSERT INTO rolpermiso (idRol, idPermiso) VALUES (4, ?);', [cpr.idPermiso]);
+  }
+  console.log('Permissions assigned to Cliente:', cliPermRows.map(p => p.nombrePermiso));
 
   // 5. Create or update user vendedor@chazinfood.com
   const passHash = await bcrypt.hash('vendedor123', 10);
