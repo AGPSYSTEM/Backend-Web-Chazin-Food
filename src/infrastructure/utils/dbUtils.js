@@ -216,11 +216,29 @@ async function ensureFichaTecnicaColombiaTimezone() {
   }
 }
 
+/**
+ * Ensures table `evento` contains required idProducto and promotion columns
+ */
+async function ensureEventoColumnsSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `evento` LIKE 'idProducto'");
+    if (cols.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `evento` ADD COLUMN `idProducto` INT NULL AFTER `idEvento`, ADD COLUMN `tipoEvento` VARCHAR(50) NULL AFTER `idProducto`, ADD COLUMN `descuento` DECIMAL(10,2) NULL AFTER `tipoEvento`, ADD COLUMN `nuevoPrecio` DECIMAL(10,2) NULL AFTER `descuento`, ADD COLUMN `accionInsumo` VARCHAR(20) NULL AFTER `nuevoPrecio`, ADD COLUMN `insumosAsociados` TEXT NULL AFTER `accionInsumo`"
+      );
+    }
+  } catch (err) {
+    console.warn("Error ensuring evento columns schema:", err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
   resequenceAllCoreTables,
   ensureFichaTecnicaTrashSchema,
   ensureFichaTecnicaInsumoVariantZero,
-  ensureFichaTecnicaColombiaTimezone
+  ensureFichaTecnicaColombiaTimezone,
+  ensureEventoColumnsSchema
 };
