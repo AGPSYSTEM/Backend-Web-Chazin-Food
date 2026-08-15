@@ -16,7 +16,8 @@ const { swaggerUi, swaggerSpec } = require('./src/infrastructure/swagger/swagger
 const {
   resequenceAllCoreTables,
   ensureFichaTecnicaTrashSchema,
-  ensureFichaTecnicaInsumoVariantZero
+  ensureFichaTecnicaInsumoVariantZero,
+  ensureEventoColumnsSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
 // Connect to Database via Sequelize
@@ -24,6 +25,7 @@ connectDB();
 sequelize.sync({ alter: true }).then(async () => {
   await ensureFichaTecnicaTrashSchema();
   await ensureFichaTecnicaInsumoVariantZero();
+  await ensureEventoColumnsSchema();
   console.log('Modelos de Sequelize sincronizados correctamente.');
   await resequenceAllCoreTables();
 }).catch((err) => {
