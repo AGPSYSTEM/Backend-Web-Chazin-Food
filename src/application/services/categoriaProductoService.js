@@ -15,6 +15,7 @@ class CategoriaProductoService {
             idCategoriaProducto: cat.idCategoriaProducto,
             nombre: cat.nombre,
             descripcion: cat.descripcion || '',
+            icon: cat.icon || '',
             estado: cat.estado === 1 ? 'Activo' : 'Inactivo',
             cantidad
           };
@@ -38,12 +39,13 @@ class CategoriaProductoService {
       idCategoriaProducto: cat.idCategoriaProducto,
       nombre: cat.nombre,
       descripcion: cat.descripcion || '',
+      icon: cat.icon || '',
       estado: cat.estado === 1 ? 'Activo' : 'Inactivo',
       cantidad
     };
   }
 
-  static async create({ nombre, descripcion }) {
+  static async create({ nombre, descripcion, icon }) {
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre de la categoría es obligatorio');
       error.statusCode = 400;
@@ -60,6 +62,7 @@ class CategoriaProductoService {
     const category = await CategoriaProducto.create({
       nombre: nombre.trim(),
       descripcion: descripcion || '',
+      icon: icon || '',
       estado: 1
     });
 
@@ -76,6 +79,7 @@ class CategoriaProductoService {
 
     if (data.nombre) cat.nombre = data.nombre.trim();
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
+    if (data.icon !== undefined) cat.icon = data.icon;
     if (data.estado !== undefined) {
       cat.estado = data.estado === 'Activo' || data.estado === 1 ? 1 : 0;
     }

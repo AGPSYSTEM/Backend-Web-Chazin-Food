@@ -421,6 +421,9 @@ const CategoriaProducto = sequelize.define('categoriaproducto', {
   descripcion: {
     type: DataTypes.STRING(255)
   },
+  icon: {
+    type: DataTypes.STRING(255)
+  },
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
