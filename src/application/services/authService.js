@@ -55,7 +55,7 @@ class AuthService {
 
     if (!finalRolId) {
       const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
-      finalRolId = clienteRol ? clienteRol.idRol : 3;
+      finalRolId = clienteRol ? clienteRol.idRol : 4;
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -114,15 +114,21 @@ class AuthService {
   }
 
   static async login(email, password) {
-    const finalEmail = email;
+    const finalEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!finalEmail || !password) {
       const error = new Error('Por favor proporcione correo y contraseña');
       error.statusCode = 400;
       throw error;
     }
 
+    const { Sequelize, Op } = require('sequelize');
     const user = await User.findOne({
-      where: { email: finalEmail },
+      where: {
+        [Op.or]: [
+          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), finalEmail),
+          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), `${finalEmail}.com`)
+        ]
+      },
       include: [
         { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
         { model: Cliente, as: 'clienteInfo' }

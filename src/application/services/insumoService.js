@@ -1,4 +1,5 @@
-const { Insumo, CategoriaInsumo, Proveedor } = require('../../persistence/models');
+const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
+const database = require('../../persistence/config/db');
 
 function formatInsumo(i) {
   const catNombre = i.categoria ? i.categoria.nombre : 'Sin categoría';
@@ -71,7 +72,7 @@ class InsumoService {
       nombre, idCategoriaInsumo, stock, stockMinimo,
       fechaExpedicion, fechaVencimiento, unidadMedida,
       precioUnitario, idProveedor, descripcion,
-      categoria, proveedor
+      categoria, proveedor, fichaTecnica
     } = insumoData;
 
     if (!nombre || !nombre.trim()) {
@@ -97,21 +98,36 @@ class InsumoService {
       throw error;
     }
 
-    const insumo = await Insumo.create({
-      nombre: nombre.trim(),
-      idCategoriaInsumo: idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null,
-      stock: stock !== undefined && stock !== null ? parseFloat(stock) : 0,
-      stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0,
-      fechaExpedicion: fechaExpedicion || null,
-      fechaVencimiento: fechaVencimiento || null,
-      unidadMedida: unidadMedida || 'und',
-      precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? parseFloat(precioUnitario) : 0,
-      idProveedor: idProveedor ? parseInt(idProveedor) : null,
-      descripcion: descripcion || '',
-      estado: 1
-    });
+    const transaction = await database.sequelize.transaction();
+    try {
+      const insumo = await Insumo.create({
+        nombre: nombre.trim(),
+        idCategoriaInsumo: idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null,
+        stock: stock !== undefined && stock !== null ? parseFloat(stock) : 0,
+        stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0,
+        fechaExpedicion: fechaExpedicion || null,
+        fechaVencimiento: fechaVencimiento || null,
+        unidadMedida: unidadMedida || 'und',
+        precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? parseFloat(precioUnitario) : 0,
+        idProveedor: idProveedor ? parseInt(idProveedor) : null,
+        descripcion: descripcion || '',
+        estado: 1
+      }, { transaction });
 
-    return this.getById(insumo.idInsumo);
+      if (fichaTecnica) {
+        const FichaTecnicaService = require('./fichaTecnicaService');
+        await FichaTecnicaService.saveForInsumo(insumo.idInsumo, fichaTecnica, {
+          transaction,
+          skipReload: true
+        });
+      }
+
+      await transaction.commit();
+      return this.getById(insumo.idInsumo);
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   }
 
   static async update(idInsumo, insumoData) {
@@ -158,44 +174,87 @@ class InsumoService {
   }
 
   static async softDelete(idInsumo) {
-    const insumo = await Insumo.findByPk(idInsumo);
-    if (!insumo) {
-      const error = new Error('Insumo no encontrado');
-      error.statusCode = 404;
+    const transaction = await database.sequelize.transaction();
+
+    try {
+      const insumo = await Insumo.findByPk(idInsumo, { transaction });
+      if (!insumo) {
+        const error = new Error('Insumo no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      insumo.estado = 0;
+      await insumo.save({ transaction });
+
+      const FichaTecnicaService = require('./fichaTecnicaService');
+      await FichaTecnicaService.softDeleteByInsumoId(idInsumo, { transaction });
+
+      await transaction.commit();
+      return { message: 'Insumo y ficha técnica movidos a la papelera' };
+    } catch (error) {
+      await transaction.rollback();
       throw error;
     }
-    insumo.estado = 0;
-    await insumo.save();
-    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
-    await resetAutoIncrement('insumo', 'idInsumo');
-    return { message: 'Insumo movido a la papelera' };
   }
 
   static async restore(idInsumo) {
-    const insumo = await Insumo.findByPk(idInsumo);
-    if (!insumo) {
-      const error = new Error('Insumo no encontrado');
-      error.statusCode = 404;
+    const transaction = await database.sequelize.transaction();
+
+    try {
+      const insumo = await Insumo.findByPk(idInsumo, { transaction });
+      if (!insumo) {
+        const error = new Error('Insumo no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      insumo.estado = 1;
+      await insumo.save({ transaction });
+
+      const FichaTecnicaService = require('./fichaTecnicaService');
+      await FichaTecnicaService.restoreByInsumoId(idInsumo, { transaction });
+
+      await transaction.commit();
+      return this.getById(idInsumo);
+    } catch (error) {
+      await transaction.rollback();
       throw error;
     }
-    insumo.estado = 1;
-    await insumo.save();
-    return this.getById(idInsumo);
   }
 
   static async hardDelete(idInsumo) {
-    const insumo = await Insumo.findByPk(idInsumo);
+    const id = parseInt(idInsumo, 10);
+    const insumo = await Insumo.findByPk(id);
     if (!insumo) {
       const error = new Error('Insumo no encontrado');
       error.statusCode = 404;
       throw error;
     }
+
+    const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+
+    // Delete ALL associated fichas técnicas de este insumo (pueden haber múltiples)
+    const fichas = await FichaTecnica.findAll({ where: { idInsumo: id } });
+    if (fichas && fichas.length > 0) {
+      for (const ficha of fichas) {
+        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+        await ficha.destroy();
+      }
+    }
+
+    // Eliminar también cualquier referencia a este insumo como ingrediente en detalles de otras fichas
+    await DetalleFichaInsumo.destroy({ where: { idInsumo: id } });
+
     await insumo.destroy();
 
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('insumo', 'idInsumo');
+    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [
+      { table: 'detallefichainsumo', column: 'idFichaTecnica' }
+    ]);
 
-    return { message: 'Insumo eliminado físicamente' };
+    return { message: 'Insumo y su ficha técnica eliminados físicamente' };
   }
 }
 

@@ -112,6 +112,12 @@ class RoleService {
       throw error;
     }
 
+    if (Number(id) === 1 || (role.nombre && role.nombre.toLowerCase() === 'administrador')) {
+      const error = new Error('El rol Administrador no se puede eliminar bajo ninguna circunstancia');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const userCount = await User.count({ where: { idRol: id } });
     if (userCount > 0) {
       const error = new Error('No se puede eliminar el rol porque está asignado a usuarios');

@@ -1,39 +1,63 @@
-const { Product, CategoriaProducto } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante } = require('../../persistence/models');
 
 class ProductService {
-  /*Obtiene todos los productos registrados junto con la información de su categoría.
-   Además, organiza los datos antes de enviarlos al cliente. */
   static async getProducts() {
     const products = await Product.findAll({
-      include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      include: [
+        { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+      ]
     });
-    return products.map(p => {
-      let adiciones = [];
-      try {
-        adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
-      } catch (e) {
-        adiciones = [];
-      }
-      return {
-        _id: p.idProducto,
-        id: p.idProducto,
-        idProducto: p.idProducto,
-        nombre: p.nombre,
-        precio: parseFloat(p.precio || 0),
-        descripcion: p.descripcion || '',
-        imagen: p.imagen || '',
-        stock: p.stock || 0,
-        idCategoriaProducto: p.idCategoriaProducto,
-        categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
-        estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-        adiciones
-      };
-    });
+
+    return products
+      .filter(p => p.idProducto !== 0 && !p.nombre?.startsWith('__SISTEMA'))
+      .map(p => {
+        let adiciones = [];
+        try {
+          adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
+        } catch (e) {
+          adiciones = [];
+        }
+
+        const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+        const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
+          ? parseFloat(p.precio)
+          : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
+
+        const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
+          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
+          : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+
+        return {
+          _id: p.idProducto,
+          id: p.idProducto,
+          idProducto: p.idProducto,
+          nombre: p.nombre,
+          precio: realPrecio,
+          descripcion: p.descripcion || '',
+          imagen: p.imagen || '',
+          stock: p.stock || 0,
+          idCategoriaProducto: p.idCategoriaProducto,
+          categoriaId: p.idCategoriaProducto,
+          categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
+          estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+          variantes,
+          adiciones,
+          eventos: p.eventos || []
+        };
+      });
   }
-  /*Busca un producto por su ID. Si no existe, devuelve un error 404. */
+
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
-      include: [{ model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] }]
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      include: [
+        { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+      ]
     });
     if (!p) {
       const error = new Error('Producto no encontrado');
@@ -48,25 +72,36 @@ class ProductService {
       adiciones = [];
     }
 
+    const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
+    const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
+      ? parseFloat(p.precio)
+      : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
+
+    const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
+      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
+      : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+
     return {
       _id: p.idProducto,
       id: p.idProducto,
       idProducto: p.idProducto,
       nombre: p.nombre,
-      precio: parseFloat(p.precio || 0),
+      precio: realPrecio,
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
       stock: p.stock || 0,
       idCategoriaProducto: p.idCategoriaProducto,
-      categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
+      categoriaId: p.idCategoriaProducto,
+      categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-      adiciones
+      variantes,
+      adiciones,
+      eventos: p.eventos || []
     };
   }
-  /*Crea un nuevo producto. Antes de guardarlo, valida que el nombre sea obligatorio,
-   que no exista otro producto con el mismo nombre y asigna la categoría correspondiente.*/
+
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto, estado } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -80,31 +115,44 @@ class ProductService {
       throw error;
     }
 
-    // Resolve category ID
+    const normalizedCategoria = typeof categoria === 'string' ? categoria.trim() : '';
     let resolvedCatId = idCategoriaProducto;
-    if (!resolvedCatId && categoria) {
-      const catObj = await CategoriaProducto.findOne({ where: { nombre: categoria } });
+
+    if (!resolvedCatId && normalizedCategoria) {
+      const catObj = await CategoriaProducto.findOne({ where: { nombre: normalizedCategoria } });
       if (catObj) resolvedCatId = catObj.idCategoriaProducto;
     }
+
     if (!resolvedCatId) {
       const firstCat = await CategoriaProducto.findOne();
       resolvedCatId = firstCat ? firstCat.idCategoriaProducto : 1;
     }
 
+    const normalizedEstado = estado === 'Inactivo' || estado === 0 || estado === '0' ? 0 : 1;
+
     const product = await Product.create({
       idCategoriaProducto: resolvedCatId,
       nombre: nombre.trim(),
-      precio: precio || 0,
       descripcion: descripcion || '',
       imagen: imagen || '',
-      stock: stock || 0,
       categoria: categoria || '',
+      stock: stock || 0,
+      estado: normalizedEstado,
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
     });
 
+    if (precio !== undefined && precio !== null && precio !== '') {
+      await Variante.create({
+        idProducto: product.idProducto,
+        nombre: `${nombre.trim()} - base`,
+        precio: Number(precio) || 0,
+        estado: normalizedEstado
+      });
+    }
+
     return this.getProductById(product.idProducto);
   }
-  /*Actualiza la información de un producto, como el nombre, precio, stock, categoría, estado y demás datos. */
+
   static async updateProduct(id, data) {
     const p = await Product.findByPk(id);
     if (!p) {
@@ -113,20 +161,17 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, estado, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
     if (nombre !== undefined) p.nombre = nombre.trim();
-    if (precio !== undefined) p.precio = precio;
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
-    if (stock !== undefined) p.stock = stock;
     if (estado !== undefined) {
       p.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
     }
 
     if (idCategoriaProducto) {
       p.idCategoriaProducto = idCategoriaProducto;
-    } else if (categoria !== undefined) {
-      p.categoria = categoria;
+    } else if (categoria !== undefined && categoria !== null && categoria !== '') {
       const catObj = await CategoriaProducto.findOne({ where: { nombre: categoria } });
       if (catObj) p.idCategoriaProducto = catObj.idCategoriaProducto;
     }
@@ -134,9 +179,25 @@ class ProductService {
     if (adiciones !== undefined) p.adiciones = JSON.stringify(adiciones);
 
     await p.save();
+
+    if (precio !== undefined && precio !== null && precio !== '') {
+      let variante = await Variante.findOne({ where: { idProducto: id } });
+      if (!variante) {
+        variante = await Variante.create({
+          idProducto: id,
+          nombre: `${p.nombre} - base`,
+          precio: Number(precio) || 0,
+          estado: 1
+        });
+      } else {
+        variante.precio = Number(precio) || 0;
+        await variante.save();
+      }
+    }
+
     return this.getProductById(id);
   }
-  /*Elimina un producto de la base de datos y reinicia el autoincremento de la tabla. */
+
   static async deleteProduct(id) {
     const p = await Product.findByPk(id);
     if (!p) {
@@ -144,6 +205,15 @@ class ProductService {
       error.statusCode = 404;
       throw error;
     }
+
+    // Delete associated ficha técnica and its details
+    const { FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
+    const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
+    if (ficha) {
+      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+      await ficha.destroy();
+    }
+
     await p.destroy();
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('producto', 'idProducto');
