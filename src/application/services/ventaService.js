@@ -142,6 +142,7 @@ class VentaService {
       id: v.idVenta,
       idVenta: v.idVenta,
       idDescuento: v.idDescuento || null,
+      tipoVenta: v.tipoVenta || (tipoEntrega === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
       numeroVenta,
       codigoPedido: numeroVenta,
       clienteNombre,
@@ -385,6 +386,36 @@ class VentaService {
 
     const finalClienteId = clienteObj.idCliente;
 
+    // Determinar y normalizar tipoVenta (PUNTO_DE_VENTA vs DOMICILIO)
+    const rawTipoVenta = String(data.tipoVenta || "").toUpperCase();
+    const rawEntrega = String(data.tipoEntrega || (data.mesa ? "En Mesa" : "")).toLowerCase();
+    let resolvedTipoVenta = "PUNTO_DE_VENTA";
+
+    if (rawTipoVenta.includes("DOMICILIO") || rawTipoVenta.includes("LINEA") || rawEntrega.includes("domicilio")) {
+      resolvedTipoVenta = "DOMICILIO";
+    } else {
+      resolvedTipoVenta = "PUNTO_DE_VENTA";
+    }
+
+    // Si es venta rápida (PUNTO_DE_VENTA), asegurar que se asocie al responsable con rol Vendedor o Administrador
+    let responsibleUserId = targetUserId;
+    if (resolvedTipoVenta === "PUNTO_DE_VENTA") {
+      const userRole = userObj.idRol || userObj.rol || (userObj.role ? userObj.role.nombre : null);
+      const isSellerOrAdmin = (userRole === 2 || userRole === 1 || String(userRole).toLowerCase().includes('vendedor') || String(userRole).toLowerCase().includes('admin'));
+
+      if (!isSellerOrAdmin) {
+        const { Op } = require('sequelize');
+        const sellerUser = await User.findOne({
+          include: [{ model: Role, as: 'role', where: { nombre: { [Op.like]: '%Vendedor%' } } }],
+          where: { estado: { [Op.in]: [1, 'ACTIVO', '1'] } }
+        }).catch(() => null);
+
+        if (sellerUser) {
+          responsibleUserId = sellerUser.idUsuario;
+        }
+      }
+    }
+
     let parsedObs = {};
     if (typeof data.observaciones === 'string' && data.observaciones.startsWith('{')) {
       try { parsedObs = JSON.parse(data.observaciones); } catch (e) {}
@@ -425,8 +456,9 @@ class VentaService {
 
     const venta = await Venta.create({
       idCliente: finalClienteId,
-      idUsuario: targetUserId,
+      idUsuario: responsibleUserId,
       idDescuento: data.idDescuento || null,
+      tipoVenta: resolvedTipoVenta,
       subtotal: data.subtotal || data.total || 0,
       descuentoAplicado: data.descuentoAplicado || 0,
       total: data.total || 0,

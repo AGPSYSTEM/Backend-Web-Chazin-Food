@@ -3,7 +3,7 @@ const { Product, CategoriaProducto, Evento, Variante } = require('../../persiste
 class ProductService {
   static async getProducts() {
     const products = await Product.findAll({
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -38,7 +38,6 @@ class ProductService {
           precio: realPrecio,
           descripcion: p.descripcion || '',
           imagen: p.imagen || '',
-          stock: p.stock || 0,
           idCategoriaProducto: p.idCategoriaProducto,
           categoriaId: p.idCategoriaProducto,
           categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
@@ -52,7 +51,7 @@ class ProductService {
 
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -89,7 +88,6 @@ class ProductService {
       precio: realPrecio,
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
-      stock: p.stock || 0,
       idCategoriaProducto: p.idCategoriaProducto,
       categoriaId: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
@@ -101,7 +99,7 @@ class ProductService {
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto, estado } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -136,7 +134,6 @@ class ProductService {
       descripcion: descripcion || '',
       imagen: imagen || '',
       categoria: categoria || '',
-      stock: stock || 0,
       estado: normalizedEstado,
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
     });

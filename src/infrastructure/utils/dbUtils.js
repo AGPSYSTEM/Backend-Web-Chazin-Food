@@ -140,7 +140,7 @@ async function ensureFichaTecnicaInsumoVariantZero() {
       );
     } else if (!productZero && !productByName) {
       await sequelize.query(
-        "INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `precio`, `stock`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, 0, 0, '__SISTEMA_VARIANTE_CERO__')",
+        "INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `precio`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, 0, '__SISTEMA_VARIANTE_CERO__')",
         { transaction }
       );
     }

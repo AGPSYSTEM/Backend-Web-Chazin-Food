@@ -384,10 +384,6 @@ const Product = sequelize.define('producto', {
   imagen: {
     type: DataTypes.STRING(255)
   },
-  stock: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0
-  },
   categoria: {
     type: DataTypes.STRING(100)
   },
@@ -457,6 +453,10 @@ const Venta = sequelize.define('venta', {
   fechaVenta: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
+  },
+  tipoVenta: {
+    type: DataTypes.STRING(50),
+    defaultValue: 'PUNTO_DE_VENTA'
   },
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
