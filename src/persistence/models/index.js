@@ -703,6 +703,7 @@ FichaTecnica.hasMany(DetalleFichaInsumo, { foreignKey: 'idFichaTecnica', as: 'de
 DetalleFichaInsumo.belongsTo(FichaTecnica, { foreignKey: 'idFichaTecnica', onDelete: 'CASCADE' });
 DetalleFichaInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo', onDelete: 'CASCADE' });
 FichaTecnica.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+Product.hasOne(FichaTecnica, { foreignKey: 'idProducto', as: 'fichaTecnica' });
 FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo', onDelete: 'CASCADE' });
 Insumo.hasMany(FichaTecnica, { foreignKey: 'idInsumo', as: 'fichasTecnicas', onDelete: 'CASCADE' });
 Insumo.hasMany(DetalleFichaInsumo, { foreignKey: 'idInsumo', as: 'usosEnFichas', onDelete: 'CASCADE' });

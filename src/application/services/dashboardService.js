@@ -25,6 +25,22 @@ class DashboardService {
       let ventasVariacion = 0;
       if (totalVentasAnterior > 0) {
         ventasVariacion = parseFloat((((totalVentasActual - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1));
+      } else if (totalVentasActual > 0) {
+        // Compare recent 7 days vs previous 7 days
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+        const ventasRecentWeek = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= sevenDaysAgo);
+        const ventasPriorWeek = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= fourteenDaysAgo && new Date(v.fechaVenta) < sevenDaysAgo);
+
+        const sumRecent = ventasRecentWeek.reduce((s, v) => s + parseFloat(v.total || 0), 0);
+        const sumPrior = ventasPriorWeek.reduce((s, v) => s + parseFloat(v.total || 0), 0);
+
+        if (sumPrior > 0) {
+          ventasVariacion = parseFloat((((sumRecent - sumPrior) / sumPrior) * 100).toFixed(1));
+        } else {
+          ventasVariacion = 100;
+        }
       }
 
       // Orders count
@@ -35,11 +51,45 @@ class DashboardService {
       let pedidosVariacion = 0;
       if (pedidosTotalAnterior > 0) {
         pedidosVariacion = parseFloat((((pedidosTotalActual - pedidosTotalAnterior) / pedidosTotalAnterior) * 100).toFixed(1));
+      } else if (pedidosTotalActual > 0) {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+        const pedRecent = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= sevenDaysAgo).length;
+        const pedPrior = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= fourteenDaysAgo && new Date(v.fechaVenta) < sevenDaysAgo).length;
+
+        if (pedPrior > 0) {
+          pedidosVariacion = parseFloat((((pedRecent - pedPrior) / pedPrior) * 100).toFixed(1));
+        } else {
+          pedidosVariacion = 100;
+        }
       }
 
       // Active clients count
       const clientesTotal = await Cliente.count().catch(() => 0);
       const clientesActivos = await Cliente.count({ where: { estado: 1 } }).catch(() => clientesTotal);
+
+      // Clientes variation
+      let clientesVariacion = 0;
+      try {
+        const allUsers = await sequelize.query("SELECT idUsuario, createdAt, fechaCreacion FROM usuario", { type: sequelize.QueryTypes.SELECT }).catch(() => []);
+        const usersThisMonth = allUsers.filter(u => {
+          const date = u.createdAt || u.fechaCreacion;
+          return date && new Date(date) >= firstDayCurrentMonth;
+        }).length;
+        const usersLastMonth = allUsers.filter(u => {
+          const date = u.createdAt || u.fechaCreacion;
+          return date && new Date(date) >= firstDayLastMonth && new Date(date) <= lastDayLastMonth;
+        }).length;
+
+        if (usersLastMonth > 0) {
+          clientesVariacion = parseFloat((((usersThisMonth - usersLastMonth) / usersLastMonth) * 100).toFixed(1));
+        } else if (usersThisMonth > 0) {
+          clientesVariacion = 100;
+        }
+      } catch (err) {
+        clientesVariacion = 0;
+      }
 
       // Products count & Low Stock
       const productosTotal = await Product.count({ where: { estado: 1 } }).catch(() => 0);
@@ -61,7 +111,7 @@ class DashboardService {
         pedidosVariacion,
         clientesTotal,
         clientesActivos,
-        clientesVariacion: 0,
+        clientesVariacion,
         productosTotal,
         insumosBajoStock
       };

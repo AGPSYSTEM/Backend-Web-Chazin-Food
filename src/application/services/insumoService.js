@@ -122,6 +122,17 @@ class InsumoService {
         });
       }
 
+      const TrazabilidadService = require('./trazabilidadService');
+      await TrazabilidadService.create({
+        tipo: 'Creado',
+        entidadNombre: insumo.nombre,
+        detalle: `Se creó un nuevo insumo en el inventario: ${insumo.nombre}`,
+        idInsumo: insumo.idInsumo,
+        tipoMovimiento: 'Entrada',
+        cantidad: insumo.stock,
+        motivo: 'Registro inicial de insumo'
+      });
+
       await transaction.commit();
       return this.getById(insumo.idInsumo);
     } catch (error) {
@@ -131,46 +142,71 @@ class InsumoService {
   }
 
   static async update(idInsumo, insumoData) {
-    const insumo = await Insumo.findByPk(idInsumo);
-    if (!insumo) {
-      const error = new Error('Insumo no encontrado');
-      error.statusCode = 404;
+    const transaction = await database.sequelize.transaction();
+    try {
+      const insumo = await Insumo.findByPk(idInsumo, { transaction });
+      if (!insumo) {
+        const error = new Error('Insumo no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      let {
+        nombre, idCategoriaInsumo, stock, stockMinimo,
+        fechaExpedicion, fechaVencimiento, unidadMedida,
+        precioUnitario, idProveedor, descripcion, estado,
+        categoria, proveedor, fichaTecnica
+      } = insumoData;
+
+      if (!idCategoriaInsumo && categoria) {
+        const cat = await CategoriaInsumo.findOne({ where: { nombre: categoria } });
+        if (cat) idCategoriaInsumo = cat.idCategoriaInsumo;
+      }
+
+      if (!idProveedor && proveedor) {
+        const prov = await Proveedor.findOne({ where: { nombre: proveedor } });
+        if (prov) idProveedor = prov.idProveedor;
+      }
+
+      if (nombre !== undefined) insumo.nombre = nombre.trim();
+      if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null;
+      if (stock !== undefined) insumo.stock = parseFloat(stock);
+      if (stockMinimo !== undefined) insumo.stockMinimo = parseFloat(stockMinimo);
+      if (fechaExpedicion !== undefined) insumo.fechaExpedicion = fechaExpedicion || null;
+      if (fechaVencimiento !== undefined) insumo.fechaVencimiento = fechaVencimiento || null;
+      if (unidadMedida !== undefined) insumo.unidadMedida = unidadMedida;
+      if (precioUnitario !== undefined) insumo.precioUnitario = parseFloat(precioUnitario);
+      if (idProveedor !== undefined) insumo.idProveedor = idProveedor ? parseInt(idProveedor) : null;
+      if (descripcion !== undefined) insumo.descripcion = descripcion;
+      if (estado !== undefined) {
+        insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+      }
+
+      await insumo.save({ transaction });
+
+      if (fichaTecnica) {
+        const FichaTecnicaService = require('./fichaTecnicaService');
+        await FichaTecnicaService.saveForInsumo(idInsumo, fichaTecnica, {
+          transaction,
+          skipReload: true
+        });
+      }
+
+      const TrazabilidadService = require('./trazabilidadService');
+      await TrazabilidadService.create({
+        tipo: 'Editado',
+        entidadNombre: insumo.nombre,
+        detalle: `Se actualizaron los datos del insumo: ${insumo.nombre}`,
+        idInsumo: insumo.idInsumo,
+        motivo: 'Actualización de datos'
+      });
+
+      await transaction.commit();
+      return this.getById(idInsumo);
+    } catch (error) {
+      await transaction.rollback();
       throw error;
     }
-
-    let {
-      nombre, idCategoriaInsumo, stock, stockMinimo,
-      fechaExpedicion, fechaVencimiento, unidadMedida,
-      precioUnitario, idProveedor, descripcion, estado,
-      categoria, proveedor
-    } = insumoData;
-
-    if (!idCategoriaInsumo && categoria) {
-      const cat = await CategoriaInsumo.findOne({ where: { nombre: categoria } });
-      if (cat) idCategoriaInsumo = cat.idCategoriaInsumo;
-    }
-
-    if (!idProveedor && proveedor) {
-      const prov = await Proveedor.findOne({ where: { nombre: proveedor } });
-      if (prov) idProveedor = prov.idProveedor;
-    }
-
-    if (nombre !== undefined) insumo.nombre = nombre.trim();
-    if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null;
-    if (stock !== undefined) insumo.stock = parseFloat(stock);
-    if (stockMinimo !== undefined) insumo.stockMinimo = parseFloat(stockMinimo);
-    if (fechaExpedicion !== undefined) insumo.fechaExpedicion = fechaExpedicion || null;
-    if (fechaVencimiento !== undefined) insumo.fechaVencimiento = fechaVencimiento || null;
-    if (unidadMedida !== undefined) insumo.unidadMedida = unidadMedida;
-    if (precioUnitario !== undefined) insumo.precioUnitario = parseFloat(precioUnitario);
-    if (idProveedor !== undefined) insumo.idProveedor = idProveedor ? parseInt(idProveedor) : null;
-    if (descripcion !== undefined) insumo.descripcion = descripcion;
-    if (estado !== undefined) {
-      insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
-    }
-
-    await insumo.save();
-    return this.getById(idInsumo);
   }
 
   static async softDelete(idInsumo) {
@@ -189,6 +225,15 @@ class InsumoService {
 
       const FichaTecnicaService = require('./fichaTecnicaService');
       await FichaTecnicaService.softDeleteByInsumoId(idInsumo, { transaction });
+
+      const TrazabilidadService = require('./trazabilidadService');
+      await TrazabilidadService.create({
+        tipo: 'Eliminado',
+        entidadNombre: insumo.nombre,
+        detalle: `Se movió a la papelera el insumo: ${insumo.nombre}`,
+        idInsumo: insumo.idInsumo,
+        motivo: 'Inactivación / Envío a papelera'
+      });
 
       await transaction.commit();
       return { message: 'Insumo y ficha técnica movidos a la papelera' };
@@ -215,6 +260,15 @@ class InsumoService {
       const FichaTecnicaService = require('./fichaTecnicaService');
       await FichaTecnicaService.restoreByInsumoId(idInsumo, { transaction });
 
+      const TrazabilidadService = require('./trazabilidadService');
+      await TrazabilidadService.create({
+        tipo: 'Restaurado',
+        entidadNombre: insumo.nombre,
+        detalle: `Se restauró el insumo en el inventario: ${insumo.nombre}`,
+        idInsumo: insumo.idInsumo,
+        motivo: 'Restauración desde papelera'
+      });
+
       await transaction.commit();
       return this.getById(idInsumo);
     } catch (error) {
@@ -232,6 +286,8 @@ class InsumoService {
       throw error;
     }
 
+    const nombreInsumo = insumo.nombre;
+
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 
     // Delete ALL associated fichas técnicas de este insumo (pueden haber múltiples)
@@ -247,6 +303,14 @@ class InsumoService {
     await DetalleFichaInsumo.destroy({ where: { idInsumo: id } });
 
     await insumo.destroy();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado permanente',
+      entidadNombre: nombreInsumo,
+      detalle: `Se eliminó permanentemente el insumo: ${nombreInsumo}`,
+      motivo: 'Eliminación física definitiva'
+    }).catch(() => {});
 
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('insumo', 'idInsumo');

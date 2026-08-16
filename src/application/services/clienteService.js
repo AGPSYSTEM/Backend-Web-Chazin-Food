@@ -108,6 +108,21 @@ class ClienteService {
     return result;
   }
 
+  static async getClientesStats() {
+    const list = await this.getAll();
+    const totalCount = list.length;
+    const vipCount = list.filter((c) => (c.tipo || (c.esVip ? 'VIP' : '')) === 'VIP').length;
+    const frecuentesCount = list.filter((c) => (c.tipo || '') === 'Frecuente').length;
+    const nuevosCount = list.filter((c) => (c.tipo || '') === 'Nuevo').length;
+
+    return {
+      total: totalCount,
+      vip: vipCount,
+      frecuentes: frecuentesCount,
+      nuevos: nuevosCount
+    };
+  }
+
   static async getById(id) {
     const c = await Cliente.findByPk(id, {
       include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono', 'estado'] }]

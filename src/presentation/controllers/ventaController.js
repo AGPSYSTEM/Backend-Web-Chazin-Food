@@ -2,8 +2,26 @@ const VentaService = require('../../application/services/ventaService');
 
 const getVentas = async (req, res, next) => {
   try {
-    const ventas = await VentaService.getAll();
+    const filter = {
+      periodo: req.query.periodo,
+      estado: req.query.estado,
+      search: req.query.search
+    };
+    const ventas = await VentaService.getAll(filter);
     res.json(ventas);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getVentasStats = async (req, res, next) => {
+  try {
+    const filter = {
+      periodo: req.query.periodo,
+      estado: req.query.estado
+    };
+    const stats = await VentaService.getStats(filter);
+    res.json(stats);
   } catch (error) {
     next(error);
   }
@@ -45,4 +63,4 @@ const cancelarVenta = async (req, res, next) => {
   }
 };
 
-module.exports = { getVentas, getVentaById, createVenta, updateEstadoVenta, cancelarVenta };
+module.exports = { getVentas, getVentasStats, getVentaById, createVenta, updateEstadoVenta, cancelarVenta };

@@ -166,6 +166,7 @@ async function ensureFichaTecnicaInsumoVariantZero() {
     }
 
     await sequelize.query("UPDATE `fichatecnica` SET `idVariante` = 0 WHERE `tipo` = 'INSUMO' AND `idVariante` IS NULL", { transaction });
+    await sequelize.query("UPDATE `fichatecnica` SET `idInsumo` = NULL WHERE `idInsumo` = 0", { transaction });
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction });
     await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction });
     await transaction.commit();
