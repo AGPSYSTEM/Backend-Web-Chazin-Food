@@ -310,6 +310,45 @@ async function ensureCategoriaProductoIconSchema() {
   }
 }
 
+/**
+ * Ensures table `venta` contains the `estadoAprobacion` column.
+ * Also backfills existing rows: orders already in PREPARANDO/LISTO/ENTREGADO get APROBADO,
+ * orders in CANCELADO get RECHAZADO, and PENDIENTE stays PENDIENTE.
+ */
+async function ensureVentaAprobacionSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+
+    // Check and add estadoAprobacion column
+    const [colsAprobacion] = await sequelize.query("SHOW COLUMNS FROM `venta` LIKE 'estadoAprobacion'");
+    if (colsAprobacion.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `venta` ADD COLUMN `estadoAprobacion` ENUM('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'PENDIENTE' AFTER `observaciones`"
+      );
+      console.log('[DB Migration] Columna estadoAprobacion agregada a tabla venta');
+
+      // Backfill: orders already in progress or completed should be marked APROBADO
+      await sequelize.query(
+        "UPDATE `venta` SET `estadoAprobacion` = 'APROBADO' WHERE `estadoEntrega` IN ('PREPARANDO','LISTO','EN_CAMINO','ENTREGADO')"
+      );
+      // Backfill: cancelled orders should be marked RECHAZADO
+      await sequelize.query(
+        "UPDATE `venta` SET `estadoAprobacion` = 'RECHAZADO' WHERE `estadoEntrega` = 'CANCELADO'"
+      );
+      console.log('[DB Migration] Backfill de estadoAprobacion completado');
+    }
+
+    // Ensure deprecated column `aprobado` is dropped if still present
+    const [colsAprobado] = await sequelize.query("SHOW COLUMNS FROM `venta` LIKE 'aprobado'");
+    if (colsAprobado.length > 0) {
+      await sequelize.query("ALTER TABLE `venta` DROP COLUMN `aprobado`");
+      console.log('[DB Migration] Columna obsoleta aprobado eliminada de tabla venta');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] Error asegurando esquema de estadoAprobacion en venta:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -319,5 +358,6 @@ module.exports = {
   ensureFichaTecnicaColombiaTimezone,
   ensureEventoColumnsSchema,
   syncVentasTotals,
-  ensureCategoriaProductoIconSchema
+  ensureCategoriaProductoIconSchema,
+  ensureVentaAprobacionSchema
 };

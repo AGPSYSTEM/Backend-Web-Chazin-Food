@@ -476,6 +476,10 @@ const Venta = sequelize.define('venta', {
   },
   observaciones: {
     type: DataTypes.TEXT
+  },
+  estadoAprobacion: {
+    type: DataTypes.ENUM('PENDIENTE', 'APROBADO', 'RECHAZADO'),
+    defaultValue: 'PENDIENTE'
   }
 }, { tableName: 'venta', timestamps: false });
 
