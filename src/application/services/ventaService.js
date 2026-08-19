@@ -535,7 +535,8 @@ class VentaService {
       vueltoEfectivo: parsedObs.vueltoEfectivo || (data.datosPago ? data.datosPago.vueltoEfectivo : null) || 0,
       transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",
       transferBanco: parsedObs.transferBanco || (data.datosPago ? data.datosPago.transferBanco : null) || "",
-      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || ""
+      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || "",
+      estadoAprobacion: data.estadoAprobacion || parsedObs.estadoAprobacion || 'PENDIENTE'
     };
 
     const obsStr = JSON.stringify(obsObj);
@@ -549,7 +550,8 @@ class VentaService {
       descuentoAplicado: finalDescuento,
       total: finalTotal,
       estadoEntrega: data.estadoEntrega || data.estado || 'ENTREGADO',
-      observaciones: obsStr
+      observaciones: obsStr,
+      estadoAprobacion: data.estadoAprobacion || 'PENDIENTE'
     });
 
     if (rawDetails.length > 0) {
@@ -698,6 +700,11 @@ class VentaService {
     else if (estado === 'Anulada' || estado === 'CANCELADO') estadoEnum = 'CANCELADO';
 
     v.estadoEntrega = estadoEnum;
+    if (estadoEnum === 'CANCELADO') {
+      v.estadoAprobacion = 'RECHAZADO';
+    } else if (estadoEnum === 'PREPARANDO' || estadoEnum === 'LISTO' || estadoEnum === 'ENTREGADO') {
+      v.estadoAprobacion = 'APROBADO';
+    }
     await v.save();
     return this.getById(id);
   }

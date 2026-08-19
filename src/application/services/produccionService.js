@@ -241,14 +241,34 @@ class ProduccionService {
           }
         }
 
-        // Map delivery/production status
-        let estadoStr = "En Cola";
+        // Map approval and delivery/production status
+        // Primary source: real DB column `estadoAprobacion`
         const est = (v.estadoEntrega || 'PENDIENTE').toUpperCase();
-        if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') estadoStr = "En Preparación";
-        else if (est === 'LISTO') estadoStr = "Listo";
-        else if (est === 'ENTREGADO' || est === 'DESPACHADO' || est === 'COMPLETADA') estadoStr = "Entregado";
-        else if (est === 'CANCELADO' || est === 'ANULADA') estadoStr = "Anulada";
-        else estadoStr = "En Cola";
+        let estadoAprobacion = v.estadoAprobacion;
+        if (!estadoAprobacion) {
+          if (est === 'PREPARANDO' || est === 'LISTO' || est === 'ENTREGADO' || est === 'DESPACHADO') {
+            estadoAprobacion = 'APROBADO';
+          } else if (est === 'CANCELADO' || est === 'ANULADA') {
+            estadoAprobacion = 'RECHAZADO';
+          } else {
+            estadoAprobacion = 'PENDIENTE';
+          }
+        }
+
+        let estadoStr = "Por Aprobar";
+        if (estadoAprobacion === 'RECHAZADO' || est === 'CANCELADO' || est === 'ANULADA') {
+          estadoStr = "Rechazado";
+        } else if (estadoAprobacion === 'PENDIENTE') {
+          estadoStr = "Por Aprobar";
+        } else if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') {
+          estadoStr = "En Preparación";
+        } else if (est === 'LISTO') {
+          estadoStr = "Listo";
+        } else if (est === 'ENTREGADO' || est === 'DESPACHADO' || est === 'COMPLETADA') {
+          estadoStr = "Entregado";
+        } else {
+          estadoStr = "En Cola";
+        }
 
         const platilloNombre = productosList.length > 0
           ? productosList.map(p => `${p.nombre} (x${p.cantidad})`).join(', ')
@@ -282,10 +302,11 @@ class ProduccionService {
           tiempo: primaryProd?.receta?.tiempoPreparacion || "15 min",
           fecha: fechaStr,
           horaInicio: horaStr,
-          prioridad: est === 'PENDIENTE' ? "Alta" : "Normal",
+          prioridad: (est === 'PENDIENTE' || estadoAprobacion === 'PENDIENTE') ? "Alta" : "Normal",
           estado: estadoStr,
+          estadoAprobacion,
           estadoEntrega: v.estadoEntrega || 'PENDIENTE',
-          alerta: est === 'PENDIENTE',
+          alerta: estadoAprobacion === 'PENDIENTE' || est === 'PENDIENTE',
           observaciones: cleanGeneralObs,
           tipo: obsObj.tipoEntrega || "En Local",
           mesa: obsObj.mesa || (obsObj.tipoEntrega === 'Recoger' ? 'Para Llevar' : 'Mesa'),
@@ -336,21 +357,53 @@ class ProduccionService {
       throw error;
     }
 
-    let estadoEnum = 'PENDIENTE';
+    let obsObj = {};
+    if (v.observaciones) {
+      try {
+        obsObj = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+          ? JSON.parse(v.observaciones)
+          : { nota: v.observaciones };
+      } catch (e) {
+        obsObj = { nota: v.observaciones };
+      }
+    }
+
+    let estadoEnum = v.estadoEntrega || 'PENDIENTE';
+    let newAprobacion = v.estadoAprobacion || 'PENDIENTE';
     const norm = String(nuevoEstado || '').toUpperCase();
-    if (norm === 'EN PREPARACIÓN' || norm === 'EN PREPARACION' || norm === 'PREPARANDO') {
+
+    if (norm === 'APROBAR' || norm === 'APROBADO') {
+      newAprobacion = 'APROBADO';
+      if (estadoEnum === 'PENDIENTE') {
+        estadoEnum = 'PREPARANDO';
+      }
+    } else if (norm === 'RECHAZAR' || norm === 'RECHAZADO') {
+      newAprobacion = 'RECHAZADO';
+      estadoEnum = 'CANCELADO';
+    } else if (norm === 'EN PREPARACIÓN' || norm === 'EN PREPARACION' || norm === 'PREPARANDO') {
+      newAprobacion = 'APROBADO';
       estadoEnum = 'PREPARANDO';
     } else if (norm === 'LISTO' || norm === 'LISTOS') {
+      newAprobacion = 'APROBADO';
       estadoEnum = 'LISTO';
     } else if (norm === 'DESPACHADO' || norm === 'ENTREGADO' || norm === 'COMPLETADA') {
+      newAprobacion = 'APROBADO';
       estadoEnum = 'ENTREGADO';
     } else if (norm === 'ANULADA' || norm === 'CANCELADO' || norm === 'CANCELADA') {
+      newAprobacion = 'RECHAZADO';
       estadoEnum = 'CANCELADO';
     } else {
       estadoEnum = 'PENDIENTE';
     }
 
+    // Write to real DB columns (source of truth)
     v.estadoEntrega = estadoEnum;
+    v.estadoAprobacion = newAprobacion;
+
+    // Also keep obsObj JSON in sync for backward compatibility
+    obsObj.estadoAprobacion = newAprobacion;
+    v.observaciones = JSON.stringify(obsObj);
+
     await v.save();
 
     return {
@@ -358,6 +411,7 @@ class ProduccionService {
       idVenta: v.idVenta,
       estado: nuevoEstado,
       estadoEntrega: estadoEnum,
+      estadoAprobacion: newAprobacion,
       message: `Estado de la orden #${v.idVenta} actualizado a "${nuevoEstado}" con éxito`
     };
   }
@@ -389,12 +443,57 @@ class ProduccionService {
     }
 
     if (v) {
-      v.estadoEntrega = 'CANCELADO';
-      await v.save();
-      return { message: `Orden #${v.idVenta} marcada como cancelada` };
+      const targetId = v.idVenta;
+      const { sequelize, DetalleVentaProducto, DetalleVentaAdicion, Pago, Devolucion } = require('../../persistence/models');
+
+      // Execute physical deletion in a managed transaction
+      await sequelize.transaction(async (t) => {
+        // 1. Get all DetalleVentaProducto IDs for this venta
+        const detalles = await DetalleVentaProducto.findAll({
+          where: { idVenta: targetId },
+          attributes: ['idDetalleVenta'],
+          transaction: t
+        });
+        const detalleIds = detalles.map(d => d.idDetalleVenta);
+
+        // 2. Delete all DetalleVentaAdicion associated with those detalles
+        if (detalleIds.length > 0) {
+          await DetalleVentaAdicion.destroy({
+            where: { idDetalleVenta: { [Op.in]: detalleIds } },
+            transaction: t
+          });
+        }
+
+        // 3. Delete all DetalleVentaProducto
+        await DetalleVentaProducto.destroy({
+          where: { idVenta: targetId },
+          transaction: t
+        });
+
+        // 4. Delete associated Pagos if table exists
+        if (Pago) {
+          await Pago.destroy({
+            where: { idVenta: targetId },
+            transaction: t
+          });
+        }
+
+        // 5. Delete associated Devoluciones if table exists
+        if (Devolucion) {
+          await Devolucion.destroy({
+            where: { idVenta: targetId },
+            transaction: t
+          });
+        }
+
+        // 6. Physically delete the Venta row
+        await v.destroy({ transaction: t });
+      });
+
+      return { message: `Orden #${targetId} eliminada de la base de datos con éxito` };
     }
 
-    return { message: "Orden procesada" };
+    return { message: "Orden procesada o no encontrada" };
   }
 }
 
