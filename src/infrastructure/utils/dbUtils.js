@@ -293,6 +293,23 @@ async function syncVentasTotals() {
   }
 }
 
+/**
+ * Ensures table `categoriaproducto` contains the `icon` column
+ */
+async function ensureCategoriaProductoIconSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `categoriaproducto` LIKE 'icon'");
+    if (cols.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `categoriaproducto` ADD COLUMN `icon` VARCHAR(255) NULL AFTER `descripcion`"
+      );
+    }
+  } catch (err) {
+    console.warn("Error ensuring categoriaproducto icon schema:", err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -301,5 +318,6 @@ module.exports = {
   ensureFichaTecnicaInsumoVariantZero,
   ensureFichaTecnicaColombiaTimezone,
   ensureEventoColumnsSchema,
-  syncVentasTotals
+  syncVentasTotals,
+  ensureCategoriaProductoIconSchema
 };
