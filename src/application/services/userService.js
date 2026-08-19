@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { User, Role, Cliente } = require('../../persistence/models');
+const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName } = require('../../infrastructure/utils/validationUtils');
 const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
@@ -22,23 +23,27 @@ class UserService {
       order: [['fechaRegistro', 'DESC']]
     });
 
-    return users.map(user => ({
-      _id: user.idUsuario,
-      id: user.idUsuario,
-      idUsuario: user.idUsuario,
-      nombre: user.nombre,
-      apellidos: user.apellidos || '',
-      apellido: user.apellidos || '',
-      tipoDocumento: user.tipoDocumento || '',
-      telefono: user.telefono || '',
-      email: user.email,
-      correo: user.email,
-      idRol: user.idRol,
-      rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
-      estado: user.estado,
-      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
-      fechaRegistro: user.fechaRegistro
-    }));
+    return users.map(user => {
+      const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
+      const cleanTel = sanitizeTelefono(user.telefono);
+      return {
+        _id: user.idUsuario,
+        id: user.idUsuario,
+        idUsuario: user.idUsuario,
+        nombre: cleanNom,
+        apellidos: cleanApe,
+        apellido: cleanApe,
+        tipoDocumento: user.tipoDocumento || '',
+        telefono: cleanTel,
+        email: user.email,
+        correo: user.email,
+        idRol: user.idRol,
+        rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
+        estado: user.estado,
+        direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
+        fechaRegistro: user.fechaRegistro
+      };
+    });
   }
 
   static async getUserById(id) {
@@ -52,15 +57,18 @@ class UserService {
       throw error;
     }
 
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
+    const cleanTel = sanitizeTelefono(user.telefono);
+
     return {
       _id: user.idUsuario,
       id: user.idUsuario,
       idUsuario: user.idUsuario,
-      nombre: user.nombre,
-      apellidos: user.apellidos || '',
-      apellido: user.apellidos || '',
+      nombre: cleanNom,
+      apellidos: cleanApe,
+      apellido: cleanApe,
       tipoDocumento: user.tipoDocumento || '',
-      telefono: user.telefono || '',
+      telefono: cleanTel,
       email: user.email,
       correo: user.email,
       idRol: user.idRol,
@@ -72,13 +80,16 @@ class UserService {
   }
 
   static async createUser(userData) {
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, documento, telefono, direccion, estado } = userData;
     const finalEmail = email || correo;
     const finalPassword = contrasena || contraseña || password || '123456';
-    const finalApellido = apellidos || apellido || '';
+    const rawApellido = apellidos || apellido || '';
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(nombre, rawApellido);
+    const cleanTel = sanitizeTelefono(telefono);
+    const cleanDoc = sanitizeDocumento(documento || tipoDocumento, tipoDocumento);
     const finalRolId = idRol || rol_id || 1;
 
-    if (!nombre || !finalEmail) {
+    if (!cleanNom || !finalEmail) {
       const error = new Error('Nombre y correo son requeridos');
       error.statusCode = 400;
       throw error;
@@ -95,10 +106,10 @@ class UserService {
     const hashedPassword = await bcrypt.hash(finalPassword, salt);
 
     const user = await User.create({
-      nombre,
-      apellidos: finalApellido,
-      tipoDocumento: tipoDocumento || '',
-      telefono: telefono || '',
+      nombre: cleanNom,
+      apellidos: cleanApe,
+      tipoDocumento: tipoDocumento || 'C.C.',
+      telefono: cleanTel,
       email: finalEmail,
       contrasena: hashedPassword,
       idRol: finalRolId,
@@ -108,7 +119,7 @@ class UserService {
 
     if (direccion) {
       const cleanDir = getCleanDireccion(direccion);
-      const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
+      const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0, nombre: cleanNom, apellidos: cleanApe, telefono: cleanTel });
       await Cliente.create({
         idUsuario: user.idUsuario,
         direccion: metaStr
@@ -136,14 +147,20 @@ class UserService {
       throw error;
     }
 
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, documento, telefono, direccion, estado } = userData;
     const isPasswordOnly = Boolean((contrasena || contraseña || password) && !nombre && !email && !correo && !telefono && !idRol && !estado);
     
-    if (nombre) user.nombre = nombre;
-    if (apellidos !== undefined || apellido !== undefined) user.apellidos = apellidos || apellido || '';
+    if (nombre !== undefined || apellidos !== undefined || apellido !== undefined) {
+      const rawNom = nombre !== undefined ? nombre : user.nombre;
+      const rawApe = (apellidos !== undefined || apellido !== undefined) ? (apellidos || apellido || '') : user.apellidos;
+      const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(rawNom, rawApe);
+      user.nombre = cleanNom;
+      user.apellidos = cleanApe;
+    }
+
     if (email || correo) user.email = email || correo;
     if (tipoDocumento !== undefined) user.tipoDocumento = tipoDocumento;
-    if (telefono !== undefined) user.telefono = telefono;
+    if (telefono !== undefined) user.telefono = sanitizeTelefono(telefono);
     if (idRol || rol_id) user.idRol = idRol || rol_id;
     if (estado) user.estado = estado;
 

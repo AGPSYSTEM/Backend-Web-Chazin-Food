@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User, Role, Cliente, Permiso } = require('../../persistence/models');
+const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName } = require('../../infrastructure/utils/validationUtils');
 const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
@@ -27,11 +28,14 @@ class AuthService {
     const { idUsuario, documento, nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion } = userData;
     const finalEmail = email || correo;
     const finalPassword = contrasena || contraseña;
-    const finalApellido = apellidos || apellido || '';
+    const rawApellido = apellidos || apellido || '';
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(nombre, rawApellido);
+    const cleanTel = sanitizeTelefono(telefono);
+    const cleanTipoDoc = tipoDocumento || 'C.C.';
     let finalRolId = idRol || rol_id;
     const finalDocumento = idUsuario || documento;
 
-    if (!finalEmail || !finalPassword || !nombre) {
+    if (!finalEmail || !finalPassword || !cleanNom) {
       const error = new Error('Por favor complete todos los campos requeridos');
       error.statusCode = 400;
       throw error;
@@ -62,10 +66,10 @@ class AuthService {
     const hashedPassword = await bcrypt.hash(finalPassword, salt);
 
     const userPayload = {
-      nombre,
-      apellidos: finalApellido,
-      tipoDocumento: tipoDocumento || '',
-      telefono: telefono || '',
+      nombre: cleanNom,
+      apellidos: cleanApe,
+      tipoDocumento: cleanTipoDoc,
+      telefono: cleanTel,
       email: finalEmail,
       contrasena: hashedPassword,
       idRol: finalRolId,
@@ -75,11 +79,10 @@ class AuthService {
 
     const user = await User.create(userPayload);
 
-
     if (direccion) {
       try {
         const cleanDir = getCleanDireccion(direccion);
-        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
+        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0, nombre: cleanNom, apellidos: cleanApe, telefono: cleanTel });
         await Cliente.create({
           idUsuario: user.idUsuario,
           direccion: metaStr

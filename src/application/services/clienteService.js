@@ -1,5 +1,6 @@
 const { Cliente, User, Role, Venta, DetalleVentaProducto } = require('../../persistence/models');
 const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
+const { sanitizeTelefono, cleanNameAndLastName } = require('../../infrastructure/utils/validationUtils');
 const bcrypt = require('bcryptjs');
 const EmailService = require('./emailService');
 
@@ -66,6 +67,10 @@ class ClienteService {
     } else if (c.usuario && (c.usuario.estado === 'INACTIVO' || c.usuario.estado === '0' || c.usuario.estado === 0)) {
       estadoStr = 'Inactivo';
     }
+    const rawNombre = c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente sin cuenta');
+    const rawApellidos = c.usuario ? c.usuario.apellidos : (meta.apellidos || '');
+    const { nombre: cleanNombre, apellidos: cleanApellidos } = cleanNameAndLastName(rawNombre, rawApellidos);
+    const cleanTelefono = sanitizeTelefono(c.usuario ? c.usuario.telefono : (meta.telefono || ''));
 
     return {
       id: c.idCliente,
@@ -75,10 +80,10 @@ class ClienteService {
       direccion: cleanDireccion,
       tipo,
       descuentoPorcentaje,
-      nombre: c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente sin cuenta'),
-      apellidos: c.usuario ? c.usuario.apellidos : (meta.apellidos || ''),
+      nombre: cleanNombre,
+      apellidos: cleanApellidos,
       email: c.usuario ? c.usuario.email : (meta.email || ''),
-      telefono: c.usuario ? c.usuario.telefono : (meta.telefono || ''),
+      telefono: cleanTelefono,
       estado: estadoStr,
       compras: comprasCount,
       totalGastado: `$${totalGastadoSum.toLocaleString('es-CO')}`,
@@ -86,10 +91,10 @@ class ClienteService {
       transacciones,
       usuario: c.usuario ? {
         id: c.usuario.idUsuario,
-        nombre: c.usuario.nombre,
-        apellidos: c.usuario.apellidos,
+        nombre: cleanNombre,
+        apellidos: cleanApellidos,
         email: c.usuario.email,
-        telefono: c.usuario.telefono,
+        telefono: cleanTelefono,
         estado: c.usuario.estado
       } : null
     };
@@ -140,19 +145,21 @@ class ClienteService {
   static async create(data) {
     let idUsuario = data.idUsuario || null;
     const sinCuenta = data.sinCuenta || data.crearSinCuenta || (!data.contrasena && !idUsuario);
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(data.nombre, data.apellidos);
+    const cleanTel = sanitizeTelefono(data.telefono);
 
     // Only create a user if sinCuenta is false and credentials/data provided
-    if (!sinCuenta && !idUsuario && data.nombre && (data.email || data.contrasena)) {
+    if (!sinCuenta && !idUsuario && cleanNom && (data.email || data.contrasena)) {
       const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
       const defaultPass = data.contrasena || '123456';
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(defaultPass, salt);
 
       const user = await User.create({
-        nombre: data.nombre.trim(),
-        apellidos: data.apellidos ? data.apellidos.trim() : '',
+        nombre: cleanNom,
+        apellidos: cleanApe,
         email: data.email ? data.email.trim() : `cliente_${Date.now()}@chazinfood.com`,
-        telefono: data.telefono ? data.telefono.trim() : '',
+        telefono: cleanTel,
         contrasena: hashedPassword,
         idRol: clienteRol ? clienteRol.idRol : 4,
         estado: 'ACTIVO'
@@ -171,10 +178,10 @@ class ClienteService {
       direccion: data.direccion || '',
       tipo,
       descuentoPorcentaje: descPorcent,
-      nombre: data.nombre || '',
-      apellidos: data.apellidos || '',
+      nombre: cleanNom,
+      apellidos: cleanApe,
       email: data.email || '',
-      telefono: data.telefono || '',
+      telefono: cleanTel,
       estado: estadoVal === 0 ? 'Inactivo' : 'Activo'
     });
 
@@ -210,6 +217,11 @@ class ClienteService {
       existingMeta = { direccion: c.direccion || '' };
     }
 
+    const rawNom = data.nombre !== undefined ? data.nombre : existingMeta.nombre;
+    const rawApe = data.apellidos !== undefined ? data.apellidos : existingMeta.apellidos;
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(rawNom, rawApe);
+    const cleanTel = data.telefono !== undefined ? sanitizeTelefono(data.telefono) : existingMeta.telefono;
+
     const newDireccionStr = data.direccion !== undefined ? data.direccion : existingMeta.direccion || '';
     const newTipo = data.tipo !== undefined ? data.tipo : existingMeta.tipo || 'Nuevo';
     const defaultDesc = newTipo === 'VIP' ? 15 : newTipo === 'Frecuente' ? 10 : newTipo === 'Regular' ? 5 : 0;
@@ -223,10 +235,10 @@ class ClienteService {
       const hashedPassword = await bcrypt.hash(defaultPass, salt);
 
       const user = await User.create({
-        nombre: (data.nombre || existingMeta.nombre || 'Cliente').trim(),
-        apellidos: (data.apellidos || existingMeta.apellidos || '').trim(),
+        nombre: cleanNom || 'Cliente',
+        apellidos: cleanApe || '',
         email: data.email.trim(),
-        telefono: (data.telefono || existingMeta.telefono || '').trim(),
+        telefono: cleanTel || '',
         contrasena: hashedPassword,
         idRol: clienteRol ? clienteRol.idRol : 4,
         estado: 'ACTIVO'
@@ -241,10 +253,10 @@ class ClienteService {
       direccion: newDireccionStr,
       tipo: newTipo,
       descuentoPorcentaje: newDesc,
-      nombre: data.nombre !== undefined ? data.nombre : existingMeta.nombre,
-      apellidos: data.apellidos !== undefined ? data.apellidos : existingMeta.apellidos,
+      nombre: cleanNom,
+      apellidos: cleanApe,
       email: data.email !== undefined ? data.email : existingMeta.email,
-      telefono: data.telefono !== undefined ? data.telefono : existingMeta.telefono,
+      telefono: cleanTel,
       estado: finalEstado === 0 ? 'Inactivo' : 'Activo'
     });
 
@@ -253,10 +265,12 @@ class ClienteService {
 
     if (c.usuario) {
       const nameChanged = data.nombre !== undefined || data.apellidos !== undefined;
-      if (data.nombre !== undefined) c.usuario.nombre = data.nombre.trim();
-      if (data.apellidos !== undefined) c.usuario.apellidos = data.apellidos.trim();
+      if (data.nombre !== undefined || data.apellidos !== undefined) {
+        c.usuario.nombre = cleanNom;
+        c.usuario.apellidos = cleanApe;
+      }
       if (data.email !== undefined) c.usuario.email = data.email.trim();
-      if (data.telefono !== undefined) c.usuario.telefono = data.telefono.trim();
+      if (data.telefono !== undefined) c.usuario.telefono = cleanTel;
       if (data.estado !== undefined) {
         c.usuario.estado = data.estado === 'Inactivo' || data.estado === 0 ? 'INACTIVO' : 'ACTIVO';
       }
