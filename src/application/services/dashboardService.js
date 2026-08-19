@@ -26,21 +26,7 @@ class DashboardService {
       if (totalVentasAnterior > 0) {
         ventasVariacion = parseFloat((((totalVentasActual - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1));
       } else if (totalVentasActual > 0) {
-        // Compare recent 7 days vs previous 7 days
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
-        const ventasRecentWeek = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= sevenDaysAgo);
-        const ventasPriorWeek = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= fourteenDaysAgo && new Date(v.fechaVenta) < sevenDaysAgo);
-
-        const sumRecent = ventasRecentWeek.reduce((s, v) => s + parseFloat(v.total || 0), 0);
-        const sumPrior = ventasPriorWeek.reduce((s, v) => s + parseFloat(v.total || 0), 0);
-
-        if (sumPrior > 0) {
-          ventasVariacion = parseFloat((((sumRecent - sumPrior) / sumPrior) * 100).toFixed(1));
-        } else {
-          ventasVariacion = 100;
-        }
+        ventasVariacion = 100;
       }
 
       // Orders count
@@ -52,17 +38,7 @@ class DashboardService {
       if (pedidosTotalAnterior > 0) {
         pedidosVariacion = parseFloat((((pedidosTotalActual - pedidosTotalAnterior) / pedidosTotalAnterior) * 100).toFixed(1));
       } else if (pedidosTotalActual > 0) {
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
-        const pedRecent = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= sevenDaysAgo).length;
-        const pedPrior = todasVentas.filter(v => v.fechaVenta && new Date(v.fechaVenta) >= fourteenDaysAgo && new Date(v.fechaVenta) < sevenDaysAgo).length;
-
-        if (pedPrior > 0) {
-          pedidosVariacion = parseFloat((((pedRecent - pedPrior) / pedPrior) * 100).toFixed(1));
-        } else {
-          pedidosVariacion = 100;
-        }
+        pedidosVariacion = 100;
       }
 
       // Active clients count
@@ -194,9 +170,9 @@ class DashboardService {
 
   static async getProductosPopulares() {
     try {
-      // Consultar los detalles de venta reales
+      // Consultar los detalles de venta reales uniendo con producto y variante
       const [rows] = await sequelize.query(`
-        SELECT dv.observaciones, dv.cantidad, p.nombre as productoNombre
+        SELECT dv.idVariante, dv.observaciones, dv.cantidad, p.nombre as productoNombre, var.nombre as varNombre
         FROM detalleventaproducto dv
         LEFT JOIN variante var ON dv.idVariante = var.idVariante
         LEFT JOIN producto p ON var.idProducto = p.idProducto
@@ -208,26 +184,33 @@ class DashboardService {
 
       const productCounts = {};
       rows.forEach(r => {
-        let pName = null;
-        if (r.observaciones) {
+        // Priorizar el nombre real del producto en base de datos
+        let pName = r.productoNombre || r.varNombre || null;
+
+        // Si no tiene nombre por join, verificar si observaciones es un JSON estructurado con nombre
+        if (!pName && r.observaciones) {
           try {
-            const parsed = typeof r.observaciones === 'string' && r.observaciones.startsWith('{')
-              ? JSON.parse(r.observaciones)
-              : { nombre: r.observaciones };
-            pName = parsed.nombre || parsed.nombreProducto || (typeof r.observaciones === 'string' ? r.observaciones : null);
+            if (typeof r.observaciones === 'string' && r.observaciones.startsWith('{')) {
+              const parsed = JSON.parse(r.observaciones);
+              pName = parsed.nombre || parsed.nombreProducto || null;
+            }
           } catch (e) {
-            pName = typeof r.observaciones === 'string' ? r.observaciones : null;
+            pName = null;
           }
         }
-        if (!pName && r.productoNombre) {
-          pName = r.productoNombre;
-        }
 
-        if (!pName || pName === "Pedido de Venta" || pName === "Producto General" || pName.startsWith("Producto #")) return;
+        // Descartar si es un placeholder genérico o inválido
+        if (
+          !pName ||
+          pName === "Producto" ||
+          pName === "Pedido de Venta" ||
+          pName === "Producto General" ||
+          pName.startsWith("Producto #")
+        ) return;
 
-        // Limpiar adiciones entre paréntesis (ej: "Pollo Broaster (+Salsa...)" -> "Pollo Broaster")
-        const nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").trim();
-        if (!nombreLimpio || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
+        // Limpiar adiciones entre paréntesis (ej: "Hamburguesa chazin monster - base" o "(+Salsa...)")
+        let nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").replace(/\s*-\s*base/i, "").trim();
+        if (!nombreLimpio || nombreLimpio === "Producto" || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
 
         const key = nombreLimpio.toLowerCase();
         if (!productCounts[key]) {

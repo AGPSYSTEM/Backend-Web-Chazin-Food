@@ -130,8 +130,9 @@ class InsumoService {
         idInsumo: insumo.idInsumo,
         tipoMovimiento: 'Entrada',
         cantidad: insumo.stock,
-        motivo: 'Registro inicial de insumo'
-      });
+        motivo: 'Registro inicial de insumo',
+        skipStockUpdate: true
+      }, { transaction });
 
       await transaction.commit();
       return this.getById(insumo.idInsumo);
@@ -198,8 +199,9 @@ class InsumoService {
         entidadNombre: insumo.nombre,
         detalle: `Se actualizaron los datos del insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
-        motivo: 'Actualización de datos'
-      });
+        motivo: 'Actualización de datos',
+        skipStockUpdate: true
+      }, { transaction });
 
       await transaction.commit();
       return this.getById(idInsumo);
@@ -232,8 +234,9 @@ class InsumoService {
         entidadNombre: insumo.nombre,
         detalle: `Se movió a la papelera el insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
-        motivo: 'Inactivación / Envío a papelera'
-      });
+        motivo: 'Inactivación / Envío a papelera',
+        skipStockUpdate: true
+      }, { transaction });
 
       await transaction.commit();
       return { message: 'Insumo y ficha técnica movidos a la papelera' };
@@ -266,8 +269,9 @@ class InsumoService {
         entidadNombre: insumo.nombre,
         detalle: `Se restauró el insumo en el inventario: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
-        motivo: 'Restauración desde papelera'
-      });
+        motivo: 'Restauración desde papelera',
+        skipStockUpdate: true
+      }, { transaction });
 
       await transaction.commit();
       return this.getById(idInsumo);

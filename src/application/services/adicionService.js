@@ -39,11 +39,13 @@ class AdicionService {
     });
 
     const TrazabilidadService = require('./trazabilidadService');
-    await TrazabilidadService.registrarMovimiento({
-      entidad: 'Adicion',
-      idEntidad: adicion.idAdicion,
-      accion: 'Creacion',
-      detalles: `Se creó la adición ${adicion.nombre} por $${adicion.precio}`
+    await TrazabilidadService.create({
+      tipo: 'Creado',
+      entidadNombre: `Adición: ${adicion.nombre}`,
+      detalle: `Se creó la adición ${adicion.nombre} por $${adicion.precio}`,
+      idInsumo: adicion.idInsumo,
+      motivo: 'Creación de adición',
+      skipStockUpdate: true
     });
 
     return this.getById(adicion.idAdicion);
@@ -69,11 +71,13 @@ class AdicionService {
     await adicion.save();
     
     const TrazabilidadService = require('./trazabilidadService');
-    await TrazabilidadService.registrarMovimiento({
-      entidad: 'Adicion',
-      idEntidad: adicion.idAdicion,
-      accion: 'Actualizacion',
-      detalles: `Se actualizó la adición ${adicion.nombre}`
+    await TrazabilidadService.create({
+      tipo: 'Editado',
+      entidadNombre: `Adición: ${adicion.nombre}`,
+      detalle: `Se actualizó la adición ${adicion.nombre}`,
+      idInsumo: adicion.idInsumo,
+      motivo: 'Actualización de adición',
+      skipStockUpdate: true
     });
 
     return this.getById(id);
@@ -91,11 +95,13 @@ class AdicionService {
     await adicion.save();
 
     const TrazabilidadService = require('./trazabilidadService');
-    await TrazabilidadService.registrarMovimiento({
-      entidad: 'Adicion',
-      idEntidad: adicion.idAdicion,
-      accion: 'Eliminacion (Soft)',
-      detalles: `Se desactivó la adición ${adicion.nombre}`
+    await TrazabilidadService.create({
+      tipo: 'Eliminado',
+      entidadNombre: `Adición: ${adicion.nombre}`,
+      detalle: `Se desactivó la adición ${adicion.nombre}`,
+      idInsumo: adicion.idInsumo,
+      motivo: 'Desactivación de adición',
+      skipStockUpdate: true
     });
 
     return { message: 'Adición desactivada' };

@@ -17,7 +17,8 @@ const {
   resequenceAllCoreTables,
   ensureFichaTecnicaTrashSchema,
   ensureFichaTecnicaInsumoVariantZero,
-  ensureEventoColumnsSchema
+  ensureEventoColumnsSchema,
+  syncVentasTotals
 } = require('./src/infrastructure/utils/dbUtils');
 
 // Connect to Database via Sequelize
@@ -26,6 +27,7 @@ sequelize.sync({ alter: true }).then(async () => {
   await ensureFichaTecnicaTrashSchema();
   await ensureFichaTecnicaInsumoVariantZero();
   await ensureEventoColumnsSchema();
+  await syncVentasTotals();
   console.log('Modelos de Sequelize sincronizados correctamente.');
   await resequenceAllCoreTables();
 }).catch((err) => {

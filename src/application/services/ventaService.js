@@ -68,29 +68,84 @@ class VentaService {
     // Dynamic products from db details or order metadata
     let productos = [];
     if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
-      productos = obsData.productos;
+      productos = obsData.productos.map(p => {
+        const itemAdds = (p.adiciones || []).map(a => {
+          if (typeof a === 'object' && a !== null) {
+            return {
+              idAdicion: a.idAdicion || a.id,
+              nombre: a.nombre,
+              precio: Number(a.precio || 0),
+              cantidad: Number(a.cantidad || 1)
+            };
+          }
+          return {
+            nombre: String(a),
+            precio: 0,
+            cantidad: 1
+          };
+        });
+
+        const addsSum = itemAdds.reduce((s, a) => s + (Number(a.precio || 0) * Number(a.cantidad || 1)), 0);
+        const pQty = Number(p.cantidad || 1);
+        const pUnit = Number(p.precioUnitario || p.precio || 0);
+        const pTot = Number(p.total || 0) > 0 ? Number(p.total) : (pUnit + addsSum) * pQty;
+
+        return {
+          id: p.id || p.idVariante || p.idDetalleVenta,
+          idVariante: p.idVariante || p.id,
+          nombre: p.nombre || p.nombreProducto || "Producto",
+          cantidad: pQty,
+          precioUnitario: pUnit,
+          total: pTot,
+          observaciones: p.observaciones || p.observacion || p.especificaciones || p.nota || "",
+          adiciones: itemAdds
+        };
+      });
     } else if (v.detalles && v.detalles.length > 0) {
       productos = v.detalles.map(d => {
-        let pName = null;
+        let pName = d.variante?.producto?.nombre || d.variante?.nombre || null;
         let pAdiciones = [];
+        let pObs = "";
+
+        if (d.adiciones && d.adiciones.length > 0) {
+          pAdiciones = d.adiciones.map(da => ({
+            idAdicion: da.idAdicion,
+            nombre: da.adicion?.nombre || `Adición #${da.idAdicion}`,
+            precio: parseFloat(da.precioUnitario || da.adicion?.precio || 0),
+            cantidad: Number(da.cantidad || 1)
+          }));
+        }
+
         if (d.observaciones) {
           try {
-            const parsedObs = typeof d.observaciones === 'string' && d.observaciones.startsWith('{')
-              ? JSON.parse(d.observaciones)
-              : { nombre: d.observaciones };
-            pName = parsedObs.nombre || parsedObs.nombreProducto || null;
-            pAdiciones = parsedObs.adiciones || [];
+            if (typeof d.observaciones === 'string' && d.observaciones.startsWith('{')) {
+              const parsedObs = JSON.parse(d.observaciones);
+              pName = pName || parsedObs.nombre || parsedObs.nombreProducto;
+              pObs = parsedObs.observaciones || parsedObs.observacion || parsedObs.nota || "";
+              if (pAdiciones.length === 0 && Array.isArray(parsedObs.adiciones)) {
+                pAdiciones = parsedObs.adiciones.map(a => typeof a === 'object' ? a : { nombre: String(a), precio: 0, cantidad: 1 });
+              }
+            } else {
+              pObs = d.observaciones;
+            }
           } catch (e) {
-            pName = typeof d.observaciones === 'string' ? d.observaciones : null;
+            pObs = d.observaciones;
           }
         }
+
+        const addsSum = pAdiciones.reduce((s, a) => s + (Number(a.precio || 0) * Number(a.cantidad || 1)), 0);
+        const pQty = Number(d.cantidad || 1);
+        const pUnit = parseFloat(d.precioUnitario || 0);
+        const pTot = parseFloat(d.subtotal || 0) > 0 ? parseFloat(d.subtotal) : (pUnit + addsSum) * pQty;
+
         return {
           id: d.idDetalleVenta || d.idVariante,
           idVariante: d.idVariante,
-          nombre: pName,
-          cantidad: d.cantidad,
-          precioUnitario: parseFloat(d.precioUnitario || 0),
-          total: parseFloat(d.subtotal || 0),
+          nombre: pName || `Producto #${d.idVariante}`,
+          cantidad: pQty,
+          precioUnitario: pUnit,
+          total: pTot,
+          observaciones: pObs,
           adiciones: pAdiciones
         };
       });
@@ -99,8 +154,16 @@ class VentaService {
       productos = [];
     }
 
-    const subtotal = parseFloat(v.subtotal) || 0;
-    const total = parseFloat(v.total) || 0;
+    let subtotal = parseFloat(v.subtotal) || 0;
+    let total = parseFloat(v.total) || 0;
+
+    // Si total o subtotal está en 0 en base de datos, calcular de productos o detalles
+    if ((total === 0 || subtotal === 0) && Array.isArray(productos) && productos.length > 0) {
+      subtotal = productos.reduce((acc, p) => acc + Number(p.total || 0), 0);
+      const desc = parseFloat(v.descuentoAplicado || 0) || (subtotal * (Number(obsData.descuentoPorcentaje || 0) / 100));
+      total = Math.max(0, subtotal - desc);
+    }
+
     const iva = Math.round(subtotal * 0.19);
 
     let descuentoPorcentaje = obsData.descuentoPorcentaje || 0;
@@ -425,11 +488,25 @@ class VentaService {
 
     const rawDetails = data.detalles || data.items || [];
 
+    let calculatedSubtotal = 0;
+    for (const it of rawDetails) {
+      const itPrice = Number(it.precioUnitario || it.precio || 0);
+      const itQty = Number(it.cantidad || 1);
+      const itAdds = Array.isArray(it.adiciones)
+        ? it.adiciones.reduce((s, a) => s + (Number(a.precio || a.precioUnitario || 0)), 0)
+        : 0;
+      calculatedSubtotal += (itPrice + itAdds) * itQty;
+    }
+
+    const finalSubtotal = Number(data.subtotal) > 0 ? Number(data.subtotal) : calculatedSubtotal;
+    const finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
+    const finalTotal = Number(data.total) > 0 ? Number(data.total) : Math.max(0, finalSubtotal - finalDescuento);
+
     const obsObj = {
       horario: data.horario || parsedObs.horario || "12:30 – 12:48",
-      tipoEntrega: data.tipoEntrega || parsedObs.tipoEntrega || (data.mesa ? "En Mesa" : "Domicilio"),
+      tipoEntrega: data.tipoEntrega || parsedObs.tipoEntrega || (data.mesa ? "En Mesa" : "Recoger"),
       metodoPago: data.metodoPago || parsedObs.metodoPago || "Efectivo",
-      direccion: data.direccion || parsedObs.direccion || "",
+      direccion: data.direccion || parsedObs.direccion || "Recoger en Local",
       estadoPago: data.estadoPago || parsedObs.estadoPago || "Pagado",
       codigoPedido: data.codigoPedido || data.numeroVenta || parsedObs.codigoPedido || `VEN-${String(Date.now()).slice(-4)}`,
       clienteNombre: data.clienteNombre || parsedObs.clienteNombre || `${userObj.nombre} ${userObj.apellidos || ''}`.trim(),
@@ -437,19 +514,28 @@ class VentaService {
         ? data.productos
         : (Array.isArray(parsedObs.productos) && parsedObs.productos.length > 0)
           ? parsedObs.productos
-          : rawDetails.map(it => ({
-              idVariante: it.idVariante || it.varianteId,
-              nombre: it.nombre || it.observaciones || it.observacion || "Producto",
-              cantidad: it.cantidad || 1,
-              precioUnitario: it.precioUnitario || it.precio || 0,
-              total: it.total || ((it.precioUnitario || it.precio || 0) * (it.cantidad || 1)),
-              observaciones: it.observaciones || it.observacion || "",
-              adiciones: it.idAdiciones || it.adiciones || []
-            })),
+          : rawDetails.map(it => {
+              const itPrice = Number(it.precioUnitario || it.precio || 0);
+              const itQty = Number(it.cantidad || 1);
+              const itAdds = Array.isArray(it.adiciones)
+                ? it.adiciones.reduce((s, a) => s + (Number(a.precio || a.precioUnitario || 0)), 0)
+                : 0;
+              return {
+                idVariante: it.idVariante || it.varianteId,
+                nombre: it.nombre || it.observaciones || it.observacion || "Producto",
+                cantidad: itQty,
+                precioUnitario: itPrice,
+                total: Number(it.subtotal || it.total) > 0 ? Number(it.subtotal || it.total) : (itPrice + itAdds) * itQty,
+                observaciones: it.observaciones || it.observacion || "",
+                adiciones: it.adiciones || it.idAdiciones || []
+              };
+            }),
       especificaciones: data.observacion || parsedObs.especificaciones || data.observaciones || "",
-      efectivoConCuanto: parsedObs.efectivoConCuanto || "",
-      vueltoEfectivo: parsedObs.vueltoEfectivo || 0,
-      transferenciaReferencia: parsedObs.transferenciaReferencia || ""
+      efectivoConCuanto: parsedObs.efectivoConCuanto || (data.datosPago ? data.datosPago.efectivoConCuanto : null) || "",
+      vueltoEfectivo: parsedObs.vueltoEfectivo || (data.datosPago ? data.datosPago.vueltoEfectivo : null) || 0,
+      transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",
+      transferBanco: parsedObs.transferBanco || (data.datosPago ? data.datosPago.transferBanco : null) || "",
+      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || ""
     };
 
     const obsStr = JSON.stringify(obsObj);
@@ -459,10 +545,10 @@ class VentaService {
       idUsuario: responsibleUserId,
       idDescuento: data.idDescuento || null,
       tipoVenta: resolvedTipoVenta,
-      subtotal: data.subtotal || data.total || 0,
-      descuentoAplicado: data.descuentoAplicado || 0,
-      total: data.total || 0,
-      estadoEntrega: data.estadoEntrega || data.estado || 'PENDIENTE',
+      subtotal: finalSubtotal,
+      descuentoAplicado: finalDescuento,
+      total: finalTotal,
+      estadoEntrega: data.estadoEntrega || data.estado || 'ENTREGADO',
       observaciones: obsStr
     });
 

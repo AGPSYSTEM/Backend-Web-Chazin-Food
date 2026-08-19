@@ -69,7 +69,7 @@ class TrazabilidadService {
     return { unreadCount: count };
   }
 
-  static async create(data) {
+  static async create(data, options = {}) {
     const {
       tipo, entidadNombre, detalle,
       idInsumo, tipoMovimiento, cantidad, motivo, usuarioId,
@@ -81,10 +81,9 @@ class TrazabilidadService {
     const finalDetalle = detalle || motivo || `${finalTipo} en trazabilidad`;
 
     // Solo actualizar stock si NO se indica skipStockUpdate
-    // (compraService ya maneja su propio ajuste de stock y pasa skipStockUpdate: true)
     if (!skipStockUpdate && idInsumo && cantidad !== undefined && tipoMovimiento) {
       try {
-        const insumo = await Insumo.findByPk(idInsumo);
+        const insumo = await Insumo.findByPk(idInsumo, { transaction: options.transaction });
         if (insumo) {
           const cantNum = parseFloat(cantidad);
           if (tipoMovimiento === 'Entrada') {
@@ -92,27 +91,32 @@ class TrazabilidadService {
           } else if (tipoMovimiento === 'Salida') {
             insumo.stock = Math.max(0, parseFloat(insumo.stock || 0) - cantNum);
           }
-          await insumo.save();
+          await insumo.save({ transaction: options.transaction });
         }
       } catch (err) {
         console.warn('Advertencia al actualizar stock en trazabilidad:', err.message);
       }
     }
 
-    const registro = await Trazabilidad.create({
-      tipo: finalTipo,
-      entidadNombre: finalEntidadNombre,
-      detalle: finalDetalle,
-      leido: 0,
-      idInsumo: idInsumo || null,
-      tipoMovimiento: tipoMovimiento || null,
-      cantidad: cantidad !== undefined && cantidad !== null ? parseFloat(cantidad) : null,
-      motivo: motivo || null,
-      usuarioId: usuarioId || null,
-      fecha: new Date()
-    });
+    try {
+      const registro = await Trazabilidad.create({
+        tipo: finalTipo,
+        entidadNombre: finalEntidadNombre,
+        detalle: finalDetalle,
+        leido: 0,
+        idInsumo: idInsumo || null,
+        tipoMovimiento: tipoMovimiento || null,
+        cantidad: cantidad !== undefined && cantidad !== null ? parseFloat(cantidad) : null,
+        motivo: motivo || null,
+        usuarioId: usuarioId || null,
+        fecha: new Date()
+      }, { transaction: options.transaction });
 
-    return registro;
+      return registro;
+    } catch (tzErr) {
+      console.warn('Advertencia al crear registro de trazabilidad:', tzErr.message);
+      return null;
+    }
   }
 
   static async markAllAsRead() {

@@ -136,6 +136,22 @@ class ProduccionService {
               itemAdiciones = d.adiciones.map(a => a.adicion?.nombre || `Adición #${a.idAdicion}`);
             }
 
+            // Match with obsObj.productos if available to retrieve full observations and additions
+            const matchedObsProd = Array.isArray(obsObj.productos)
+              ? obsObj.productos.find(op => op.idVariante === d.idVariante || op.id === d.idVariante || (op.nombre && op.nombre.toLowerCase().trim() === itemNombre.toLowerCase().trim())) || obsObj.productos[productosList.length]
+              : null;
+
+            if (matchedObsProd) {
+              const opObs = matchedObsProd.observaciones || matchedObsProd.observacion || matchedObsProd.especificaciones || matchedObsProd.nota;
+              if (opObs && typeof opObs === 'string' && opObs.trim() && opObs.trim().toLowerCase() !== itemNombre.toLowerCase().trim()) {
+                itemObs = opObs.trim();
+              }
+              if (Array.isArray(matchedObsProd.adiciones) && matchedObsProd.adiciones.length > 0) {
+                const opAdds = matchedObsProd.adiciones.map(a => typeof a === 'object' ? (a.nombre || a.nombreAdicion || JSON.stringify(a)) : String(a));
+                itemAdiciones = Array.from(new Set([...itemAdiciones, ...opAdds]));
+              }
+            }
+
             // Clean itemObs: do not repeat product name or dump raw addition list
             if (itemObs) {
               const normObs = itemObs.toLowerCase().trim();
@@ -146,7 +162,6 @@ class ProduccionService {
               if (normObs === normName || normObs === normProdName || normObs === normVarName) {
                 itemObs = "";
               } else if (normObs.startsWith(normName) || normObs.startsWith(normProdName) || normObs.startsWith(normVarName)) {
-                // If it contains (+...) extract into itemAdiciones if empty
                 if (itemObs.includes("(+") || itemObs.includes("( +")) {
                   const match = itemObs.match(/\(\s*\+([^)]+)\)/);
                   if (match && match[1]) {
@@ -243,11 +258,16 @@ class ProduccionService {
         const mainEmoji = getProductEmoji(primaryProd?.nombre || platilloNombre);
 
         // General human observation ONLY (no raw JSON dump)
-        const cleanGeneralObs = (
+        let cleanGeneralObs = "";
+        const rawGeneralObs =
           obsObj.especificaciones ||
           obsObj.nota ||
-          (typeof v.observaciones === 'string' && !v.observaciones.startsWith('{') ? v.observaciones : "")
-        ).trim();
+          (typeof v.observaciones === 'string' && !v.observaciones.startsWith('{') ? v.observaciones : "");
+        if (typeof rawGeneralObs === 'string') {
+          cleanGeneralObs = rawGeneralObs.trim();
+        } else if (rawGeneralObs && typeof rawGeneralObs === 'object') {
+          cleanGeneralObs = "";
+        }
 
         return {
           id: v.idVenta,
@@ -285,22 +305,33 @@ class ProduccionService {
   }
 
   static async updateEstado(id, nuevoEstado) {
-    let idVentaNum = null;
-    if (typeof id === 'string' && id.startsWith('VEN-')) {
-      idVentaNum = Number(id.replace('VEN-', ''));
-    } else {
-      idVentaNum = Number(id);
+    const { Op } = require('sequelize');
+    let v = null;
+    let idVentaNum = Number(id);
+
+    if (!isNaN(idVentaNum) && idVentaNum > 0) {
+      v = await Venta.findByPk(idVentaNum);
     }
 
-    if (!idVentaNum || isNaN(idVentaNum)) {
-      const error = new Error('ID de orden no válido');
-      error.statusCode = 400;
-      throw error;
+    if (!v && typeof id === 'string') {
+      v = await Venta.findOne({
+        where: {
+          observaciones: {
+            [Op.like]: `%"codigoPedido":"${id}"%`
+          }
+        }
+      });
     }
 
-    const v = await Venta.findByPk(idVentaNum);
     if (!v) {
-      const error = new Error(`Orden #${idVentaNum} no encontrada en la base de datos`);
+      const numMatch = String(id).match(/\d+/);
+      if (numMatch) {
+        v = await Venta.findByPk(Number(numMatch[0]));
+      }
+    }
+
+    if (!v) {
+      const error = new Error(`Orden "${id}" no encontrada en la base de datos`);
       error.statusCode = 404;
       throw error;
     }
@@ -323,27 +354,46 @@ class ProduccionService {
     await v.save();
 
     return {
-      id: idVentaNum,
-      idVenta: idVentaNum,
+      id: v.idVenta,
+      idVenta: v.idVenta,
       estado: nuevoEstado,
       estadoEntrega: estadoEnum,
-      message: `Estado de la orden #${idVentaNum} actualizado a "${nuevoEstado}" con éxito`
+      message: `Estado de la orden #${v.idVenta} actualizado a "${nuevoEstado}" con éxito`
     };
   }
 
   static async delete(id) {
-    let idVentaNum = typeof id === 'string' && id.startsWith('VEN-')
-      ? Number(id.replace('VEN-', ''))
-      : Number(id);
+    const { Op } = require('sequelize');
+    let v = null;
+    let idVentaNum = Number(id);
 
-    if (idVentaNum && !isNaN(idVentaNum)) {
-      const v = await Venta.findByPk(idVentaNum);
-      if (v) {
-        v.estadoEntrega = 'CANCELADO';
-        await v.save();
-        return { message: `Orden #${idVentaNum} marcada como cancelada` };
+    if (!isNaN(idVentaNum) && idVentaNum > 0) {
+      v = await Venta.findByPk(idVentaNum);
+    }
+
+    if (!v && typeof id === 'string') {
+      v = await Venta.findOne({
+        where: {
+          observaciones: {
+            [Op.like]: `%"codigoPedido":"${id}"%`
+          }
+        }
+      });
+    }
+
+    if (!v) {
+      const numMatch = String(id).match(/\d+/);
+      if (numMatch) {
+        v = await Venta.findByPk(Number(numMatch[0]));
       }
     }
+
+    if (v) {
+      v.estadoEntrega = 'CANCELADO';
+      await v.save();
+      return { message: `Orden #${v.idVenta} marcada como cancelada` };
+    }
+
     return { message: "Orden procesada" };
   }
 }

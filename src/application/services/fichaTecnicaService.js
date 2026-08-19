@@ -145,7 +145,7 @@ class FichaTecnicaService {
     if (!f) {
       f = await FichaTecnica.create({
         idProducto,
-        idInsumo: 0,
+        idInsumo: null,
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
         descripcion: data.descripcion || data.caracteristicas || '',
@@ -163,7 +163,7 @@ class FichaTecnicaService {
     } else {
       const updatePayload = {
         idProducto,
-        idInsumo: 0,
+        idInsumo: null,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
@@ -209,9 +209,9 @@ class FichaTecnicaService {
 
     if (!f) {
       f = await FichaTecnica.create({
-        idProducto: 0,
+        idProducto: null,
         idInsumo,
-        idVariante: resolvedVarianteId,
+        idVariante: resolvedVarianteId !== null && resolvedVarianteId !== undefined ? resolvedVarianteId : null,
         tipo: 'INSUMO',
         descripcion: data.descripcion || data.caracteristicas || '',
         procedimiento: data.procedimiento || '',
@@ -227,9 +227,9 @@ class FichaTecnicaService {
       }, { transaction: options.transaction });
     } else {
       const updatePayload = {
-        idProducto: 0,
+        idProducto: null,
         idInsumo,
-        idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
+        idVariante: resolvedVarianteId !== null && resolvedVarianteId !== undefined ? resolvedVarianteId : f.idVariante,
         descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,

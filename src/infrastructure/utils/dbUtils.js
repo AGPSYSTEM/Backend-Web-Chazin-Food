@@ -234,6 +234,65 @@ async function ensureEventoColumnsSchema() {
   }
 }
 
+/**
+ * Automatically syncs and repairs any sales in table `venta` where `total = 0` or `subtotal = 0`
+ * by calculating the real sum from `observaciones` (JSON products) or `detalleventaproducto`.
+ */
+async function syncVentasTotals() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [ventasZero] = await sequelize.query(
+      "SELECT idVenta, subtotal, total, descuentoAplicado, observaciones FROM `venta` WHERE total = 0 OR subtotal = 0"
+    );
+
+    if (ventasZero && ventasZero.length > 0) {
+      for (const v of ventasZero) {
+        let obsData = {};
+        if (v.observaciones) {
+          try {
+            obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+              ? JSON.parse(v.observaciones)
+              : {};
+          } catch (e) {}
+        }
+
+        let calcSubtotal = 0;
+        if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
+          calcSubtotal = obsData.productos.reduce((s, p) => {
+            const itemAdds = Array.isArray(p.adiciones)
+              ? p.adiciones.reduce((sa, a) => sa + (Number(a.precio || 0)), 0)
+              : 0;
+            const pUnit = Number(p.precioUnitario || p.precio || 0) + itemAdds;
+            const pTot = Number(p.total || 0) > 0 ? Number(p.total) : pUnit * Number(p.cantidad || 1);
+            return s + pTot;
+          }, 0);
+        }
+
+        if (calcSubtotal === 0) {
+          const [detalles] = await sequelize.query(
+            "SELECT cantidad, precioUnitario, subtotal FROM `detalleventaproducto` WHERE idVenta = :idVenta",
+            { replacements: { idVenta: v.idVenta } }
+          );
+          if (detalles && detalles.length > 0) {
+            calcSubtotal = detalles.reduce((s, d) => s + (Number(d.subtotal || 0) || (Number(d.precioUnitario || 0) * Number(d.cantidad || 1))), 0);
+          }
+        }
+
+        if (calcSubtotal > 0) {
+          const desc = parseFloat(v.descuentoAplicado || 0);
+          const calcTotal = Math.max(0, calcSubtotal - desc);
+          await sequelize.query(
+            "UPDATE `venta` SET `subtotal` = :subtotal, `total` = :total WHERE `idVenta` = :idVenta",
+            { replacements: { subtotal: calcSubtotal, total: calcTotal, idVenta: v.idVenta } }
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Error syncing ventas totals:", err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -241,5 +300,6 @@ module.exports = {
   ensureFichaTecnicaTrashSchema,
   ensureFichaTecnicaInsumoVariantZero,
   ensureFichaTecnicaColombiaTimezone,
-  ensureEventoColumnsSchema
+  ensureEventoColumnsSchema,
+  syncVentasTotals
 };
