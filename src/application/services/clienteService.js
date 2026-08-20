@@ -8,16 +8,36 @@ const FidelidadService = require('./fidelidadService');
 class ClienteService {
   static async formatCliente(c) {
     let meta = {};
-    let cleanDireccion = c.direccion || '';
+    let cleanDireccion = '';
 
     if (c.direccion) {
-      try {
-        if (c.direccion.trim().startsWith('{')) {
-          meta = JSON.parse(c.direccion);
-          cleanDireccion = meta.direccion !== undefined ? meta.direccion : c.direccion;
+      const raw = String(c.direccion).trim();
+      if (raw.startsWith('{')) {
+        try {
+          meta = JSON.parse(raw);
+          if (meta && typeof meta === 'object') {
+            cleanDireccion = typeof meta.direccion === 'string' ? meta.direccion : (meta.d || '');
+          }
+        } catch (e) {
+          // Truncated / malformed JSON fallback via regex
+          const match = raw.match(/"direccion"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i) || raw.match(/"d"\s*:\s*"([^"]+)"/i);
+          if (match && match[1]) {
+            cleanDireccion = match[1];
+          }
         }
-      } catch (e) {
-        meta = {};
+      } else {
+        cleanDireccion = raw;
+      }
+    }
+
+    // Defensive guarantee: cleanDireccion must NEVER be a raw JSON string
+    if (cleanDireccion.startsWith('{')) {
+      try {
+        const p = JSON.parse(cleanDireccion);
+        cleanDireccion = p.direccion || p.d || '';
+      } catch {
+        const m = cleanDireccion.match(/"direccion"\s*:\s*"([^"]+)"/i);
+        cleanDireccion = m ? m[1] : '';
       }
     }
 
@@ -346,31 +366,42 @@ class ClienteService {
       if (!c) return null;
 
       let meta = {};
-      if (c.direccion && c.direccion.trim().startsWith('{')) {
-        try {
-          meta = JSON.parse(c.direccion);
-        } catch (e) {
-          meta = {};
+      let cleanDir = '';
+      if (c.direccion) {
+        const raw = String(c.direccion).trim();
+        if (raw.startsWith('{')) {
+          try {
+            meta = JSON.parse(raw);
+            cleanDir = meta.direccion || '';
+          } catch (e) {
+            const match = raw.match(/"direccion"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i);
+            if (match) cleanDir = match[1];
+          }
+        } else {
+          cleanDir = raw;
         }
       }
 
       const fidelidadActual = meta.fidelidad || {
         tipo: meta.tipo || 'Nuevo',
-        comprasCiclo: meta.comprasCiclo || 0,
+        comprasCiclo: meta.ciclo || meta.comprasCiclo || 0,
         comprasTotales: meta.comprasTotales || 0,
-        fechaInicioNivel: meta.fechaInicioNivel,
-        fechaVencimientoNivel: meta.fechaVencimientoNivel
+        fechaInicioNivel: meta.fechaInicioNivel || meta.inicio,
+        fechaVencimientoNivel: meta.fechaVencimientoNivel || meta.vence
       };
 
       const nuevaFidelidad = FidelidadService.registrarCompra(fidelidadActual);
-      meta.fidelidad = nuevaFidelidad;
-      meta.tipo = nuevaFidelidad.tipo;
-      meta.descuentoPorcentaje = nuevaFidelidad.descuentoPorcentaje;
-      meta.comprasCiclo = nuevaFidelidad.comprasCiclo;
-      meta.fechaInicioNivel = nuevaFidelidad.fechaInicioNivel;
-      meta.fechaVencimientoNivel = nuevaFidelidad.fechaVencimientoNivel;
 
-      c.direccion = JSON.stringify(meta);
+      // Keep metadata compact to strictly fit inside VARCHAR(255)
+      const compactMeta = {
+        direccion: cleanDir,
+        tipo: nuevaFidelidad.tipo,
+        ciclo: nuevaFidelidad.comprasCiclo,
+        inicio: nuevaFidelidad.fechaInicioNivel ? String(nuevaFidelidad.fechaInicioNivel).substring(0, 10) : null,
+        vence: nuevaFidelidad.fechaVencimientoNivel ? String(nuevaFidelidad.fechaVencimientoNivel).substring(0, 10) : null
+      };
+
+      c.direccion = JSON.stringify(compactMeta);
       await c.save();
       return nuevaFidelidad;
     } catch (err) {
