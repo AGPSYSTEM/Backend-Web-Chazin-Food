@@ -107,10 +107,23 @@ class ProduccionService {
             totalItemsCount += qty;
 
             let itemNombre = d.observaciones || d.variante?.nombre || prod?.nombre || `Producto #${d.idVariante || d.idDetalleVenta}`;
-            if (prod?.nombre && d.variante?.nombre && prod.nombre !== d.variante.nombre) {
-              itemNombre = `${prod.nombre} (${d.variante.nombre})`;
-            } else if (prod?.nombre) {
-              itemNombre = prod.nombre;
+            const pName = prod?.nombre || "";
+            const vName = d.variante?.nombre || "";
+
+            if (pName && vName) {
+              const pLower = pName.toLowerCase().trim();
+              const vLower = vName.toLowerCase().trim();
+              if (vLower === pLower || vLower === `${pLower} - base` || vLower === 'base' || vLower === 'estándar' || vLower === 'estandar') {
+                itemNombre = pName;
+              } else if (vLower.startsWith(`${pLower} - `)) {
+                itemNombre = `${pName} (${vName.slice(pName.length + 3).trim()})`;
+              } else if (vLower !== pLower) {
+                itemNombre = `${pName} (${vName})`;
+              } else {
+                itemNombre = pName;
+              }
+            } else if (pName) {
+              itemNombre = pName;
             }
 
             // Parse any custom JSON in d.observaciones
@@ -133,7 +146,12 @@ class ProduccionService {
 
             // Include real db adiciones
             if (d.adiciones && d.adiciones.length > 0) {
-              itemAdiciones = d.adiciones.map(a => a.adicion?.nombre || `Adición #${a.idAdicion}`);
+              itemAdiciones = d.adiciones.map(a => ({
+                idAdicion: a.idAdicion,
+                nombre: a.adicion?.nombre || `Adición #${a.idAdicion}`,
+                cantidad: Number(a.cantidad) || 1,
+                precio: parseFloat(a.precioUnitario || 0)
+              }));
             }
 
             // Match with obsObj.productos if available to retrieve full observations and additions
@@ -147,12 +165,34 @@ class ProduccionService {
                 itemObs = opObs.trim();
               }
               if (Array.isArray(matchedObsProd.adiciones) && matchedObsProd.adiciones.length > 0) {
-                const opAdds = matchedObsProd.adiciones.map(a => typeof a === 'object' ? (a.nombre || a.nombreAdicion || JSON.stringify(a)) : String(a));
-                itemAdiciones = Array.from(new Set([...itemAdiciones, ...opAdds]));
+                const opAdds = matchedObsProd.adiciones.map(a => {
+                  if (typeof a === 'object' && a !== null) {
+                    return {
+                      idAdicion: a.idAdicion || a.id,
+                      nombre: a.nombre || a.nombreAdicion || 'Adición',
+                      cantidad: Number(a.cantidad) || 1,
+                      precio: parseFloat(a.precio || 0)
+                    };
+                  }
+                  return { nombre: String(a), cantidad: 1 };
+                });
+
+                if (itemAdiciones.length === 0) {
+                  itemAdiciones = opAdds;
+                } else {
+                  for (const oa of opAdds) {
+                    const existing = itemAdiciones.find(ia => (ia.nombre || '').toLowerCase().trim() === (oa.nombre || '').toLowerCase().trim());
+                    if (existing) {
+                      existing.cantidad = Math.max(existing.cantidad, oa.cantidad);
+                    } else {
+                      itemAdiciones.push(oa);
+                    }
+                  }
+                }
               }
             }
 
-            // Clean itemObs: do not repeat product name or dump raw addition list
+            // Clean itemObs: do not repeat product name or dump raw addition list or summary parenthesis
             if (itemObs) {
               const normObs = itemObs.toLowerCase().trim();
               const normName = itemNombre.toLowerCase().trim();
@@ -171,6 +211,9 @@ class ProduccionService {
                     }
                   }
                 }
+                itemObs = "";
+              } else if (itemObs.includes("(+") || itemObs.includes("( +")) {
+                // If the entire note is just a product title with additions in parentheses
                 itemObs = "";
               }
             }
@@ -289,6 +332,26 @@ class ProduccionService {
           cleanGeneralObs = "";
         }
 
+        // Determine delivery type and table label accurately
+        const rawTipo = obsObj.tipoEntrega || (v.tipoVenta === 'DOMICILIO' ? 'Domicilio' : (obsObj.mesa ? 'En Mesa' : 'En Local'));
+        let finalTipo = 'En Local';
+        let finalMesa = obsObj.mesa || '';
+
+        const normTipo = String(rawTipo).toLowerCase();
+        if (normTipo.includes('domicilio') || (v.tipoVenta && v.tipoVenta.toUpperCase() === 'DOMICILIO')) {
+          finalTipo = 'Domicilio';
+          finalMesa = 'Domicilio';
+        } else if (normTipo.includes('recoger') || normTipo.includes('llevar')) {
+          finalTipo = 'Para Llevar';
+          finalMesa = 'Para Llevar';
+        } else if (obsObj.mesa) {
+          finalTipo = 'En Mesa';
+          finalMesa = String(obsObj.mesa).toLowerCase().startsWith('mesa') ? obsObj.mesa : `Mesa ${obsObj.mesa}`;
+        } else {
+          finalTipo = 'En Local';
+          finalMesa = 'En Local';
+        }
+
         return {
           id: v.idVenta,
           idVenta: v.idVenta,
@@ -302,14 +365,16 @@ class ProduccionService {
           tiempo: primaryProd?.receta?.tiempoPreparacion || "15 min",
           fecha: fechaStr,
           horaInicio: horaStr,
+          fechaVenta: v.fechaVenta,
           prioridad: (est === 'PENDIENTE' || estadoAprobacion === 'PENDIENTE') ? "Alta" : "Normal",
           estado: estadoStr,
           estadoAprobacion,
           estadoEntrega: v.estadoEntrega || 'PENDIENTE',
           alerta: estadoAprobacion === 'PENDIENTE' || est === 'PENDIENTE',
           observaciones: cleanGeneralObs,
-          tipo: obsObj.tipoEntrega || "En Local",
-          mesa: obsObj.mesa || (obsObj.tipoEntrega === 'Recoger' ? 'Para Llevar' : 'Mesa'),
+          tipo: finalTipo,
+          mesa: finalMesa,
+          tipoVenta: v.tipoVenta || (finalTipo === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
           productos: productosList
         };
       });
