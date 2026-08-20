@@ -3,6 +3,7 @@ const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure
 const { sanitizeTelefono, cleanNameAndLastName } = require('../../infrastructure/utils/validationUtils');
 const bcrypt = require('bcryptjs');
 const EmailService = require('./emailService');
+const FidelidadService = require('./fidelidadService');
 
 class ClienteService {
   static async formatCliente(c) {
@@ -19,10 +20,6 @@ class ClienteService {
         meta = {};
       }
     }
-
-    const tipo = meta.tipo || (c.esVip ? 'VIP' : 'Nuevo');
-    const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
-    const descuentoPorcentaje = meta.descuentoPorcentaje !== undefined ? meta.descuentoPorcentaje : defaultDesc;
 
     // Fetch real DB transactions for this client
     let transacciones = [];
@@ -60,6 +57,22 @@ class ClienteService {
       console.warn(`Error cargando ventas para cliente #${c.idCliente}:`, err.message);
     }
 
+    const calculatedTierFromPurchases = comprasCount >= 9 ? 'VIP' : comprasCount >= 6 ? 'Frecuente' : comprasCount >= 3 ? 'Regular' : 'Nuevo';
+    const calculatedCicloFromPurchases = comprasCount % 3;
+
+    // Dynamic Fidelity Assessment (Tiers: Nuevo, Regular 5%, Frecuente 10%, VIP 15% with 30-day streak and grace periods)
+    const fidelidadActual = meta.fidelidad || {
+      tipo: calculatedTierFromPurchases,
+      comprasCiclo: calculatedCicloFromPurchases,
+      comprasTotales: comprasCount,
+      fechaInicioNivel: meta.fechaInicioNivel || null,
+      fechaVencimientoNivel: meta.fechaVencimientoNivel || null
+    };
+
+    const fidelidadEvaluada = FidelidadService.evaluarEstadoFidelidad(fidelidadActual, comprasCount);
+    const tipo = fidelidadEvaluada.tipo;
+    const descuentoPorcentaje = fidelidadEvaluada.descuentoPorcentaje;
+
     // Determine state: if no user account linked, client state is Inactivo/Pendiente
     let estadoStr = 'Activo';
     if (!c.idUsuario || c.estado === 0 || meta.estado === 'Inactivo' || meta.estado === 0) {
@@ -80,6 +93,7 @@ class ClienteService {
       direccion: cleanDireccion,
       tipo,
       descuentoPorcentaje,
+      fidelidad: fidelidadEvaluada,
       nombre: cleanNombre,
       apellidos: cleanApellidos,
       email: c.usuario ? c.usuario.email : (meta.email || ''),
@@ -103,11 +117,32 @@ class ClienteService {
   static async getAll() {
     const clientes = await Cliente.findAll({
       order: [['idCliente', 'ASC']],
-      include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono', 'estado'] }]
+      include: [
+        {
+          model: User,
+          as: 'usuario',
+          attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono', 'estado', 'idRol'],
+          include: [{ model: Role, as: 'rolInfo', attributes: ['idRol', 'nombre'] }]
+        }
+      ]
     });
 
     const result = [];
     for (const c of clientes) {
+      // Exclude Cliente Mostrador placeholder (id 26 or Mostrador) from registered clients list
+      if (c.idCliente === 26 || (c.direccion && c.direccion.toLowerCase().includes('cliente mostrador'))) {
+        continue;
+      }
+
+      // Exclude staff users (Administrador, Vendedor, Cocinero) from client list
+      if (c.usuario) {
+        const userRolId = c.usuario.idRol;
+        const rolNom = String(c.usuario.rolInfo?.nombre || '').toLowerCase();
+        if (userRolId === 1 || userRolId === 2 || userRolId === 3 || 
+            rolNom.includes('admin') || rolNom.includes('vendedor') || rolNom.includes('cocinero')) {
+          continue;
+        }
+      }
       result.push(await this.formatCliente(c));
     }
     return result;
@@ -302,6 +337,50 @@ class ClienteService {
     await resequenceTableIds('cliente', 'idCliente', [{ table: 'venta', column: 'idCliente' }]);
 
     return { message: 'Cliente eliminado exitosamente' };
+  }
+
+  static async registrarCompraFidelidad(idCliente) {
+    if (!idCliente) return null;
+    try {
+      const c = await Cliente.findByPk(idCliente);
+      if (!c) return null;
+
+      let meta = {};
+      if (c.direccion && c.direccion.trim().startsWith('{')) {
+        try {
+          meta = JSON.parse(c.direccion);
+        } catch (e) {
+          meta = {};
+        }
+      }
+
+      const fidelidadActual = meta.fidelidad || {
+        tipo: meta.tipo || 'Nuevo',
+        comprasCiclo: meta.comprasCiclo || 0,
+        comprasTotales: meta.comprasTotales || 0,
+        fechaInicioNivel: meta.fechaInicioNivel,
+        fechaVencimientoNivel: meta.fechaVencimientoNivel
+      };
+
+      const nuevaFidelidad = FidelidadService.registrarCompra(fidelidadActual);
+      meta.fidelidad = nuevaFidelidad;
+      meta.tipo = nuevaFidelidad.tipo;
+      meta.descuentoPorcentaje = nuevaFidelidad.descuentoPorcentaje;
+      meta.comprasCiclo = nuevaFidelidad.comprasCiclo;
+      meta.fechaInicioNivel = nuevaFidelidad.fechaInicioNivel;
+      meta.fechaVencimientoNivel = nuevaFidelidad.fechaVencimientoNivel;
+
+      c.direccion = JSON.stringify(meta);
+      await c.save();
+      return nuevaFidelidad;
+    } catch (err) {
+      console.warn(`Error registrando compra de fidelidad para cliente #${idCliente}:`, err.message);
+      return null;
+    }
+  }
+
+  static getCatalogoFidelidad() {
+    return FidelidadService.getCatalogoNiveles();
   }
 }
 

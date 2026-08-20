@@ -54,5 +54,14 @@ const deleteCliente = async (req, res, next) => {
   }
 };
 
-module.exports = { getClientes, getClientesStats, getClienteById, createCliente, updateCliente, deleteCliente };
+const getFidelidadCatalogo = async (req, res, next) => {
+  try {
+    const catalogo = ClienteService.getCatalogoFidelidad();
+    res.json(catalogo);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getClientes, getClientesStats, getClienteById, createCliente, updateCliente, deleteCliente, getFidelidadCatalogo };
 

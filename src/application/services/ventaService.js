@@ -23,33 +23,20 @@ class VentaService {
 
     const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `VEN-${String(v.idVenta).padStart(4, '0')}`;
     
-    // Dynamic format of date/time (Formato 12 horas con AM/PM)
-    let horario = obsData.horario;
-    if (!horario && v.fechaVenta) {
+    // Dynamic format of date/time in local Colombia timezone (Formato 12 horas con AM/PM)
+    let horario = null;
+    let fechaFormatted = null;
+    if (v.fechaVenta) {
       const d = new Date(v.fechaVenta);
-      let h = d.getHours();
-      const m = String(d.getMinutes()).padStart(2, '0');
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      h = h % 12;
-      h = h ? h : 12;
-      horario = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
-    }
-    // Si el horario guardado es en formato 24h (ej: "23:56"), convertirlo a 12h AM/PM
-    if (horario && typeof horario === 'string') {
-      if (horario.includes('–')) {
-        horario = horario.split('–')[0].trim();
-      }
-      if (/^\d{1,2}:\d{2}$/.test(horario.trim())) {
-        const parts = horario.trim().split(':');
-        let h = parseInt(parts[0], 10);
-        const m = parts[1];
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12;
-        h = h ? h : 12;
-        horario = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+      if (!isNaN(d.getTime())) {
+        horario = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+        fechaFormatted = d.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' });
       }
     }
-    horario = horario || null;
+    if (!horario && obsData.horario) {
+      horario = obsData.horario;
+    }
+    horario = horario || "12:30 PM";
 
     const tipoEntrega = obsData.tipoEntrega || (
       (v.observaciones || "").toLowerCase().includes("recoger") || (v.observaciones || "").toLowerCase().includes("para llevar") || (v.observaciones || "").toLowerCase().includes("llevar")
@@ -156,43 +143,47 @@ class VentaService {
 
     let subtotal = parseFloat(v.subtotal) || 0;
     let total = parseFloat(v.total) || 0;
+    let descuentoAplicado = parseFloat(v.descuentoAplicado || 0);
 
     // Si total o subtotal está en 0 en base de datos, calcular de productos o detalles
     if ((total === 0 || subtotal === 0) && Array.isArray(productos) && productos.length > 0) {
       subtotal = productos.reduce((acc, p) => acc + Number(p.total || 0), 0);
-      const desc = parseFloat(v.descuentoAplicado || 0) || (subtotal * (Number(obsData.descuentoPorcentaje || 0) / 100));
-      total = Math.max(0, subtotal - desc);
+      descuentoAplicado = descuentoAplicado || (subtotal * (Number(obsData.descuentoPorcentaje || 0) / 100));
+      total = Math.max(0, subtotal - descuentoAplicado);
+    }
+
+    // Dynamic extraction of client fidelity
+    let clientMeta = {};
+    if (clienteObj && clienteObj.direccion) {
+      try {
+        if (clienteObj.direccion.trim().startsWith('{')) {
+          clientMeta = JSON.parse(clienteObj.direccion);
+        }
+      } catch (e) {
+        clientMeta = {};
+      }
+    }
+    const FidelidadService = require('./fidelidadService');
+    const fidelidadInfo = FidelidadService.evaluarEstadoFidelidad(clientMeta.fidelidad || {
+      tipo: clientMeta.tipo || (clienteObj.idUsuario ? 'Nuevo' : 'Mostrador'),
+      comprasCiclo: clientMeta.comprasCiclo || 0,
+      comprasTotales: clientMeta.comprasTotales || 0,
+      fechaInicioNivel: clientMeta.fechaInicioNivel || null,
+      fechaVencimientoNivel: clientMeta.fechaVencimientoNivel || null
+    });
+
+    // Calculate clear discount percentage
+    let descuentoPorcentaje = obsData.descuentoPorcentaje || fidelidadInfo.descuentoPorcentaje || 0;
+    if (descuentoAplicado > 0 && subtotal > 0) {
+      descuentoPorcentaje = Math.round((descuentoAplicado / subtotal) * 100);
+    } else if (subtotal > total && subtotal > 0) {
+      descuentoAplicado = subtotal - total;
+      descuentoPorcentaje = Math.round((descuentoAplicado / subtotal) * 100);
     }
 
     const iva = Math.round(subtotal * 0.19);
-
-    let descuentoPorcentaje = obsData.descuentoPorcentaje || 0;
-    if (!descuentoPorcentaje && parseFloat(v.descuentoAplicado || 0) > 0 && (subtotal > 0 || total > 0)) {
-      const base = subtotal > total ? subtotal : total + parseFloat(v.descuentoAplicado);
-      descuentoPorcentaje = Math.round((parseFloat(v.descuentoAplicado) / base) * 100);
-    } else if (!descuentoPorcentaje && clienteObj && clienteObj.direccion) {
-      try {
-        if (clienteObj.direccion.trim().startsWith('{')) {
-          const meta = JSON.parse(clienteObj.direccion);
-          if (meta.descuentoPorcentaje !== undefined) {
-            descuentoPorcentaje = parseFloat(meta.descuentoPorcentaje);
-          } else if (meta.tipo) {
-            const t = meta.tipo;
-            descuentoPorcentaje = t === 'VIP' ? 15 : t === 'Frecuente' ? 10 : t === 'Regular' ? 5 : 0;
-          }
-        }
-      } catch (e) {}
-    }
-
-    let precioOriginal = subtotal > total ? subtotal : total;
-    if (descuentoPorcentaje > 0 && total > 0) {
-      if (parseFloat(v.descuentoAplicado || 0) > 0) {
-        precioOriginal = total + parseFloat(v.descuentoAplicado);
-      } else if (precioOriginal === total) {
-        precioOriginal = Math.round(total / (1 - (descuentoPorcentaje / 100)));
-      }
-    }
-    const montoDescuento = Math.max(0, precioOriginal - total);
+    const precioOriginal = subtotal > total ? subtotal : (total + descuentoAplicado);
+    const montoDescuento = descuentoAplicado;
 
     let estadoStr = 'Pendiente';
     if (v.estadoEntrega === 'PREPARANDO') estadoStr = 'En Preparación';
@@ -200,6 +191,21 @@ class VentaService {
     else if (v.estadoEntrega === 'ENTREGADO') estadoStr = 'Completada';
     else if (v.estadoEntrega === 'CANCELADO') estadoStr = 'Anulada';
     else if (v.estadoEntrega) estadoStr = v.estadoEntrega;
+
+    const responsable = v.usuario ? {
+      idUsuario: v.usuario.idUsuario,
+      nombre: `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim(),
+      email: v.usuario.email,
+      rol: v.usuario.rolInfo?.nombre || (v.usuario.idRol === 1 ? 'Administrador' : v.usuario.idRol === 2 ? 'Vendedor' : 'Empleado'),
+      tieneCuenta: true,
+      estado: v.usuario.estado || 'Activo'
+    } : {
+      idUsuario: null,
+      nombre: 'Sistema / Online',
+      rol: 'Online',
+      tieneCuenta: false,
+      estado: 'Activo'
+    };
 
     return {
       id: v.idVenta,
@@ -212,8 +218,17 @@ class VentaService {
       cliente: clienteNombre,
       idCliente: v.idCliente,
       idUsuario: v.idUsuario,
+      responsable,
+      clienteFidelidad: {
+        tipo: fidelidadInfo.tipo,
+        descuentoPorcentaje: fidelidadInfo.descuentoPorcentaje,
+        comprasCiclo: fidelidadInfo.comprasCiclo,
+        enGracia: fidelidadInfo.enGracia,
+        tieneCuenta: !!clienteObj.idUsuario
+      },
       fecha: v.fechaVenta,
       fechaVenta: v.fechaVenta,
+      fechaFormatted,
       horario,
       tipoEntrega,
       metodoPago,
@@ -225,7 +240,7 @@ class VentaService {
       precioOriginal,
       descuentoPorcentaje,
       montoDescuento,
-      descuentoAplicado: parseFloat(v.descuentoAplicado || 0) || montoDescuento,
+      descuentoAplicado,
       total,
       observaciones: v.observaciones,
       productos,
@@ -243,13 +258,13 @@ class VentaService {
       if (periodo === 'hoy') {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfDay };
-      } else if (periodo === '7_dias') {
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (periodo === '7dias') {
+        const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
         where.fechaVenta = { [Op.gte]: sevenDaysAgo };
-      } else if (periodo === 'este_mes') {
+      } else if (periodo === 'mes') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfMonth };
-      } else if (periodo === 'este_ano') {
+      } else if (periodo === 'ano') {
         const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfYear };
       }
@@ -276,7 +291,12 @@ class VentaService {
           as: 'cliente',
           include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
         },
-        { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
+        { 
+          model: User, 
+          as: 'usuario', 
+          attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'estado', 'idRol'],
+          include: [{ model: Role, as: 'rolInfo', attributes: ['idRol', 'nombre'] }]
+        },
         { 
           model: DetalleVentaProducto, 
           as: 'detalles',
@@ -398,6 +418,30 @@ class VentaService {
     return this.formatVenta(v);
   }
 
+  static async getOrCreateClienteMostrador() {
+    let mostrador = await Cliente.findOne({
+      where: {
+        idUsuario: null
+      }
+    });
+
+    if (!mostrador) {
+      const metaStr = JSON.stringify({
+        nombre: 'Cliente',
+        apellidos: 'Mostrador',
+        tipo: 'Nuevo',
+        descuentoPorcentaje: 0,
+        estado: 'Activo'
+      });
+      mostrador = await Cliente.create({
+        idUsuario: null,
+        direccion: metaStr,
+        estado: 1
+      });
+    }
+    return mostrador;
+  }
+
   static async create(data) {
     let targetUserId = data.idUsuario || data.userId;
 
@@ -409,7 +453,9 @@ class VentaService {
     }
 
     // Strict Validation 2: Check user exists in DB
-    const userObj = await User.findByPk(targetUserId);
+    const userObj = await User.findByPk(targetUserId, {
+      include: [{ model: Role, as: 'rolInfo' }]
+    });
     if (!userObj) {
       const error = new Error('El usuario especificado no existe en el sistema.');
       error.statusCode = 404;
@@ -423,31 +469,47 @@ class VentaService {
       throw error;
     }
 
-    // Strict Validation 4 & 5: Check client linked to user
-    let clienteObj = await Cliente.findOne({ where: { idUsuario: targetUserId } });
-    
-    // Auto-associate client ONLY if this user has no client entry yet
-    if (!clienteObj) {
-      clienteObj = await Cliente.create({
-        idUsuario: targetUserId,
-        direccion: data.direccion || '',
-        estado: 1
-      });
-    }
+    // Determine if the operating user is staff (Admin, Vendedor, Cocinero)
+    const userRole = userObj.idRol || (userObj.rolInfo ? userObj.rolInfo.nombre : null);
+    const isStaff = (userRole === 1 || userRole === 2 || userRole === 3 || 
+                     String(userRole).toLowerCase().includes('admin') || 
+                     String(userRole).toLowerCase().includes('vendedor') || 
+                     String(userRole).toLowerCase().includes('cocinero'));
 
-    // Strict Validation 6: Check client is ACTIVE
-    let clientMeta = {};
-    if (clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
-      try { clientMeta = JSON.parse(clienteObj.direccion); } catch (e) { clientMeta = {}; }
-    }
+    let finalClienteId = null;
 
-    if (clienteObj.estado === 0 || clientMeta.estado === 'Inactivo' || clientMeta.estado === 0) {
-      const error = new Error('No puedes realizar el pedido porque tu cliente está inactivo.');
-      error.statusCode = 403;
-      throw error;
-    }
+    if (isStaff) {
+      // Staff (Vendedor/Admin) creating POS sale -> seller is employee, NOT customer
+      if (data.idCliente) {
+        finalClienteId = Number(data.idCliente);
+      } else {
+        const mostrador = await this.getOrCreateClienteMostrador();
+        finalClienteId = mostrador.idCliente;
+      }
+    } else {
+      // Regular customer placing an order online
+      let clienteObj = await Cliente.findOne({ where: { idUsuario: targetUserId } });
+      if (!clienteObj) {
+        clienteObj = await Cliente.create({
+          idUsuario: targetUserId,
+          direccion: data.direccion || '',
+          estado: 1
+        });
+      }
 
-    const finalClienteId = clienteObj.idCliente;
+      let clientMeta = {};
+      if (clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
+        try { clientMeta = JSON.parse(clienteObj.direccion); } catch (e) { clientMeta = {}; }
+      }
+
+      if (clienteObj.estado === 0 || clientMeta.estado === 'Inactivo' || clientMeta.estado === 0) {
+        const error = new Error('No puedes realizar el pedido porque tu cliente está inactivo.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      finalClienteId = clienteObj.idCliente;
+    }
 
     // Determinar y normalizar tipoVenta (PUNTO_DE_VENTA vs DOMICILIO)
     const rawTipoVenta = String(data.tipoVenta || "").toUpperCase();
@@ -463,13 +525,10 @@ class VentaService {
     // Si es venta rápida (PUNTO_DE_VENTA), asegurar que se asocie al responsable con rol Vendedor o Administrador
     let responsibleUserId = targetUserId;
     if (resolvedTipoVenta === "PUNTO_DE_VENTA") {
-      const userRole = userObj.idRol || userObj.rol || (userObj.role ? userObj.role.nombre : null);
-      const isSellerOrAdmin = (userRole === 2 || userRole === 1 || String(userRole).toLowerCase().includes('vendedor') || String(userRole).toLowerCase().includes('admin'));
-
-      if (!isSellerOrAdmin) {
+      if (!isStaff) {
         const { Op } = require('sequelize');
         const sellerUser = await User.findOne({
-          include: [{ model: Role, as: 'role', where: { nombre: { [Op.like]: '%Vendedor%' } } }],
+          include: [{ model: Role, as: 'rolInfo', where: { nombre: { [Op.like]: '%Vendedor%' } } }],
           where: { estado: { [Op.in]: [1, 'ACTIVO', '1'] } }
         }).catch(() => null);
 
@@ -499,11 +558,27 @@ class VentaService {
     }
 
     const finalSubtotal = Number(data.subtotal) > 0 ? Number(data.subtotal) : calculatedSubtotal;
-    const finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
-    const finalTotal = Number(data.total) > 0 ? Number(data.total) : Math.max(0, finalSubtotal - finalDescuento);
+    let finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
+
+    const ClienteService = require('./clienteService');
+    if (finalDescuento === 0 && finalClienteId) {
+      try {
+        const clienteInfo = await ClienteService.getById(finalClienteId);
+        if (clienteInfo && Number(clienteInfo.descuentoPorcentaje) > 0) {
+          finalDescuento = Math.round(finalSubtotal * (Number(clienteInfo.descuentoPorcentaje) / 100));
+        }
+      } catch (e) {
+        // Continue without blocking
+      }
+    }
+
+    const finalTotal = Math.max(0, finalSubtotal - finalDescuento);
+
+    const now = new Date();
+    const formattedHorario = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
 
     const obsObj = {
-      horario: data.horario || parsedObs.horario || "12:30 – 12:48",
+      horario: data.horario || parsedObs.horario || formattedHorario,
       tipoEntrega: data.tipoEntrega || parsedObs.tipoEntrega || (data.mesa ? "En Mesa" : "Recoger"),
       metodoPago: data.metodoPago || parsedObs.metodoPago || "Efectivo",
       direccion: data.direccion || parsedObs.direccion || "Recoger en Local",
@@ -681,6 +756,13 @@ class VentaService {
       }
     }
 
+    // Trigger client loyalty progression
+    if (finalClienteId) {
+      ClienteService.registrarCompraFidelidad(finalClienteId).catch(err =>
+        console.warn('Error registrando fidelidad:', err.message)
+      );
+    }
+
     return this.getById(venta.idVenta);
   }
 
@@ -706,6 +788,14 @@ class VentaService {
       v.estadoAprobacion = 'APROBADO';
     }
     await v.save();
+
+    if ((estadoEnum === 'ENTREGADO' || estadoEnum === 'APROBADO') && v.idCliente) {
+      const ClienteService = require('./clienteService');
+      ClienteService.registrarCompraFidelidad(v.idCliente).catch(err =>
+        console.warn('Error registrando fidelidad en cambio de estado:', err.message)
+      );
+    }
+
     return this.getById(id);
   }
 

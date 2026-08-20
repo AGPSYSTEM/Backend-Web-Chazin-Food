@@ -164,10 +164,29 @@ class AuthService {
       ? user.rolInfo.permisos.map(p => p.nombrePermiso)
       : [];
 
+    let fidelidadObj = null;
+    let idCliente = null;
+    let tipoCliente = 'Nuevo';
+    let descuentoPorcentaje = 0;
+
+    if (user.clienteInfo) {
+      try {
+        const ClienteService = require('./clienteService');
+        const formattedCliente = await ClienteService.formatCliente(user.clienteInfo);
+        idCliente = formattedCliente.id;
+        fidelidadObj = formattedCliente.fidelidad;
+        tipoCliente = formattedCliente.tipo;
+        descuentoPorcentaje = formattedCliente.descuentoPorcentaje;
+      } catch (e) {
+        idCliente = user.clienteInfo.idCliente;
+      }
+    }
+
     return {
       _id: user.idUsuario,
       id: user.idUsuario,
       idUsuario: user.idUsuario,
+      idCliente,
       nombre: user.nombre,
       apellidos: user.apellidos,
       apellido: user.apellidos,
@@ -177,6 +196,9 @@ class AuthService {
       idRol: user.idRol,
       permisos,
       direccion,
+      tipo: tipoCliente,
+      descuentoPorcentaje,
+      fidelidad: fidelidadObj,
       token: this.generateToken(user.idUsuario)
     };
   }
@@ -192,10 +214,29 @@ class AuthService {
       throw error;
     }
 
+    let fidelidadObj = null;
+    let idCliente = null;
+    let tipoCliente = 'Nuevo';
+    let descuentoPorcentaje = 0;
+
+    if (user.clienteInfo) {
+      try {
+        const ClienteService = require('./clienteService');
+        const formattedCliente = await ClienteService.formatCliente(user.clienteInfo);
+        idCliente = formattedCliente.id;
+        fidelidadObj = formattedCliente.fidelidad;
+        tipoCliente = formattedCliente.tipo;
+        descuentoPorcentaje = formattedCliente.descuentoPorcentaje;
+      } catch (e) {
+        idCliente = user.clienteInfo.idCliente;
+      }
+    }
+
     return {
       _id: user.idUsuario,
       id: user.idUsuario,
       idUsuario: user.idUsuario,
+      idCliente,
       nombre: user.nombre,
       apellidos: user.apellidos,
       apellido: user.apellidos,
@@ -206,7 +247,10 @@ class AuthService {
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       idRol: user.idRol,
       estado: user.estado,
-      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : '')
+      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
+      tipo: tipoCliente,
+      descuentoPorcentaje,
+      fidelidad: fidelidadObj
     };
   }
 
