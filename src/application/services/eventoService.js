@@ -17,7 +17,8 @@ class EventoService {
       descuento: e.descuento,
       nuevoPrecio: e.nuevoPrecio,
       accionInsumo: e.accionInsumo,
-      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : []
+      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : [],
+      productosAsociados: e.productosAsociados ? JSON.parse(e.productosAsociados) : []
     }));
   }
 
@@ -42,14 +43,15 @@ class EventoService {
       descuento: e.descuento,
       nuevoPrecio: e.nuevoPrecio,
       accionInsumo: e.accionInsumo,
-      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : []
+      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : [],
+      productosAsociados: e.productosAsociados ? JSON.parse(e.productosAsociados) : []
     };
   }
 
   static async create(data) {
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, isTemporal
+      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, productos, isTemporal
     } = data;
     const finalNombre = nombreEvento || nombre;
 
@@ -71,7 +73,8 @@ class EventoService {
       descuento: descuento || null,
       nuevoPrecio: nuevoPrecio || null,
       accionInsumo: accion || null,
-      insumosAsociados: insumos ? JSON.stringify(insumos) : null
+      insumosAsociados: insumos ? JSON.stringify(insumos) : null,
+      productosAsociados: productos ? JSON.stringify(productos) : null
     });
 
     return this.getById(created.idEvento);
@@ -87,7 +90,7 @@ class EventoService {
 
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, isTemporal
+      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, productos, isTemporal
     } = data;
     const finalNombre = nombreEvento || nombre;
 
@@ -115,6 +118,7 @@ class EventoService {
     if (nuevoPrecio !== undefined) e.nuevoPrecio = nuevoPrecio;
     if (accion !== undefined) e.accionInsumo = accion;
     if (insumos !== undefined) e.insumosAsociados = insumos ? JSON.stringify(insumos) : null;
+    if (productos !== undefined) e.productosAsociados = productos ? JSON.stringify(productos) : null;
 
     await e.save();
     return this.getById(id);

@@ -41,6 +41,13 @@ class DashboardService {
         pedidosVariacion = 100;
       }
 
+      // Frecuencia de ventas (pedidos por dia en el mes actual)
+      const currentDay = now.getDate();
+      let frecuenciaVentas = 0;
+      if (currentDay > 0) {
+        frecuenciaVentas = parseFloat((pedidosTotalActual / currentDay).toFixed(1));
+      }
+
       // Active clients count
       const clientesTotal = await Cliente.count().catch(() => 0);
       const clientesActivos = await Cliente.count({ where: { estado: 1 } }).catch(() => clientesTotal);
@@ -85,6 +92,7 @@ class DashboardService {
         ventasVariacion,
         pedidosTotal,
         pedidosVariacion,
+        frecuenciaVentas,
         clientesTotal,
         clientesActivos,
         clientesVariacion,
@@ -98,6 +106,7 @@ class DashboardService {
         ventasVariacion: 0,
         pedidosTotal: 0,
         pedidosVariacion: 0,
+        frecuenciaVentas: 0,
         clientesTotal: 0,
         clientesActivos: 0,
         clientesVariacion: 0,

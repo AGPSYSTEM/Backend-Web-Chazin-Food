@@ -751,6 +751,9 @@ const Evento = sequelize.define('evento', {
   insumosAsociados: {
     type: DataTypes.TEXT // JSON stringified array of insumos
   },
+  productosAsociados: {
+    type: DataTypes.TEXT // JSON stringified array of products with individual prices
+  },
   nombreEvento: {
     type: DataTypes.STRING(120),
     allowNull: false
