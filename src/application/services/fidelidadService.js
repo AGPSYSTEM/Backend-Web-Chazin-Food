@@ -59,10 +59,14 @@ class FidelidadService {
     if (tipo === "FRECUENTE") tipo = "Frecuente";
     if (tipo === "vip") tipo = "VIP";
 
-    let comprasCiclo = Number(fidelidadData.comprasCiclo || 0);
+    let comprasCiclo = Number(fidelidadData.comprasCiclo !== undefined ? fidelidadData.comprasCiclo : (fidelidadData.ciclo || 0));
     let comprasTotales = Number(fidelidadData.comprasTotales || totalVentasReales || 0);
-    let fechaInicio = fidelidadData.fechaInicioNivel ? new Date(fidelidadData.fechaInicioNivel) : new Date();
-    let fechaVencimiento = fidelidadData.fechaVencimientoNivel ? new Date(fidelidadData.fechaVencimientoNivel) : null;
+    
+    const rawInicio = fidelidadData.fechaInicioNivel || fidelidadData.inicio;
+    const rawVence = fidelidadData.fechaVencimientoNivel || fidelidadData.vence;
+
+    let fechaInicio = rawInicio ? new Date(rawInicio) : new Date();
+    let fechaVencimiento = rawVence ? new Date(rawVence) : null;
 
     // Si es un cliente antiguo sin fecha de vencimiento pero con nivel asignado
     if (!fechaVencimiento && tipo !== "Nuevo") {
@@ -213,11 +217,14 @@ class FidelidadService {
     // Regla de NO SUMAR TIEMPO ACUMULADO:
     // Si asciende o renueva, inicia un nuevo mes limpio de 30 días (now + 30d).
     // Si es una compra intermedia dentro de su mes activo, NO altera la fecha de vencimiento original.
-    let nuevaFechaVencimiento = fidelidadActual.fechaVencimientoNivel 
-      ? new Date(fidelidadActual.fechaVencimientoNivel) 
+    const rawVenceActual = fidelidadActual.fechaVencimientoNivel || fidelidadActual.vence;
+    const rawInicioActual = fidelidadActual.fechaInicioNivel || fidelidadActual.inicio;
+
+    let nuevaFechaVencimiento = rawVenceActual 
+      ? new Date(rawVenceActual) 
       : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    if (ascendio || renovo || !fidelidadActual.fechaVencimientoNivel || estado.enGracia || nuevoTipo !== estado.tipo) {
+    if (ascendio || renovo || !rawVenceActual || estado.enGracia || nuevoTipo !== estado.tipo) {
       nuevaFechaVencimiento = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     }
 
@@ -234,7 +241,7 @@ class FidelidadService {
       comprasMeta: 3,
       progresoPorcentaje: Math.round((nuevoComprasCiclo / 3) * 100),
       siguienteNivel: config.siguienteNivel,
-      fechaInicioNivel: (ascendio || renovo || !fidelidadActual.fechaInicioNivel) ? now.toISOString() : fidelidadActual.fechaInicioNivel,
+      fechaInicioNivel: (ascendio || renovo || !rawInicioActual) ? now.toISOString() : (new Date(rawInicioActual)).toISOString(),
       fechaVencimientoNivel: nuevoTipo === "Nuevo" ? null : nuevaFechaVencimiento.toISOString(),
       diasRestantes,
       enGracia: false,

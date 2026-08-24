@@ -83,16 +83,35 @@ class ClienteService {
 
     // Dynamic Fidelity Assessment (Tiers: Nuevo, Regular 5%, Frecuente 10%, VIP 15% with 30-day streak and grace periods)
     const fidelidadActual = meta.fidelidad || {
-      tipo: calculatedTierFromPurchases,
-      comprasCiclo: calculatedCicloFromPurchases,
+      tipo: meta.tipo || calculatedTierFromPurchases,
+      comprasCiclo: meta.ciclo !== undefined ? Number(meta.ciclo) : (meta.comprasCiclo !== undefined ? Number(meta.comprasCiclo) : calculatedCicloFromPurchases),
       comprasTotales: comprasCount,
-      fechaInicioNivel: meta.fechaInicioNivel || null,
-      fechaVencimientoNivel: meta.fechaVencimientoNivel || null
+      fechaInicioNivel: meta.inicio || meta.fechaInicioNivel || null,
+      fechaVencimientoNivel: meta.vence || meta.fechaVencimientoNivel || null
     };
 
     const fidelidadEvaluada = FidelidadService.evaluarEstadoFidelidad(fidelidadActual, comprasCount);
     const tipo = fidelidadEvaluada.tipo;
     const descuentoPorcentaje = fidelidadEvaluada.descuentoPorcentaje;
+
+    // Persist fixed dates / degradation into DB so remaining days decrement consistently
+    const needsDatePersistence = fidelidadEvaluada.tipo !== 'Nuevo' && (!meta.vence || !meta.inicio);
+    const needsStatePersistence = meta.tipo && meta.tipo !== fidelidadEvaluada.tipo;
+    if (needsDatePersistence || needsStatePersistence) {
+      try {
+        const compactMeta = {
+          direccion: cleanDireccion,
+          tipo: fidelidadEvaluada.tipo,
+          ciclo: fidelidadEvaluada.comprasCiclo,
+          inicio: fidelidadEvaluada.fechaInicioNivel,
+          vence: fidelidadEvaluada.fechaVencimientoNivel
+        };
+        c.direccion = JSON.stringify(compactMeta);
+        await c.save();
+      } catch (saveErr) {
+        console.warn(`Error persistiendo fidelidad evaluada para cliente #${c.idCliente}:`, saveErr.message);
+      }
+    }
 
     // Determine state: if no user account linked, client state is Inactivo/Pendiente
     let estadoStr = 'Activo';
@@ -230,15 +249,15 @@ class ClienteService {
     // If client created without user account, it MUST be INACTIVO (0)
     const estadoVal = (sinCuenta || !idUsuario || data.estado === 'Inactivo' || data.estado === 0) ? 0 : 1;
 
+    const now = new Date();
+    const fechaVence = tipo !== 'Nuevo' ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
+
     const direccionMeta = JSON.stringify({
       direccion: data.direccion || '',
       tipo,
-      descuentoPorcentaje: descPorcent,
-      nombre: cleanNom,
-      apellidos: cleanApe,
-      email: data.email || '',
-      telefono: cleanTel,
-      estado: estadoVal === 0 ? 'Inactivo' : 'Activo'
+      ciclo: 0,
+      inicio: tipo !== 'Nuevo' ? now.toISOString() : null,
+      vence: fechaVence
     });
 
     const cliente = await Cliente.create({
@@ -304,16 +323,27 @@ class ClienteService {
       c.idUsuario = data.idUsuario;
     }
 
+    const now = new Date();
+    let newInicio = existingMeta.inicio || existingMeta.fechaInicioNivel || null;
+    let newVence = existingMeta.vence || existingMeta.fechaVencimientoNivel || null;
+    let newCiclo = existingMeta.ciclo !== undefined ? Number(existingMeta.ciclo) : (existingMeta.comprasCiclo !== undefined ? Number(existingMeta.comprasCiclo) : 0);
+
+    if (data.tipo !== undefined && data.tipo !== existingMeta.tipo) {
+      newInicio = newTipo !== 'Nuevo' ? now.toISOString() : null;
+      newVence = newTipo !== 'Nuevo' ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
+      newCiclo = 0;
+    } else if (newTipo !== 'Nuevo' && !newVence) {
+      newInicio = now.toISOString();
+      newVence = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     const finalEstado = (!c.idUsuario || data.estado === 'Inactivo' || data.estado === 0) ? 0 : 1;
     c.direccion = JSON.stringify({
       direccion: newDireccionStr,
       tipo: newTipo,
-      descuentoPorcentaje: newDesc,
-      nombre: cleanNom,
-      apellidos: cleanApe,
-      email: data.email !== undefined ? data.email : existingMeta.email,
-      telefono: cleanTel,
-      estado: finalEstado === 0 ? 'Inactivo' : 'Activo'
+      ciclo: newCiclo,
+      inicio: newInicio,
+      vence: newVence
     });
 
     if (data.estado !== undefined) c.estado = finalEstado;
@@ -441,10 +471,10 @@ class ClienteService {
 
       const fidelidadActual = meta.fidelidad || {
         tipo: meta.tipo || 'Nuevo',
-        comprasCiclo: meta.ciclo || meta.comprasCiclo || 0,
+        comprasCiclo: meta.ciclo !== undefined ? Number(meta.ciclo) : (meta.comprasCiclo !== undefined ? Number(meta.comprasCiclo) : 0),
         comprasTotales: meta.comprasTotales || 0,
-        fechaInicioNivel: meta.fechaInicioNivel || meta.inicio,
-        fechaVencimientoNivel: meta.fechaVencimientoNivel || meta.vence
+        fechaInicioNivel: meta.inicio || meta.fechaInicioNivel || null,
+        fechaVencimientoNivel: meta.vence || meta.fechaVencimientoNivel || null
       };
 
       const nuevaFidelidad = FidelidadService.registrarCompra(fidelidadActual);
@@ -454,8 +484,8 @@ class ClienteService {
         direccion: cleanDir,
         tipo: nuevaFidelidad.tipo,
         ciclo: nuevaFidelidad.comprasCiclo,
-        inicio: nuevaFidelidad.fechaInicioNivel ? String(nuevaFidelidad.fechaInicioNivel).substring(0, 10) : null,
-        vence: nuevaFidelidad.fechaVencimientoNivel ? String(nuevaFidelidad.fechaVencimientoNivel).substring(0, 10) : null
+        inicio: nuevaFidelidad.fechaInicioNivel,
+        vence: nuevaFidelidad.fechaVencimientoNivel
       };
 
       c.direccion = JSON.stringify(compactMeta);

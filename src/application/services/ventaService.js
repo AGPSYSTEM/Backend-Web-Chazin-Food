@@ -166,10 +166,10 @@ class VentaService {
     const FidelidadService = require('./fidelidadService');
     const fidelidadInfo = FidelidadService.evaluarEstadoFidelidad(clientMeta.fidelidad || {
       tipo: clientMeta.tipo || (clienteObj.idUsuario ? 'Nuevo' : 'Mostrador'),
-      comprasCiclo: clientMeta.comprasCiclo || 0,
+      comprasCiclo: clientMeta.ciclo !== undefined ? Number(clientMeta.ciclo) : (clientMeta.comprasCiclo || 0),
       comprasTotales: clientMeta.comprasTotales || 0,
-      fechaInicioNivel: clientMeta.fechaInicioNivel || null,
-      fechaVencimientoNivel: clientMeta.fechaVencimientoNivel || null
+      fechaInicioNivel: clientMeta.inicio || clientMeta.fechaInicioNivel || null,
+      fechaVencimientoNivel: clientMeta.vence || clientMeta.fechaVencimientoNivel || null
     });
 
     // Calculate clear discount percentage
