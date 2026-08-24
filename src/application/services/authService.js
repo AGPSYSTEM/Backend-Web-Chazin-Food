@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
 const { User, Role, Cliente, Permiso } = require('../../persistence/models');
-const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName } = require('../../infrastructure/utils/validationUtils');
+const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName, formatNombreCompleto } = require('../../infrastructure/utils/validationUtils');
 const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
@@ -25,15 +26,15 @@ class AuthService {
   }
 
   static async register(userData) {
-    const { idUsuario, documento, nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion } = userData;
-    const finalEmail = email || correo;
+    const { idUsuario, documento, numeroDocumento, nombre, apellidos, apellido, email, correo, contrasena, contraseña, idRol, rol_id, tipoDocumento, telefono, direccion } = userData;
+    const finalEmail = (email || correo || '').trim().toLowerCase();
     const finalPassword = contrasena || contraseña;
     const rawApellido = apellidos || apellido || '';
     const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(nombre, rawApellido);
     const cleanTel = sanitizeTelefono(telefono);
     const cleanTipoDoc = tipoDocumento || 'C.C.';
     let finalRolId = idRol || rol_id;
-    const finalDocumento = idUsuario || documento;
+    const finalDocumento = sanitizeDocumento(documento || numeroDocumento || idUsuario || '', cleanTipoDoc);
 
     if (!finalEmail || !finalPassword || !cleanNom) {
       const error = new Error('Por favor complete todos los campos requeridos');
@@ -41,6 +42,7 @@ class AuthService {
       throw error;
     }
 
+    // 1. Email Uniqueness
     const existingUser = await User.findOne({ where: { email: finalEmail } });
     if (existingUser) {
       const error = new Error('El usuario ya existe con este correo');
@@ -48,10 +50,28 @@ class AuthService {
       throw error;
     }
 
-    if (finalDocumento && !isNaN(parseInt(finalDocumento))) {
-      const existingDoc = await User.findOne({ where: { idUsuario: parseInt(finalDocumento) } });
+    // 2. Full Name Uniqueness
+    const newFullName = formatNombreCompleto(cleanNom, cleanApe).toLowerCase();
+    const allUsers = await User.findAll({ attributes: ['idUsuario', 'nombre', 'apellidos'] });
+    const duplicateName = allUsers.some(u => formatNombreCompleto(u.nombre, u.apellidos).toLowerCase() === newFullName);
+    if (duplicateName) {
+      const error = new Error(`Ya existe un usuario registrado con el nombre "${formatNombreCompleto(cleanNom, cleanApe)}"`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Document Number Uniqueness
+    if (finalDocumento) {
+      const existingDoc = await User.findOne({
+        where: {
+          [Op.or]: [
+            { numeroDocumento: finalDocumento },
+            ...(!isNaN(parseInt(finalDocumento)) ? [{ idUsuario: parseInt(finalDocumento) }] : [])
+          ]
+        }
+      });
       if (existingDoc) {
-        const error = new Error('Ya existe un usuario registrado con este número de documento');
+        const error = new Error(`Ya existe un usuario registrado con el número de documento "${finalDocumento}"`);
         error.statusCode = 400;
         throw error;
       }
@@ -69,6 +89,7 @@ class AuthService {
       nombre: cleanNom,
       apellidos: cleanApe,
       tipoDocumento: cleanTipoDoc,
+      numeroDocumento: finalDocumento || null,
       telefono: cleanTel,
       email: finalEmail,
       contrasena: hashedPassword,
@@ -190,6 +211,10 @@ class AuthService {
       nombre: user.nombre,
       apellidos: user.apellidos,
       apellido: user.apellidos,
+      tipoDocumento: user.tipoDocumento || 'C.C.',
+      numeroDocumento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
+      documento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
+      telefono: user.telefono,
       email: user.email,
       correo: user.email,
       rol: rolNombre,
@@ -232,6 +257,8 @@ class AuthService {
       }
     }
 
+    const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+
     return {
       _id: user.idUsuario,
       id: user.idUsuario,
@@ -240,7 +267,9 @@ class AuthService {
       nombre: user.nombre,
       apellidos: user.apellidos,
       apellido: user.apellidos,
-      tipoDocumento: user.tipoDocumento,
+      tipoDocumento: user.tipoDocumento || 'C.C.',
+      numeroDocumento: docVal,
+      documento: docVal,
       telefono: user.telefono,
       email: user.email,
       correo: user.email,
@@ -253,6 +282,52 @@ class AuthService {
       fidelidad: fidelidadObj
     };
   }
+
+  static async updateProfile(userId, profileData) {
+    const { passwordActual, passwordNueva, ...otherData } = profileData;
+
+    // If password change is requested
+    if (passwordNueva) {
+      if (!passwordActual) {
+        const error = new Error('Debes ingresar tu contraseña actual para cambiarla');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (passwordNueva.length < 6) {
+        const error = new Error('La nueva contraseña debe tener al menos 6 caracteres');
+        error.statusCode = 400;
+        throw error;
+      }
+      const user = await User.findByPk(userId);
+      if (!user) {
+        const error = new Error('Usuario no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+      const isMatch = await bcrypt.compare(passwordActual, user.contrasena);
+      if (!isMatch) {
+        const error = new Error('La contraseña actual es incorrecta');
+        error.statusCode = 400;
+        throw error;
+      }
+      const salt = await bcrypt.genSalt(10);
+      const hashed = await bcrypt.hash(passwordNueva, salt);
+      await user.update({ contrasena: hashed });
+    }
+
+    // If there's other profile data to update
+    if (Object.keys(otherData).length > 0) {
+      const UserService = require('./userService');
+      await UserService.updateUser(userId, otherData);
+    }
+
+    const profile = await this.getUserProfile(userId);
+    return {
+      ...profile,
+      token: this.generateToken(userId)
+    };
+  }
+
 
   static async forgotPassword(data) {
     const { email, correo } = data || {};

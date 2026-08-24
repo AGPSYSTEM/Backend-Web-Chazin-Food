@@ -223,11 +223,22 @@ async function ensureFichaTecnicaColombiaTimezone() {
 async function ensureEventoColumnsSchema() {
   try {
     const sequelize = connectDB.sequelize;
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM `evento` LIKE 'idProducto'");
-    if (cols.length === 0) {
-      await sequelize.query(
-        "ALTER TABLE `evento` ADD COLUMN `idProducto` INT NULL AFTER `idEvento`, ADD COLUMN `tipoEvento` VARCHAR(50) NULL AFTER `idProducto`, ADD COLUMN `descuento` DECIMAL(10,2) NULL AFTER `tipoEvento`, ADD COLUMN `nuevoPrecio` DECIMAL(10,2) NULL AFTER `descuento`, ADD COLUMN `accionInsumo` VARCHAR(20) NULL AFTER `nuevoPrecio`, ADD COLUMN `insumosAsociados` TEXT NULL AFTER `accionInsumo`"
-      );
+    const columnsToCheck = [
+      { name: 'idProducto', sql: 'ALTER TABLE `evento` ADD COLUMN `idProducto` INT NULL' },
+      { name: 'tipoEvento', sql: 'ALTER TABLE `evento` ADD COLUMN `tipoEvento` VARCHAR(50) NULL' },
+      { name: 'descuento', sql: 'ALTER TABLE `evento` ADD COLUMN `descuento` DECIMAL(10,2) NULL' },
+      { name: 'nuevoPrecio', sql: 'ALTER TABLE `evento` ADD COLUMN `nuevoPrecio` DECIMAL(10,2) NULL' },
+      { name: 'accionInsumo', sql: 'ALTER TABLE `evento` ADD COLUMN `accionInsumo` VARCHAR(20) NULL' },
+      { name: 'insumosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `insumosAsociados` TEXT NULL' },
+      { name: 'productosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `productosAsociados` TEXT NULL' }
+    ];
+
+    for (const col of columnsToCheck) {
+      const [existing] = await sequelize.query(`SHOW COLUMNS FROM \`evento\` LIKE '${col.name}'`);
+      if (!existing || existing.length === 0) {
+        await sequelize.query(col.sql);
+        console.log(`[DB Migration] Columna ${col.name} agregada a tabla evento`);
+      }
     }
   } catch (err) {
     console.warn("Error ensuring evento columns schema:", err.message);
@@ -349,6 +360,48 @@ async function ensureVentaAprobacionSchema() {
   }
 }
 
+/**
+ * Ensures table `usuario` contains `numeroDocumento` column and backfills existing users
+ */
+async function ensureUsuarioDocumentoSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `usuario` LIKE 'numeroDocumento'");
+    if (!cols || cols.length === 0) {
+      await sequelize.query("ALTER TABLE `usuario` ADD COLUMN `numeroDocumento` VARCHAR(50) NULL AFTER `tipoDocumento`");
+      console.log('[DB Migration] Columna numeroDocumento agregada a tabla usuario');
+    }
+    // Backfill any empty numeroDocumento with idUsuario if applicable
+    await sequelize.query("UPDATE `usuario` SET `numeroDocumento` = CAST(`idUsuario` AS CHAR) WHERE `numeroDocumento` IS NULL OR `numeroDocumento` = ''");
+    console.log('[DB Migration] Esquema numeroDocumento en usuario verificado.');
+  } catch (err) {
+    console.warn('[DB Migration] Error asegurando columna numeroDocumento en usuario:', err.message);
+  }
+}
+
+async function ensureResenaSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`resena\` (
+        \`idResena\` INT NOT NULL AUTO_INCREMENT,
+        \`idProducto\` INT NOT NULL,
+        \`idUsuario\` INT NOT NULL,
+        \`puntuacion\` TINYINT NOT NULL DEFAULT 5,
+        \`comentario\` TEXT,
+        \`fechaResena\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        \`estado\` TINYINT DEFAULT 1,
+        PRIMARY KEY (\`idResena\`),
+        KEY \`idx_resena_producto\` (\`idProducto\`),
+        KEY \`idx_resena_usuario\` (\`idUsuario\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log('[DB] Tabla resena verificada/creada correctamente.');
+  } catch (err) {
+    console.warn('[DB] Error asegurando tabla resena:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -359,5 +412,7 @@ module.exports = {
   ensureEventoColumnsSchema,
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
-  ensureVentaAprobacionSchema
+  ensureVentaAprobacionSchema,
+  ensureUsuarioDocumentoSchema,
+  ensureResenaSchema
 };

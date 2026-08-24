@@ -1,6 +1,7 @@
+const { Op } = require('sequelize');
 const { Cliente, User, Role, Venta, DetalleVentaProducto } = require('../../persistence/models');
 const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
-const { sanitizeTelefono, cleanNameAndLastName } = require('../../infrastructure/utils/validationUtils');
+const { sanitizeTelefono, cleanNameAndLastName, formatNombreCompleto, sanitizeDocumento } = require('../../infrastructure/utils/validationUtils');
 const bcrypt = require('bcryptjs');
 const EmailService = require('./emailService');
 const FidelidadService = require('./fidelidadService');
@@ -320,11 +321,67 @@ class ClienteService {
 
     if (c.usuario) {
       const nameChanged = data.nombre !== undefined || data.apellidos !== undefined;
-      if (data.nombre !== undefined || data.apellidos !== undefined) {
+      if (nameChanged) {
+        const newFullName = formatNombreCompleto(cleanNom, cleanApe).toLowerCase();
+        const currentFullName = formatNombreCompleto(c.usuario.nombre, c.usuario.apellidos).toLowerCase();
+        if (newFullName && newFullName !== currentFullName) {
+          const otherUsers = await User.findAll({
+            where: { idUsuario: { [Op.ne]: c.usuario.idUsuario } },
+            attributes: ['idUsuario', 'nombre', 'apellidos']
+          });
+          const duplicateName = otherUsers.some(u => formatNombreCompleto(u.nombre, u.apellidos).toLowerCase() === newFullName);
+          if (duplicateName) {
+            const error = new Error(`Ya existe un usuario registrado con el nombre "${formatNombreCompleto(cleanNom, cleanApe)}"`);
+            error.statusCode = 400;
+            throw error;
+          }
+        }
         c.usuario.nombre = cleanNom;
         c.usuario.apellidos = cleanApe;
       }
-      if (data.email !== undefined) c.usuario.email = data.email.trim();
+
+      if (data.email !== undefined) {
+        const finalEmail = data.email.trim().toLowerCase();
+        if (finalEmail && finalEmail !== (c.usuario.email || '').toLowerCase()) {
+          const existingEmail = await User.findOne({
+            where: {
+              email: finalEmail,
+              idUsuario: { [Op.ne]: c.usuario.idUsuario }
+            }
+          });
+          if (existingEmail) {
+            const error = new Error('Ya existe un usuario registrado con este correo electrónico');
+            error.statusCode = 400;
+            throw error;
+          }
+          c.usuario.email = finalEmail;
+        }
+      }
+
+      if (data.documento !== undefined || data.numeroDocumento !== undefined) {
+        const targetTipoDoc = data.tipoDocumento || c.usuario.tipoDocumento || 'C.C.';
+        const cleanDoc = sanitizeDocumento(data.documento || data.numeroDocumento, targetTipoDoc);
+        const currentDoc = String(c.usuario.numeroDocumento || c.usuario.idUsuario || '');
+        if (cleanDoc && cleanDoc !== currentDoc) {
+          const existingDoc = await User.findOne({
+            where: {
+              idUsuario: { [Op.ne]: c.usuario.idUsuario },
+              [Op.or]: [
+                { numeroDocumento: cleanDoc },
+                ...(!isNaN(parseInt(cleanDoc)) ? [{ idUsuario: parseInt(cleanDoc) }] : [])
+              ]
+            }
+          });
+          if (existingDoc) {
+            const error = new Error(`Ya existe un usuario registrado con el número de documento "${cleanDoc}"`);
+            error.statusCode = 400;
+            throw error;
+          }
+          c.usuario.numeroDocumento = cleanDoc;
+          if (data.tipoDocumento) c.usuario.tipoDocumento = data.tipoDocumento;
+        }
+      }
+
       if (data.telefono !== undefined) c.usuario.telefono = cleanTel;
       if (data.estado !== undefined) {
         c.usuario.estado = data.estado === 'Inactivo' || data.estado === 0 ? 'INACTIVO' : 'ACTIVO';

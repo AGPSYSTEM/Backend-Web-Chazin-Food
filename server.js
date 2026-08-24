@@ -20,23 +20,45 @@ const {
   ensureEventoColumnsSchema,
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
-  ensureVentaAprobacionSchema
+  ensureVentaAprobacionSchema,
+  ensureUsuarioDocumentoSchema,
+  ensureResenaSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
-// Connect to Database via Sequelize
-connectDB();
-sequelize.sync({ alter: true }).then(async () => {
-  await ensureFichaTecnicaTrashSchema();
-  await ensureFichaTecnicaInsumoVariantZero();
-  await ensureEventoColumnsSchema();
-  await ensureCategoriaProductoIconSchema();
-  await ensureVentaAprobacionSchema();
-  await syncVentasTotals();
-  console.log('Modelos de Sequelize sincronizados correctamente.');
-  await resequenceAllCoreTables();
-}).catch((err) => {
-  console.error('Sincronización opcional de Sequelize diferida:', err.message);
-});
+// Connect to Database and run schema verifications
+(async () => {
+  try {
+    await connectDB();
+    await ensureUsuarioDocumentoSchema();
+    await ensureFichaTecnicaTrashSchema();
+    await ensureFichaTecnicaInsumoVariantZero();
+    await ensureEventoColumnsSchema();
+    await ensureCategoriaProductoIconSchema();
+    await ensureVentaAprobacionSchema();
+    await syncVentasTotals();
+    await resequenceAllCoreTables();
+    await ensureResenaSchema();
+    try {
+      const [results] = await sequelize.query(
+        "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta' AND COLUMN_NAME = 'tipoVenta'"
+      );
+      const columnExists = results[0].cnt > 0;
+      if (!columnExists) {
+        await sequelize.query(
+          "ALTER TABLE venta ADD COLUMN tipoVenta VARCHAR(50) NOT NULL DEFAULT 'PUNTO_DE_VENTA'"
+        );
+        console.log('✅ Added venta.tipoVenta column');
+      } else {
+        console.log('✅ venta.tipoVenta column already exists');
+      }
+    } catch (err) {
+      console.warn('⚠️ could not ensure venta.tipoVenta column:', err.message);
+    }
+    console.log('Esquema y modelos de base de datos verificados correctamente.');
+  } catch (err) {
+    console.error('Error al verificar esquemas de base de datos:', err.message);
+  }
+})();
 
 const app = express();
 
@@ -110,6 +132,7 @@ app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes')
 app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
 app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
 app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
+app.use('/api/resenas', require('./src/presentation/routes/resenaRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {

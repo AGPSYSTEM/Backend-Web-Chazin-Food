@@ -66,6 +66,9 @@ const User = sequelize.define('usuario', {
   tipoDocumento: {
     type: DataTypes.STRING
   },
+  numeroDocumento: {
+    type: DataTypes.STRING
+  },
   telefono: {
     type: DataTypes.STRING
   },
@@ -1012,6 +1015,39 @@ const Pedido = sequelize.define('pedido', {
   }
 }, { tableName: 'pedido', timestamps: false });
 
+const Resena = sequelize.define('resena', {
+  idResena: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idResena'
+  },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idUsuario: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  puntuacion: {
+    type: DataTypes.TINYINT,
+    allowNull: false,
+    defaultValue: 5
+  },
+  comentario: {
+    type: DataTypes.TEXT
+  },
+  fechaResena: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  }
+}, { tableName: 'resena', timestamps: false });
+
 // Additional Relationships
 Adicion.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
 Insumo.hasMany(Adicion, { foreignKey: 'idInsumo' });
@@ -1043,6 +1079,12 @@ DetalleVentaProducto.belongsTo(Variante, { foreignKey: 'idVariante', as: 'varian
 
 Pedido.belongsTo(Cliente, { foreignKey: 'clienteId', as: 'cliente' });
 
+// Resena associations
+Resena.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
+Product.hasMany(Resena, { foreignKey: 'idProducto', as: 'resenas' });
+Resena.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
+User.hasMany(Resena, { foreignKey: 'idUsuario', as: 'resenas' });
+
 module.exports = {
   sequelize,
   Role,
@@ -1073,5 +1115,6 @@ module.exports = {
   Pago,
   Devolucion,
   DetalleVentaAdicion,
-  Pedido
+  Pedido,
+  Resena
 };
