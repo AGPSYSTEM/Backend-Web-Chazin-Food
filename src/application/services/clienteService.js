@@ -113,11 +113,14 @@ class ClienteService {
       }
     }
 
-    // Determine state: if no user account linked, client state is Inactivo/Pendiente
+    // Determine state: if no user account linked or user account is not active, client state is Inactivo
+    const isUserActive = Boolean(
+      c.usuario &&
+      (String(c.usuario.estado).toUpperCase() === 'ACTIVO' || c.usuario.estado === 1 || c.usuario.estado === true)
+    );
+
     let estadoStr = 'Activo';
-    if (!c.idUsuario || c.estado === 0 || meta.estado === 'Inactivo' || meta.estado === 0) {
-      estadoStr = 'Inactivo';
-    } else if (c.usuario && (c.usuario.estado === 'INACTIVO' || c.usuario.estado === '0' || c.usuario.estado === 0)) {
+    if (!c.idUsuario || !c.usuario || !isUserActive || c.estado === 0 || c.estado === false || meta.estado === 'Inactivo' || meta.estado === 0) {
       estadoStr = 'Inactivo';
     }
     const rawNombre = c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente sin cuenta');
@@ -130,6 +133,7 @@ class ClienteService {
       idCliente: c.idCliente,
       idUsuario: c.idUsuario || null,
       tieneCuenta: !!c.idUsuario && !!c.usuario,
+      cuentaActiva: Boolean(c.idUsuario && c.usuario && isUserActive),
       direccion: cleanDireccion,
       tipo,
       descuentoPorcentaje,
