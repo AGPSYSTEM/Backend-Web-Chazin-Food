@@ -732,6 +732,46 @@ class VentaService {
             observaciones: d.observaciones || d.observacion || d.nombre || null
           });
 
+          // Descuento Automático de Insumos según Ficha Técnica del Producto
+          try {
+            const { FichaTecnica, DetalleFichaInsumo, Insumo, Variante } = require('../../persistence/models');
+            let targetProductId = d.idProducto;
+            if (!targetProductId && chosenVarianteId) {
+              const varRow = await Variante.findByPk(chosenVarianteId);
+              if (varRow && varRow.idProducto) targetProductId = varRow.idProducto;
+            }
+            if (!targetProductId && d.idVariante) {
+              const varRow = await Variante.findByPk(d.idVariante);
+              if (varRow && varRow.idProducto) targetProductId = varRow.idProducto;
+            }
+
+            if (targetProductId) {
+              const ficha = await FichaTecnica.findOne({
+                where: { idProducto: targetProductId, estado: 1 },
+                include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+              });
+
+              if (ficha && Array.isArray(ficha.detalles)) {
+                const itemQty = Number(d.cantidad || 1);
+                for (const det of ficha.detalles) {
+                  const cantPorPlato = Number(det.cantidad || 0);
+                  const totalADescontar = cantPorPlato * itemQty;
+                  if (totalADescontar > 0 && det.idInsumo) {
+                    const insumo = await Insumo.findByPk(det.idInsumo);
+                    if (insumo) {
+                      const stockActual = Number(insumo.stock || 0);
+                      const nuevoStock = Math.max(0, stockActual - totalADescontar);
+                      insumo.stock = nuevoStock;
+                      await insumo.save();
+                    }
+                  }
+                }
+              }
+            }
+          } catch (mrpErr) {
+            console.warn('Error descontando insumos de receta:', mrpErr.message);
+          }
+
           // Guardar adiciones si fueron enviadas
           const adicList = d.idAdiciones || d.adiciones || [];
           if (Array.isArray(adicList) && adicList.length > 0) {
@@ -781,6 +821,7 @@ class VentaService {
     else if (estado === 'Completada' || estado === 'Entregado') estadoEnum = 'ENTREGADO';
     else if (estado === 'Anulada' || estado === 'CANCELADO') estadoEnum = 'CANCELADO';
 
+    const estadoAnterior = v.estadoEntrega;
     v.estadoEntrega = estadoEnum;
     if (estadoEnum === 'CANCELADO') {
       v.estadoAprobacion = 'RECHAZADO';
@@ -788,6 +829,45 @@ class VentaService {
       v.estadoAprobacion = 'APROBADO';
     }
     await v.save();
+
+    // Reintegrar insumos si la venta fue anulada/cancelada y no estaba ya cancelada
+    if (estadoEnum === 'CANCELADO' && estadoAnterior !== 'CANCELADO') {
+      try {
+        const saleData = await this.getById(id);
+        if (saleData && Array.isArray(saleData.detalles)) {
+          const { FichaTecnica, DetalleFichaInsumo, Insumo, Variante } = require('../../persistence/models');
+          for (const d of saleData.detalles) {
+            let prodId = d.idProducto;
+            if (!prodId && d.idVariante) {
+              const varRow = await Variante.findByPk(d.idVariante);
+              if (varRow) prodId = varRow.idProducto;
+            }
+            if (prodId) {
+              const ficha = await FichaTecnica.findOne({
+                where: { idProducto: prodId, estado: 1 },
+                include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+              });
+              if (ficha && Array.isArray(ficha.detalles)) {
+                const itemQty = Number(d.cantidad || 1);
+                for (const det of ficha.detalles) {
+                  const cantPorPlato = Number(det.cantidad || 0);
+                  const totalARestaurar = cantPorPlato * itemQty;
+                  if (totalARestaurar > 0 && det.idInsumo) {
+                    const insumo = await Insumo.findByPk(det.idInsumo);
+                    if (insumo) {
+                      insumo.stock = Number(insumo.stock || 0) + totalARestaurar;
+                      await insumo.save();
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (restockErr) {
+        console.warn('Error reintegrando insumos por cancelación:', restockErr.message);
+      }
+    }
 
     if ((estadoEnum === 'ENTREGADO' || estadoEnum === 'APROBADO') && v.idCliente) {
       const ClienteService = require('./clienteService');

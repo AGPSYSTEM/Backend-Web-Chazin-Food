@@ -1,4 +1,48 @@
-const { Product, CategoriaProducto, Evento, Variante } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante, FichaTecnica, DetalleFichaInsumo, Insumo } = require('../../persistence/models');
+
+function calculateProductStock(ficha) {
+  if (!ficha || !Array.isArray(ficha.detalles) || ficha.detalles.length === 0) {
+    return {
+      stock: 50,
+      stockDisponible: 50,
+      hasFicha: false,
+      insumosCriticos: []
+    };
+  }
+
+  let minPortions = Infinity;
+  const insumosCriticos = [];
+
+  for (const d of ficha.detalles) {
+    const cantRequerida = Number(d.cantidad || 0);
+    const insumoStock = Number(d.insumo?.stock || 0);
+
+    if (cantRequerida > 0) {
+      const portionsFromThisInsumo = Math.floor(insumoStock / cantRequerida);
+      if (portionsFromThisInsumo < minPortions) {
+        minPortions = portionsFromThisInsumo;
+      }
+      if (portionsFromThisInsumo <= 5) {
+        insumosCriticos.push({
+          idInsumo: d.idInsumo,
+          nombre: d.insumo?.nombre || `Insumo #${d.idInsumo}`,
+          stockActual: insumoStock,
+          unidadMedida: d.insumo?.unidadMedida || d.unidadMedida || 'und',
+          cantidadRequerida: cantRequerida,
+          porcionesPosibles: portionsFromThisInsumo
+        });
+      }
+    }
+  }
+
+  const finalStock = minPortions === Infinity ? 50 : Math.max(0, minPortions);
+  return {
+    stock: finalStock,
+    stockDisponible: finalStock,
+    hasFicha: true,
+    insumosCriticos
+  };
+}
 
 class ProductService {
   static async getProducts() {
@@ -7,7 +51,20 @@ class ProductService {
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
+        {
+          model: FichaTecnica,
+          as: 'fichaTecnica',
+          required: false,
+          where: { estado: 1 },
+          include: [
+            {
+              model: DetalleFichaInsumo,
+              as: 'detalles',
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'estado'] }]
+            }
+          ]
+        }
       ]
     });
 
@@ -30,6 +87,8 @@ class ProductService {
           ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
           : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
 
+        const stockInfo = calculateProductStock(p.fichaTecnica);
+
         return {
           _id: p.idProducto,
           id: p.idProducto,
@@ -42,6 +101,10 @@ class ProductService {
           categoriaId: p.idCategoriaProducto,
           categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
           estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+          stock: stockInfo.stock,
+          stockDisponible: stockInfo.stockDisponible,
+          hasFicha: stockInfo.hasFicha,
+          insumosCriticos: stockInfo.insumosCriticos,
           variantes,
           adiciones,
           eventos: p.eventos || []
@@ -55,7 +118,20 @@ class ProductService {
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
+        {
+          model: FichaTecnica,
+          as: 'fichaTecnica',
+          required: false,
+          where: { estado: 1 },
+          include: [
+            {
+              model: DetalleFichaInsumo,
+              as: 'detalles',
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'estado'] }]
+            }
+          ]
+        }
       ]
     });
     if (!p) {
@@ -80,6 +156,8 @@ class ProductService {
       ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
       : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
 
+    const stockInfo = calculateProductStock(p.fichaTecnica);
+
     return {
       _id: p.idProducto,
       id: p.idProducto,
@@ -92,6 +170,10 @@ class ProductService {
       categoriaId: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+      stock: stockInfo.stock,
+      stockDisponible: stockInfo.stockDisponible,
+      hasFicha: stockInfo.hasFicha,
+      insumosCriticos: stockInfo.insumosCriticos,
       variantes,
       adiciones,
       eventos: p.eventos || []
