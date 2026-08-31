@@ -1,5 +1,38 @@
 const { Product, CategoriaProducto, Evento, Variante, FichaTecnica, DetalleFichaInsumo, Insumo } = require('../../persistence/models');
 
+function convertUnits(amount, fromUnit, toUnit) {
+  if (!amount || isNaN(amount)) return 0;
+  if (!fromUnit || !toUnit) return Number(amount);
+
+  const from = String(fromUnit).toLowerCase().trim();
+  const to = String(toUnit).toLowerCase().trim();
+
+  if (from === to) return Number(amount);
+
+  // Normalizar masa / peso
+  const isKg = (u) => u.includes('kg') || u.includes('kilo');
+  const isGr = (u) => u.includes('gr') || u.includes('gram');
+  const isMg = (u) => u.includes('mg') || u.includes('miligram');
+
+  // Normalizar volumen / liquidos
+  const isLt = (u) => u.includes('lt') || u.includes('litro');
+  const isMl = (u) => u.includes('ml') || u.includes('mililitro') || u.includes('cc');
+
+  // Conversiones peso
+  if (isKg(from) && isGr(to)) return Number(amount) * 1000;
+  if (isGr(from) && isKg(to)) return Number(amount) / 1000;
+  if (isKg(from) && isMg(to)) return Number(amount) * 1000000;
+  if (isMg(from) && isKg(to)) return Number(amount) / 1000000;
+  if (isGr(from) && isMg(to)) return Number(amount) * 1000;
+  if (isMg(from) && isGr(to)) return Number(amount) / 1000;
+
+  // Conversiones volumen
+  if (isLt(from) && isMl(to)) return Number(amount) * 1000;
+  if (isMl(from) && isLt(to)) return Number(amount) / 1000;
+
+  return Number(amount);
+}
+
 function calculateProductStock(ficha) {
   if (!ficha || !Array.isArray(ficha.detalles) || ficha.detalles.length === 0) {
     return {
@@ -14,11 +47,17 @@ function calculateProductStock(ficha) {
   const insumosCriticos = [];
 
   for (const d of ficha.detalles) {
-    const cantRequerida = Number(d.cantidad || 0);
+    const rawCantRequerida = Number(d.cantidad || 0);
+    const recipeUnit = d.unidadMedida || d.insumo?.unidadMedida || 'und';
+    const insumoUnit = d.insumo?.unidadMedida || recipeUnit;
     const insumoStock = Number(d.insumo?.stock || 0);
 
-    if (cantRequerida > 0) {
-      const portionsFromThisInsumo = Math.floor(insumoStock / cantRequerida);
+    // Convertir la cantidad requerida de la receta a la unidad de medida del inventario
+    const cantRequeridaEnInsumoUnit = convertUnits(rawCantRequerida, recipeUnit, insumoUnit);
+
+    if (cantRequeridaEnInsumoUnit > 0) {
+      const portionsFloat = Number((insumoStock / cantRequeridaEnInsumoUnit).toFixed(6));
+      const portionsFromThisInsumo = Math.floor(portionsFloat);
       if (portionsFromThisInsumo < minPortions) {
         minPortions = portionsFromThisInsumo;
       }
@@ -27,8 +66,9 @@ function calculateProductStock(ficha) {
           idInsumo: d.idInsumo,
           nombre: d.insumo?.nombre || `Insumo #${d.idInsumo}`,
           stockActual: insumoStock,
-          unidadMedida: d.insumo?.unidadMedida || d.unidadMedida || 'und',
-          cantidadRequerida: cantRequerida,
+          unidadMedida: insumoUnit,
+          cantidadRequerida: rawCantRequerida,
+          unidadReceta: recipeUnit,
           porcionesPosibles: portionsFromThisInsumo
         });
       }

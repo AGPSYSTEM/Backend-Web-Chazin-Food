@@ -1,5 +1,33 @@
 const { Venta, DetalleVentaProducto, Cliente, User, Role } = require('../../persistence/models');
 
+function convertUnits(amount, fromUnit, toUnit) {
+  if (!amount || isNaN(amount)) return 0;
+  if (!fromUnit || !toUnit) return Number(amount);
+
+  const from = String(fromUnit).toLowerCase().trim();
+  const to = String(toUnit).toLowerCase().trim();
+
+  if (from === to) return Number(amount);
+
+  const isKg = (u) => u.includes('kg') || u.includes('kilo');
+  const isGr = (u) => u.includes('gr') || u.includes('gram');
+  const isMg = (u) => u.includes('mg') || u.includes('miligram');
+  const isLt = (u) => u.includes('lt') || u.includes('litro');
+  const isMl = (u) => u.includes('ml') || u.includes('mililitro') || u.includes('cc');
+
+  if (isKg(from) && isGr(to)) return Number(amount) * 1000;
+  if (isGr(from) && isKg(to)) return Number(amount) / 1000;
+  if (isKg(from) && isMg(to)) return Number(amount) * 1000000;
+  if (isMg(from) && isKg(to)) return Number(amount) / 1000000;
+  if (isGr(from) && isMg(to)) return Number(amount) * 1000;
+  if (isMg(from) && isGr(to)) return Number(amount) / 1000;
+
+  if (isLt(from) && isMl(to)) return Number(amount) * 1000;
+  if (isMl(from) && isLt(to)) return Number(amount) / 1000;
+
+  return Number(amount);
+}
+
 class VentaService {
   static formatVenta(v) {
     let obsData = {};
@@ -755,10 +783,13 @@ class VentaService {
                 const itemQty = Number(d.cantidad || 1);
                 for (const det of ficha.detalles) {
                   const cantPorPlato = Number(det.cantidad || 0);
-                  const totalADescontar = cantPorPlato * itemQty;
-                  if (totalADescontar > 0 && det.idInsumo) {
+                  const recipeUnit = det.unidadMedida || 'und';
+                  if (cantPorPlato > 0 && det.idInsumo) {
                     const insumo = await Insumo.findByPk(det.idInsumo);
                     if (insumo) {
+                      const insumoUnit = insumo.unidadMedida || recipeUnit;
+                      const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                      const totalADescontar = cantConvertida * itemQty;
                       const stockActual = Number(insumo.stock || 0);
                       const nuevoStock = Math.max(0, stockActual - totalADescontar);
                       insumo.stock = nuevoStock;
@@ -851,10 +882,13 @@ class VentaService {
                 const itemQty = Number(d.cantidad || 1);
                 for (const det of ficha.detalles) {
                   const cantPorPlato = Number(det.cantidad || 0);
-                  const totalARestaurar = cantPorPlato * itemQty;
-                  if (totalARestaurar > 0 && det.idInsumo) {
+                  const recipeUnit = det.unidadMedida || 'und';
+                  if (cantPorPlato > 0 && det.idInsumo) {
                     const insumo = await Insumo.findByPk(det.idInsumo);
                     if (insumo) {
+                      const insumoUnit = insumo.unidadMedida || recipeUnit;
+                      const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                      const totalARestaurar = cantConvertida * itemQty;
                       insumo.stock = Number(insumo.stock || 0) + totalARestaurar;
                       await insumo.save();
                     }
