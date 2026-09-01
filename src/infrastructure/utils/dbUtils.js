@@ -402,6 +402,17 @@ async function ensureResenaSchema() {
   }
 }
 
+async function ensureNoNegativeStock() {
+  const sequelize = connectDB.sequelize;
+  try {
+    await sequelize.query('UPDATE `insumo` SET `stock` = 0 WHERE `stock` < 0');
+    await sequelize.query('UPDATE `insumo` SET `stockMinimo` = 0 WHERE `stockMinimo` < 0');
+    console.log('[DB] Stock negativo verificado y saneado a 0.');
+  } catch (err) {
+    console.warn('[DB] Error saneando stock negativo:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -414,5 +425,6 @@ module.exports = {
   ensureCategoriaProductoIconSchema,
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
-  ensureResenaSchema
+  ensureResenaSchema,
+  ensureNoNegativeStock
 };
