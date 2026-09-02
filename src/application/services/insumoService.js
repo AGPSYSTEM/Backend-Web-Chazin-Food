@@ -28,7 +28,7 @@ function formatInsumo(i) {
 class InsumoService {
   static async getAll() {
     const insumos = await Insumo.findAll({
-      where: { estado: 1 },
+      where: { eliminado: 0 },
       include: [
         { model: CategoriaInsumo, as: 'categoria' },
         { model: Proveedor, as: 'proveedor' }
@@ -40,7 +40,7 @@ class InsumoService {
 
   static async getDeleted() {
     const insumos = await Insumo.findAll({
-      where: { estado: 0 },
+      where: { eliminado: 1 },
       include: [
         { model: CategoriaInsumo, as: 'categoria' },
         { model: Proveedor, as: 'proveedor' }
@@ -91,7 +91,7 @@ class InsumoService {
       if (prov) idProveedor = prov.idProveedor;
     }
 
-    const existing = await Insumo.findOne({ where: { nombre: nombre.trim(), estado: 1 } });
+    const existing = await Insumo.findOne({ where: { nombre: nombre.trim(), eliminado: 0 } });
     if (existing) {
       const error = new Error('Ya existe un insumo activo registrado con ese nombre');
       error.statusCode = 400;
@@ -222,7 +222,7 @@ class InsumoService {
         throw error;
       }
 
-      insumo.estado = 0;
+      insumo.eliminado = 1;
       await insumo.save({ transaction });
 
       const FichaTecnicaService = require('./fichaTecnicaService');
@@ -234,7 +234,7 @@ class InsumoService {
         entidadNombre: insumo.nombre,
         detalle: `Se movió a la papelera el insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
-        motivo: 'Inactivación / Envío a papelera',
+        motivo: 'Envío a papelera',
         skipStockUpdate: true
       }, { transaction });
 
@@ -257,7 +257,7 @@ class InsumoService {
         throw error;
       }
 
-      insumo.estado = 1;
+      insumo.eliminado = 0;
       await insumo.save({ transaction });
 
       const FichaTecnicaService = require('./fichaTecnicaService');

@@ -1,19 +1,27 @@
 const { Sequelize } = require('sequelize');
-const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante } = require('../../persistence/models');
+const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante, InsumoPreparado } = require('../../persistence/models');
 const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 
 class FichaTecnicaService {
   static formatFicha(f) {
     if (!f) return null;
 
+    let tipoStr = f.tipo;
+    if (!tipoStr) {
+      if (f.idProducto && f.idProducto !== 'No Aplica' && f.idProducto !== '0') tipoStr = 'PRODUCTO';
+      else if (f.insumoPreparado || (f.idInsumo && f.idInsumo !== 'No Aplica' && f.idInsumo !== '0')) tipoStr = 'INSUMO_PREPARADO';
+      else tipoStr = 'PRODUCTO';
+    }
+
     return {
       id: f.idFichaTecnica,
       idFichaTecnica: f.idFichaTecnica,
       idProducto: f.idProducto,
       idInsumo: f.idInsumo,
+      idInsumoPreparado: f.idInsumo,
       idVariante: f.idVariante,
       varianteNombre: f.variante?.nombre || 'No aplica',
-      tipo: f.tipo || (f.idInsumo ? 'INSUMO' : 'PRODUCTO'),
+      tipo: tipoStr,
       procedimiento: f.procedimiento || f.descripcion || '',
       tiempoPreparacion: f.tiempoPreparacion || 0,
       rendimiento: f.rendimiento || '',
@@ -26,6 +34,7 @@ class FichaTecnicaService {
       fechaCreacion: f.fechaCreacion,
       producto: f.producto || null,
       insumoInfo: f.insumoInfo || null,
+      insumoPreparado: f.insumoPreparado || null,
       variante: f.variante || null,
       detalles: (f.detalles || []).map((d) => ({
         idDetalleFicha: d.idDetalleFicha,
@@ -48,15 +57,17 @@ class FichaTecnicaService {
         },
         { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] },
         { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] },
+        { model: InsumoPreparado, as: 'insumoPreparado', attributes: ['id', 'nombre', 'estado', 'unidadMedida', 'descripcion'] },
         { model: Variante, as: 'variante', attributes: ['idVariante', 'nombre', 'precio'] }
       ],
       order: [['idFichaTecnica', 'ASC']]
     });
 
     const filtered = fichas.filter((f) => {
-      const insumoActivo = !f.insumoInfo || f.insumoInfo.estado === null || f.insumoInfo.estado === undefined || f.insumoInfo.estado === 1;
+      const insumoActivo = !f.insumoInfo || f.insumoInfo.eliminado !== 1;
+      const insumoPrepActivo = !f.insumoPreparado || f.insumoPreparado.eliminado !== 1;
       const productoActivo = !f.producto || f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1;
-      return insumoActivo && productoActivo;
+      return insumoActivo && insumoPrepActivo && productoActivo;
     });
 
     return filtered.map((f) => this.formatFicha(f));
@@ -73,6 +84,7 @@ class FichaTecnicaService {
         },
         { model: Product, as: 'producto' },
         { model: Insumo, as: 'insumoInfo' },
+        { model: InsumoPreparado, as: 'insumoPreparado' },
         { model: Variante, as: 'variante' }
       ]
     });
@@ -102,9 +114,9 @@ class FichaTecnicaService {
     return f ? this.formatFicha(f) : null;
   }
 
-  static async getByInsumoId(idInsumo) {
+  static async getByInsumoPreparadoId(idPreparado) {
     const f = await FichaTecnica.findOne({
-      where: { idInsumo, estado: 1 },
+      where: { idInsumo: String(idPreparado), estado: 1 },
       include: [
         {
           model: DetalleFichaInsumo,
@@ -112,15 +124,21 @@ class FichaTecnicaService {
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
         },
         { model: Variante, as: 'variante' },
-        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] }
+        { model: InsumoPreparado, as: 'insumoPreparado', attributes: ['id', 'nombre', 'estado', 'eliminado', 'unidadMedida', 'descripcion'] },
+        { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado', 'eliminado'] }
       ]
     });
 
-    if (f && f.insumoInfo && f.insumoInfo.estado !== null && f.insumoInfo.estado !== undefined && f.insumoInfo.estado !== 1) {
+    if (f && f.insumoPreparado && f.insumoPreparado.eliminado === 1) {
       return null;
     }
 
     return f ? this.formatFicha(f) : null;
+  }
+
+  static async getByInsumoId(idInsumo) {
+    // Check both InsumoPreparado and Insumo for full compatibility
+    return this.getByInsumoPreparadoId(idInsumo);
   }
 
   static async resolveVarianteId(idProducto, idInsumo, inputVarianteId) {
@@ -139,13 +157,13 @@ class FichaTecnicaService {
   }
 
   static async saveForProducto(idProducto, data) {
-    let f = await FichaTecnica.findOne({ where: { idProducto } });
+    let f = await FichaTecnica.findOne({ where: { idProducto: String(idProducto) } });
     const resolvedVarianteId = await this.resolveVarianteId(idProducto, null, data.idVariante);
 
     if (!f) {
       f = await FichaTecnica.create({
-        idProducto,
-        idInsumo: null,
+        idProducto: String(idProducto),
+        idInsumo: 'No Aplica',
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
         descripcion: data.descripcion || data.caracteristicas || '',
@@ -162,8 +180,8 @@ class FichaTecnicaService {
       });
     } else {
       const updatePayload = {
-        idProducto,
-        idInsumo: null,
+        idProducto: String(idProducto),
+        idInsumo: 'No Aplica',
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
@@ -203,16 +221,16 @@ class FichaTecnicaService {
     return this.getById(f.idFichaTecnica);
   }
 
-  static async saveForInsumo(idInsumo, data, options = {}) {
-    let f = await FichaTecnica.findOne({ where: { idInsumo }, transaction: options.transaction });
-    const resolvedVarianteId = await this.resolveVarianteId(null, idInsumo, data.idVariante);
+  static async saveForInsumoPreparado(idPreparado, data, options = {}) {
+    let f = await FichaTecnica.findOne({ where: { idInsumo: String(idPreparado) }, transaction: options.transaction });
+    const resolvedVarianteId = await this.resolveVarianteId(null, idPreparado, data.idVariante);
 
     if (!f) {
       f = await FichaTecnica.create({
-        idProducto: null,
-        idInsumo,
+        idProducto: 'No Aplica',
+        idInsumo: String(idPreparado),
         idVariante: resolvedVarianteId !== null && resolvedVarianteId !== undefined ? resolvedVarianteId : null,
-        tipo: 'INSUMO',
+        tipo: 'INSUMO_PREPARADO',
         descripcion: data.descripcion || data.caracteristicas || '',
         procedimiento: data.procedimiento || '',
         tiempoPreparacion: Number(data.tiempoPreparacion) || 0,
@@ -227,9 +245,10 @@ class FichaTecnicaService {
       }, { transaction: options.transaction });
     } else {
       const updatePayload = {
-        idProducto: null,
-        idInsumo,
+        idProducto: 'No Aplica',
+        idInsumo: String(idPreparado),
         idVariante: resolvedVarianteId !== null && resolvedVarianteId !== undefined ? resolvedVarianteId : f.idVariante,
+        tipo: 'INSUMO_PREPARADO',
         descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
         tiempoPreparacion: data.tiempoPreparacion !== undefined ? Number(data.tiempoPreparacion) : f.tiempoPreparacion,
@@ -248,7 +267,7 @@ class FichaTecnicaService {
       await f.update(updatePayload, { transaction: options.transaction });
     }
 
-    const inputDetalles = data.detalles || data.insumos || [];
+    const inputDetalles = data.detalles || data.insumos || data.ingredientes || [];
     await DetalleFichaInsumo.destroy({
       where: { idFichaTecnica: f.idFichaTecnica },
       transaction: options.transaction
@@ -264,7 +283,28 @@ class FichaTecnicaService {
       await DetalleFichaInsumo.bulkCreate(payload, { transaction: options.transaction });
     }
 
+    try {
+      const prep = await InsumoPreparado.findByPk(idPreparado, { transaction: options.transaction });
+      if (prep) {
+        const prepUpdates = {};
+        if (data.descripcion) prepUpdates.descripcion = data.descripcion;
+        if (data.rendimiento) {
+          const numRend = parseFloat(data.rendimiento);
+          if (!isNaN(numRend) && numRend > 0) prepUpdates.rendimiento = numRend;
+        }
+        if (Object.keys(prepUpdates).length > 0) {
+          await prep.update(prepUpdates, { transaction: options.transaction });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not sync InsumoPreparado fields:', e.message);
+    }
+
     return options.skipReload ? f : this.getById(f.idFichaTecnica);
+  }
+
+  static async saveForInsumo(idInsumo, data, options = {}) {
+    return this.saveForInsumoPreparado(idInsumo, data, options);
   }
 
   static async create(data) {
@@ -272,8 +312,8 @@ class FichaTecnicaService {
       return this.saveForProducto(data.idProducto, data);
     }
 
-    if (data.idInsumo) {
-      return this.saveForInsumo(data.idInsumo, data);
+    if (data.idInsumoPreparado || data.idPreparado || data.idInsumo) {
+      return this.saveForInsumoPreparado(data.idInsumoPreparado || data.idPreparado || data.idInsumo, data);
     }
 
     const resolvedVarianteId = await this.resolveVarianteId(null, null, data.idVariante);

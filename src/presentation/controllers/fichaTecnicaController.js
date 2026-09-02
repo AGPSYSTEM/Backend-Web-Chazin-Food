@@ -54,6 +54,26 @@ const saveFichaByInsumo = async (req, res, next) => {
   }
 };
 
+const getFichaByInsumoPreparado = async (req, res, next) => {
+  try {
+    const id = req.params.idInsumoPreparado || req.params.idPreparado || req.params.id;
+    const ficha = await FichaTecnicaService.getByInsumoPreparadoId(id);
+    res.json(ficha || {});
+  } catch (error) {
+    next(error);
+  }
+};
+
+const saveFichaByInsumoPreparado = async (req, res, next) => {
+  try {
+    const id = req.params.idInsumoPreparado || req.params.idPreparado || req.params.id;
+    const ficha = await FichaTecnicaService.saveForInsumoPreparado(id, req.body);
+    res.json(ficha);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createFicha = async (req, res, next) => {
   try {
     const ficha = await FichaTecnicaService.create(req.body);
@@ -86,8 +106,10 @@ module.exports = {
   getFichaById,
   getFichaByProducto,
   getFichaByInsumo,
+  getFichaByInsumoPreparado,
   saveFichaByProducto,
   saveFichaByInsumo,
+  saveFichaByInsumoPreparado,
   createFicha,
   updateFicha,
   deleteFicha
