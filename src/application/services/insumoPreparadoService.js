@@ -1,14 +1,27 @@
-const { InsumoPreparado, DetalleInsumoPreparadoInsumo, Insumo } = require('../../persistence/models');
+const { InsumoPreparado, DetalleInsumoPreparadoInsumo, Insumo, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
 
 class InsumoPreparadoService {
   static async getAll() {
     const preparados = await InsumoPreparado.findAll({
-      where: { estado: 1 },
+      where: { eliminado: 0 },
       include: [
         {
           model: DetalleInsumoPreparadoInsumo,
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo' }]
+        },
+        {
+          model: FichaTecnica,
+          as: 'fichaTecnica',
+          required: false,
+          where: { estado: 1 },
+          include: [
+            {
+              model: DetalleFichaInsumo,
+              as: 'detalles',
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+            }
+          ]
         }
       ]
     });
@@ -30,20 +43,22 @@ class InsumoPreparadoService {
         descripcion: p.descripcion || '',
         unidadMedida: p.unidadMedida || 'und',
         estado: p.estado,
+        eliminado: p.eliminado || 0,
         rendimiento: parseFloat(p.rendimiento || 1),
         unidadRendimiento: p.unidadRendimiento || 'und',
         precioVenta: parseFloat(p.precioVenta || 0),
         costoTotal: parseFloat(p.costoTotal || 0),
         fechaCreacion: p.fechaCreacion,
         insumos,
-        componentes: insumos
+        componentes: insumos,
+        fichaTecnica: p.fichaTecnica || null
       };
     });
   }
 
   static async getDeleted() {
     const preparados = await InsumoPreparado.findAll({
-      where: { estado: 0 },
+      where: { eliminado: 1 },
       include: [
         {
           model: DetalleInsumoPreparadoInsumo,
@@ -88,6 +103,19 @@ class InsumoPreparadoService {
           model: DetalleInsumoPreparadoInsumo,
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo' }]
+        },
+        {
+          model: FichaTecnica,
+          as: 'fichaTecnica',
+          required: false,
+          where: { estado: 1 },
+          include: [
+            {
+              model: DetalleFichaInsumo,
+              as: 'detalles',
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+            }
+          ]
         }
       ]
     });
@@ -120,12 +148,13 @@ class InsumoPreparadoService {
       costoTotal: parseFloat(p.costoTotal || 0),
       fechaCreacion: p.fechaCreacion,
       insumos,
-      componentes: insumos
+      componentes: insumos,
+      fichaTecnica: p.fichaTecnica || null
     };
   }
 
   static async create(data) {
-    const { nombre, descripcion, unidadMedida, rendimiento, unidadRendimiento, precioVenta, insumos, componentes, costoTotal: inputCosto } = data;
+    const { nombre, descripcion, unidadMedida, rendimiento, unidadRendimiento, precioVenta, insumos, componentes, costoTotal: inputCosto, estado, fichaTecnica } = data;
     if (!nombre) {
       const error = new Error('El nombre del insumo preparado es requerido');
       error.statusCode = 400;
@@ -142,11 +171,13 @@ class InsumoPreparadoService {
       costoTotal = parseFloat(inputCosto) || 0;
     }
 
+    const estadoNum = (estado === 'Inactivo' || estado === 0 || estado === '0') ? 0 : 1;
+
     const preparado = await InsumoPreparado.create({
       nombre,
       descripcion: descripcion || '',
       unidadMedida: unidadMedida || 'und',
-      estado: 1,
+      estado: estadoNum,
       rendimiento: rendimiento || 1,
       unidadRendimiento: unidadRendimiento || 'und',
       precioVenta: precioVenta || 0,
@@ -164,6 +195,20 @@ class InsumoPreparadoService {
       });
     }
 
+    if (fichaTecnica) {
+      const FichaTecnicaService = require('./fichaTecnicaService');
+      await FichaTecnicaService.saveForInsumoPreparado(preparado.id, fichaTecnica);
+    }
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Creado',
+      entidadNombre: preparado.nombre,
+      detalle: `Se creó el insumo preparado: ${preparado.nombre}`,
+      motivo: 'Registro inicial de insumo preparado',
+      skipStockUpdate: true
+    }).catch(() => {});
+
     return this.getById(preparado.id);
   }
 
@@ -175,7 +220,7 @@ class InsumoPreparadoService {
       throw error;
     }
 
-    const { nombre, descripcion, unidadMedida, rendimiento, unidadRendimiento, precioVenta, insumos, componentes, costoTotal: inputCosto, estado } = data;
+    const { nombre, descripcion, unidadMedida, rendimiento, unidadRendimiento, precioVenta, insumos, componentes, costoTotal: inputCosto, estado, fichaTecnica } = data;
 
     if (nombre !== undefined) p.nombre = nombre;
     if (descripcion !== undefined) p.descripcion = descripcion;
@@ -183,7 +228,9 @@ class InsumoPreparadoService {
     if (rendimiento !== undefined) p.rendimiento = rendimiento;
     if (unidadRendimiento !== undefined) p.unidadRendimiento = unidadRendimiento;
     if (precioVenta !== undefined) p.precioVenta = precioVenta;
-    if (estado !== undefined) p.estado = estado;
+    if (estado !== undefined) {
+      p.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+    }
 
     const itemsList = insumos || componentes;
     if (itemsList && Array.isArray(itemsList)) {
@@ -209,6 +256,21 @@ class InsumoPreparadoService {
     }
 
     await p.save();
+
+    if (fichaTecnica) {
+      const FichaTecnicaService = require('./fichaTecnicaService');
+      await FichaTecnicaService.saveForInsumoPreparado(id, fichaTecnica);
+    }
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Editado',
+      entidadNombre: p.nombre,
+      detalle: `Se actualizaron los datos del insumo preparado: ${p.nombre}`,
+      motivo: 'Actualización de insumo preparado',
+      skipStockUpdate: true
+    }).catch(() => {});
+
     return this.getById(id);
   }
 
@@ -220,8 +282,18 @@ class InsumoPreparadoService {
       throw error;
     }
 
-    p.estado = 0;
+    p.eliminado = 1;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado',
+      entidadNombre: p.nombre,
+      detalle: `Se movió a la papelera el insumo preparado: ${p.nombre}`,
+      motivo: 'Envío a papelera de preparado',
+      skipStockUpdate: true
+    }).catch(() => {});
+
     return { message: 'Insumo preparado movido a la papelera' };
   }
 
@@ -233,8 +305,18 @@ class InsumoPreparadoService {
       throw error;
     }
 
-    p.estado = 1;
+    p.eliminado = 0;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Restaurado',
+      entidadNombre: p.nombre,
+      detalle: `Se restauró el insumo preparado: ${p.nombre}`,
+      motivo: 'Restauración desde papelera de preparado',
+      skipStockUpdate: true
+    }).catch(() => {});
+
     return this.getById(id);
   }
 
@@ -246,8 +328,19 @@ class InsumoPreparadoService {
       throw error;
     }
 
+    const nombrePreparado = p.nombre;
+
     await DetalleInsumoPreparadoInsumo.destroy({ where: { idPreparado: id } });
     await p.destroy();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado permanente',
+      entidadNombre: nombrePreparado,
+      detalle: `Se eliminó permanentemente el insumo preparado: ${nombrePreparado}`,
+      motivo: 'Eliminación física definitiva de preparado',
+      skipStockUpdate: true
+    }).catch(() => {});
 
     const count = await InsumoPreparado.count();
     if (count === 0) {

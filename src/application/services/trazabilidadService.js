@@ -29,18 +29,22 @@ class TrazabilidadService {
 
     return registros.map(r => {
       let tipoLabel = 'Creado';
-      const rawTipo = (r.tipo || r.tipoMovimiento || '').toLowerCase();
-      if (rawTipo.includes('compra') || rawTipo.includes('reabastec') || rawTipo === 'entrada') {
-        tipoLabel = 'Reabastecimiento';
-      } else if (rawTipo.includes('edit') || rawTipo === 'modificar') {
+      const t = (r.tipo || '').toLowerCase();
+      const mov = (r.tipoMovimiento || '').toLowerCase();
+
+      if (t.includes('crea') || t === 'nuevo' || t === 'registro') {
+        tipoLabel = 'Creado';
+      } else if (t.includes('edit') || t.includes('modif') || t === 'actualizado') {
         tipoLabel = 'Editado';
-      } else if (rawTipo.includes('eliminado permanente') || rawTipo.includes('harddelete')) {
+      } else if (t.includes('eliminado permanente') || t.includes('harddelete') || t.includes('definitivo')) {
         tipoLabel = 'Eliminado permanente';
-      } else if (rawTipo.includes('elimin') || rawTipo === 'inactivar') {
+      } else if (t.includes('elimin') || t.includes('papelera') || t === 'inactivar') {
         tipoLabel = 'Eliminado';
-      } else if (rawTipo.includes('restaur')) {
+      } else if (t.includes('restaur')) {
         tipoLabel = 'Restaurado';
-      } else if (rawTipo.includes('estado') || rawTipo.includes('cambio')) {
+      } else if (t.includes('compra') || t.includes('reabastec') || mov === 'entrada' || mov === 'salida' || mov === 'compra') {
+        tipoLabel = 'Reabastecimiento';
+      } else if (t.includes('estado') || t.includes('cambio')) {
         tipoLabel = 'Estado Cambiado';
       }
 

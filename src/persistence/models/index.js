@@ -240,6 +240,10 @@ const Insumo = sequelize.define('insumo', {
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
+  },
+  eliminado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
   }
 }, { tableName: 'insumo', timestamps: false });
 
@@ -263,6 +267,10 @@ const InsumoPreparado = sequelize.define('insumopreparado', {
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
+  },
+  eliminado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
   },
   rendimiento: {
     type: DataTypes.DECIMAL(10, 2),
@@ -532,12 +540,14 @@ const FichaTecnica = sequelize.define('fichatecnica', {
     }
   },
   idProducto: {
-    type: DataTypes.INTEGER,
-    allowNull: true
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: 'No Aplica'
   },
   idInsumo: {
-    type: DataTypes.INTEGER,
-    allowNull: true
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: 'No Aplica'
   },
   idVariante: {
     type: DataTypes.INTEGER,
@@ -714,6 +724,8 @@ Product.hasOne(FichaTecnica, { foreignKey: 'idProducto', as: 'fichaTecnica' });
 FichaTecnica.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumoInfo', onDelete: 'CASCADE' });
 Insumo.hasMany(FichaTecnica, { foreignKey: 'idInsumo', as: 'fichasTecnicas', onDelete: 'CASCADE' });
 Insumo.hasMany(DetalleFichaInsumo, { foreignKey: 'idInsumo', as: 'usosEnFichas', onDelete: 'CASCADE' });
+FichaTecnica.belongsTo(InsumoPreparado, { foreignKey: 'idInsumo', as: 'insumoPreparado' });
+InsumoPreparado.hasOne(FichaTecnica, { foreignKey: 'idInsumo', as: 'fichaTecnica' });
 
 Compra.belongsTo(Proveedor, { foreignKey: 'idProveedor', as: 'proveedor' });
 Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
