@@ -135,6 +135,7 @@ app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
 app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
 app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
 app.use('/api/resenas', require('./src/presentation/routes/resenaRoutes'));
+app.use('/api/wompi', require('./src/presentation/routes/wompiRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
