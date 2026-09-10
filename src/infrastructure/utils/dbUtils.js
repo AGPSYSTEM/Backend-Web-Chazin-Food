@@ -413,6 +413,33 @@ async function ensureNoNegativeStock() {
   }
 }
 
+/**
+ * Ensures 'eliminado' column exists in 'insumo' and 'insumopreparado' tables
+ * to support logical deletion / recycle bin.
+ */
+async function ensureInsumoEliminadoSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [insumoCols] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'eliminado'");
+    if (insumoCols.length === 0) {
+      await sequelize.query('ALTER TABLE `insumo` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`');
+      console.log('[DB] ✅ Columna insumo.eliminado agregada exitosamente.');
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando columna insumo.eliminado:', err.message);
+  }
+
+  try {
+    const [prepCols] = await sequelize.query("SHOW COLUMNS FROM `insumopreparado` LIKE 'eliminado'");
+    if (prepCols.length === 0) {
+      await sequelize.query('ALTER TABLE `insumopreparado` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`');
+      console.log('[DB] ✅ Columna insumopreparado.eliminado agregada exitosamente.');
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando columna insumopreparado.eliminado:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -426,5 +453,6 @@ module.exports = {
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,
-  ensureNoNegativeStock
+  ensureNoNegativeStock,
+  ensureInsumoEliminadoSchema
 };

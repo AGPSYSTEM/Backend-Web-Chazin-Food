@@ -540,14 +540,14 @@ const FichaTecnica = sequelize.define('fichatecnica', {
     }
   },
   idProducto: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 'No Aplica'
+    defaultValue: null
   },
   idInsumo: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 'No Aplica'
+    defaultValue: null
   },
   idVariante: {
     type: DataTypes.INTEGER,

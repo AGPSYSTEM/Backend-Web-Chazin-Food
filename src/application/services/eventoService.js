@@ -1,34 +1,151 @@
-const { Evento } = require('../../persistence/models');
+const { Evento, Product, Variante, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
+
+function evaluarVigenciaEvento(e, now = new Date()) {
+  const rawInicio = e.fechaInicio;
+  const rawFin = e.fechaFin;
+
+  if (!rawFin) {
+    return {
+      estadoVigencia: 'PERMANENTE',
+      estaVigente: e.estado === 1,
+      diasRestantes: null,
+      horasRestantes: null,
+      urgente: false,
+      label: 'Vigencia Permanente',
+      shortLabel: 'Permanente',
+      fechaInicio: rawInicio,
+      fechaFin: null
+    };
+  }
+
+  const finDate = new Date(`${rawFin}T23:59:59`);
+  const inicioDate = rawInicio ? new Date(`${rawInicio}T00:00:00`) : null;
+
+  const msRestantes = finDate.getTime() - now.getTime();
+  const diasRestantes = Math.ceil(msRestantes / (1000 * 60 * 60 * 24));
+  const horasRestantes = Math.max(0, Math.floor(msRestantes / (1000 * 60 * 60)));
+
+  if (inicioDate && now < inicioDate) {
+    const msHastaInicio = inicioDate.getTime() - now.getTime();
+    const diasParaInicio = Math.ceil(msHastaInicio / (1000 * 60 * 60 * 24));
+    return {
+      estadoVigencia: 'PROGRAMADO',
+      estaVigente: false,
+      diasRestantes,
+      horasRestantes,
+      diasParaInicio,
+      urgente: false,
+      label: `Inicia en ${diasParaInicio} día${diasParaInicio !== 1 ? 's' : ''}`,
+      shortLabel: `En ${diasParaInicio}d`,
+      fechaInicio: rawInicio,
+      fechaFin: rawFin
+    };
+  }
+
+  if (msRestantes < 0) {
+    const diasExpirado = Math.abs(diasRestantes);
+    return {
+      estadoVigencia: 'EXPIRADO',
+      estaVigente: false,
+      diasRestantes: 0,
+      horasRestantes: 0,
+      diasExpirado,
+      urgente: false,
+      label: `Finalizado hace ${diasExpirado} día${diasExpirado !== 1 ? 's' : ''}`,
+      shortLabel: 'Finalizado',
+      fechaInicio: rawInicio,
+      fechaFin: rawFin
+    };
+  }
+
+  // Activo dentro de la vigencia
+  const urgente = diasRestantes <= 3;
+  let label = `Quedan ${diasRestantes} días`;
+  let shortLabel = `${diasRestantes}d restantes`;
+
+  if (diasRestantes === 1) {
+    label = `¡Último día! (Quedan ${horasRestantes}h)`;
+    shortLabel = '¡Último día!';
+  } else if (diasRestantes === 0) {
+    label = `¡Termina hoy! (Quedan ${horasRestantes}h)`;
+    shortLabel = 'Termina hoy';
+  }
+
+  return {
+    estadoVigencia: 'ACTIVO',
+    estaVigente: e.estado === 1,
+    diasRestantes,
+    horasRestantes,
+    urgente,
+    label,
+    shortLabel,
+    fechaInicio: rawInicio,
+    fechaFin: rawFin
+  };
+}
 
 class EventoService {
   static async getAll() {
-    const eventos = await Evento.findAll({ order: [['idEvento', 'ASC']] });
-    return eventos.map((e) => ({
-      id: e.idEvento,
-      idEvento: e.idEvento,
-      nombreEvento: e.nombreEvento,
-      nombre: e.nombreEvento,
-      descripcion: e.descripcion || '',
-      fechaInicio: e.fechaInicio,
-      fechaFin: e.fechaFin,
-      estado: e.estado === 1 ? 'Activo' : 'Inactivo',
-      idProducto: e.idProducto,
-      tipoEvento: e.tipoEvento,
-      descuento: e.descuento,
-      nuevoPrecio: e.nuevoPrecio,
-      accionInsumo: e.accionInsumo,
-      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : [],
-      productosAsociados: e.productosAsociados ? JSON.parse(e.productosAsociados) : []
-    }));
+    const eventos = await Evento.findAll({
+      order: [['idEvento', 'ASC']],
+      include: [
+        {
+          model: Product,
+          as: 'producto',
+          attributes: ['idProducto', 'nombre', 'precio', 'imagen'],
+          required: false
+        }
+      ]
+    });
+
+    const now = new Date();
+    return eventos.map((e) => {
+      const vigencia = evaluarVigenciaEvento(e, now);
+      return {
+        id: e.idEvento,
+        idEvento: e.idEvento,
+        nombreEvento: e.nombreEvento,
+        nombre: e.nombreEvento,
+        descripcion: e.descripcion || '',
+        fechaInicio: e.fechaInicio,
+        fechaFin: e.fechaFin,
+        estado: e.estado === 1 ? 'Activo' : 'Inactivo',
+        idProducto: e.idProducto,
+        tipoEvento: e.tipoEvento,
+        descuento: e.descuento,
+        nuevoPrecio: e.nuevoPrecio,
+        accionInsumo: e.accionInsumo,
+        insumosAsociados: e.insumosAsociados ? (typeof e.insumosAsociados === 'string' ? JSON.parse(e.insumosAsociados) : e.insumosAsociados) : [],
+        productosAsociados: e.productosAsociados ? (typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : e.productosAsociados) : [],
+        producto: e.producto ? {
+          id: e.producto.idProducto,
+          idProducto: e.producto.idProducto,
+          nombre: e.producto.nombre,
+          precio: e.producto.precio,
+          imagen: e.producto.imagen
+        } : null,
+        vigencia
+      };
+    });
   }
 
   static async getById(id) {
-    const e = await Evento.findByPk(id);
+    const e = await Evento.findByPk(id, {
+      include: [
+        {
+          model: Product,
+          as: 'producto',
+          attributes: ['idProducto', 'nombre', 'precio', 'imagen'],
+          required: false
+        }
+      ]
+    });
     if (!e) {
       const error = new Error('Evento no encontrado');
       error.statusCode = 404;
       throw error;
     }
+    const vigencia = evaluarVigenciaEvento(e);
     return {
       id: e.idEvento,
       idEvento: e.idEvento,
@@ -43,15 +160,24 @@ class EventoService {
       descuento: e.descuento,
       nuevoPrecio: e.nuevoPrecio,
       accionInsumo: e.accionInsumo,
-      insumosAsociados: e.insumosAsociados ? JSON.parse(e.insumosAsociados) : [],
-      productosAsociados: e.productosAsociados ? JSON.parse(e.productosAsociados) : []
+      insumosAsociados: e.insumosAsociados ? (typeof e.insumosAsociados === 'string' ? JSON.parse(e.insumosAsociados) : e.insumosAsociados) : [],
+      productosAsociados: e.productosAsociados ? (typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : e.productosAsociados) : [],
+      producto: e.producto ? {
+        id: e.producto.idProducto,
+        idProducto: e.producto.idProducto,
+        nombre: e.producto.nombre,
+        precio: e.producto.precio,
+        imagen: e.producto.imagen
+      } : null,
+      vigencia
     };
   }
 
   static async create(data) {
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, productos, isTemporal
+      productoId, tipoEvento, descuento, nuevoPrecio, accion, insumos, productos, isTemporal,
+      crearComoProducto, productoNuevo
     } = data;
     const finalNombre = nombreEvento || nombre;
 
@@ -61,15 +187,70 @@ class EventoService {
       throw error;
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    let finalProductoId = productoId ? Number(productoId) : null;
+
+    // Bidireccional: Crear producto desde el evento si se solicita
+    if (crearComoProducto) {
+      const pData = productoNuevo || {};
+      const prodNombre = pData.nombre || finalNombre;
+      const prodDesc = pData.descripcion || descripcion || 'Edición especial de temporada festiva';
+      const prodPrecio = pData.precio || (nuevoPrecio ? parseFloat(nuevoPrecio) * 1.15 : 25000);
+      const prodCategoria = pData.idCategoriaProducto || 3; // Default a Hamburguesas
+      const prodImagen = pData.imagen || '';
+
+      const nuevoProd = await Product.create({
+        idCategoriaProducto: prodCategoria,
+        nombre: prodNombre,
+        descripcion: prodDesc,
+        precio: prodPrecio,
+        imagen: prodImagen,
+        adiciones: pData.adiciones ? (typeof pData.adiciones === 'string' ? pData.adiciones : JSON.stringify(pData.adiciones)) : '[]',
+        estado: 1
+      });
+
+      finalProductoId = nuevoProd.idProducto;
+
+      // Crear Variante predeterminada
+      const nuevaVariante = await Variante.create({
+        idProducto: nuevoProd.idProducto,
+        nombre: 'Edición Especial',
+        precio: nuevoPrecio || prodPrecio,
+        estado: 1
+      });
+
+      // Crear Ficha Técnica
+      const nuevaFicha = await FichaTecnica.create({
+        idProducto: nuevoProd.idProducto,
+        idVariante: nuevaVariante.idVariante,
+        tipo: 'PRODUCTO',
+        descripcion: `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`,
+        procedimiento: pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
+        tiempoPreparacion: pData.tiempoPreparacion || 12,
+        rendimiento: '1 porción',
+        estado: 1
+      });
+
+      // Si vienen insumos para la ficha técnica, asociarlos
+      if (Array.isArray(pData.insumosFicha) && pData.insumosFicha.length > 0) {
+        for (const item of pData.insumosFicha) {
+          await DetalleFichaInsumo.create({
+            idFichaTecnica: nuevaFicha.idFichaTecnica,
+            idInsumo: item.idInsumo,
+            cantidad: item.cantidad || 1,
+            unidadMedida: item.unidadMedida || 'und'
+          });
+        }
+      }
+    }
+
     const created = await Evento.create({
       nombreEvento: finalNombre.trim(),
       descripcion: descripcion || '',
       fechaInicio: isTemporal ? fechaInicio : null,
       fechaFin: isTemporal ? fechaFin : null,
       estado: estado === 'Inactivo' || estado === 0 ? 0 : 1,
-      idProducto: productoId || null,
-      tipoEvento: tipoEvento || null,
+      idProducto: finalProductoId,
+      tipoEvento: tipoEvento || 'EDICION_LIMITADA',
       descuento: descuento || null,
       nuevoPrecio: nuevoPrecio || null,
       accionInsumo: accion || null,

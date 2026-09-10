@@ -84,8 +84,78 @@ function calculateProductStock(ficha) {
   };
 }
 
+function formatActiveEventos(rawEventos, now = new Date()) {
+  if (!Array.isArray(rawEventos)) return [];
+  return rawEventos
+    .filter((e) => {
+      if (e.estado !== 1 && e.estado !== 'Activo') return false;
+      if (e.fechaFin) {
+        const finDate = new Date(`${e.fechaFin}T23:59:59`);
+        if (now > finDate) return false; // Expirado
+      }
+      if (e.fechaInicio) {
+        const inicioDate = new Date(`${e.fechaInicio}T00:00:00`);
+        if (now < inicioDate) return false; // Programado / Aún no inicia
+      }
+      return true;
+    })
+    .map((e) => {
+      let diasRestantes = null;
+      let horasRestantes = null;
+      if (e.fechaFin) {
+        const finDate = new Date(`${e.fechaFin}T23:59:59`);
+        const ms = finDate.getTime() - now.getTime();
+        diasRestantes = Math.ceil(ms / (1000 * 60 * 60 * 24));
+        horasRestantes = Math.max(0, Math.floor(ms / (1000 * 60 * 60)));
+      }
+      const label =
+        diasRestantes === null
+          ? 'Permanente'
+          : diasRestantes === 1
+          ? `¡Último día! (${horasRestantes}h)`
+          : diasRestantes === 0
+          ? '¡Termina hoy!'
+          : `Quedan ${diasRestantes} días`;
+
+      return {
+        id: e.idEvento,
+        idEvento: e.idEvento,
+        idProducto: e.idProducto,
+        tipoEvento: e.tipoEvento,
+        descuento: e.descuento,
+        nuevoPrecio: e.nuevoPrecio,
+        nombreEvento: e.nombreEvento,
+        descripcion: e.descripcion,
+        fechaInicio: e.fechaInicio,
+        fechaFin: e.fechaFin,
+        estado: e.estado,
+        accionInsumo: e.accionInsumo || null,
+        insumosAsociados: e.insumosAsociados ? (typeof e.insumosAsociados === 'string' ? JSON.parse(e.insumosAsociados) : e.insumosAsociados) : [],
+        productosAsociados: e.productosAsociados ? (typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : e.productosAsociados) : [],
+        vigencia: {
+          diasRestantes,
+          horasRestantes,
+          urgente: diasRestantes !== null && diasRestantes <= 3,
+          label
+        }
+      };
+    });
+}
+
 class ProductService {
   static async getProducts() {
+    const { sequelize } = require('../../persistence/config/db');
+    const [salesRows] = await sequelize.query(`
+      SELECT v.idProducto, COALESCE(SUM(dvp.cantidad), 0) as totalVendidos
+      FROM detalleventaproducto dvp
+      JOIN variante v ON dvp.idVariante = v.idVariante
+      GROUP BY v.idProducto
+    `);
+    const salesMap = {};
+    for (const r of salesRows) {
+      salesMap[r.idProducto] = Number(r.totalVendidos || 0);
+    }
+
     const products = await Product.findAll({
       attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
       include: [
@@ -101,13 +171,14 @@ class ProductService {
             {
               model: DetalleFichaInsumo,
               as: 'detalles',
-              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'estado'] }]
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'precioUnitario', 'estado'] }]
             }
           ]
         }
       ]
     });
 
+    const now = new Date();
     return products
       .filter(p => p.idProducto !== 0 && !p.nombre?.startsWith('__SISTEMA'))
       .map(p => {
@@ -128,6 +199,7 @@ class ProductService {
           : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
 
         const stockInfo = calculateProductStock(p.fichaTecnica);
+        const realVentas = Number(salesMap[p.idProducto] || 0);
 
         return {
           _id: p.idProducto,
@@ -147,12 +219,23 @@ class ProductService {
           insumosCriticos: stockInfo.insumosCriticos,
           variantes,
           adiciones,
-          eventos: p.eventos || []
+          eventos: formatActiveEventos(p.eventos, now),
+          ventas: realVentas,
+          totalVendidos: realVentas
         };
       });
   }
 
   static async getProductById(id) {
+    const { sequelize } = require('../../persistence/config/db');
+    const [salesRows] = await sequelize.query(`
+      SELECT COALESCE(SUM(dvp.cantidad), 0) as totalVendidos
+      FROM detalleventaproducto dvp
+      JOIN variante v ON dvp.idVariante = v.idVariante
+      WHERE v.idProducto = ?
+    `, { replacements: [id] });
+    const realVentas = salesRows.length > 0 ? Number(salesRows[0].totalVendidos || 0) : 0;
+
     const p = await Product.findByPk(id, {
       attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
       include: [
@@ -168,7 +251,7 @@ class ProductService {
             {
               model: DetalleFichaInsumo,
               as: 'detalles',
-              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'estado'] }]
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'precioUnitario', 'estado'] }]
             }
           ]
         }
@@ -216,7 +299,9 @@ class ProductService {
       insumosCriticos: stockInfo.insumosCriticos,
       variantes,
       adiciones,
-      eventos: p.eventos || []
+      eventos: formatActiveEventos(p.eventos, new Date()),
+      ventas: realVentas,
+      totalVendidos: realVentas
     };
   }
 
@@ -325,18 +410,68 @@ class ProductService {
       throw error;
     }
 
-    // Delete associated ficha técnica and its details
-    const { FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
-    const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
-    if (ficha) {
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
-      await ficha.destroy();
-    }
+    const { sequelize } = require('../../persistence/config/db');
+    const t = await sequelize.transaction();
 
-    await p.destroy();
-    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
-    await resetAutoIncrement('producto', 'idProducto');
-    return { message: 'Producto eliminado correctamente' };
+    try {
+      // 1. Eliminar reseñas asociadas
+      await sequelize.query('DELETE FROM resena WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 2. Eliminar descuentos vinculados a eventos de este producto
+      await sequelize.query(
+        'DELETE FROM descuento WHERE idEvento IN (SELECT idEvento FROM evento WHERE idProducto = ?)',
+        { replacements: [id], transaction: t }
+      );
+
+      // 3. Eliminar eventos asociados al producto
+      await sequelize.query('DELETE FROM evento WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 4. Eliminar detalles de fichas técnicas y fichas técnicas del producto
+      await sequelize.query(
+        'DELETE FROM detallefichainsumo WHERE idFichaTecnica IN (SELECT idFichaTecnica FROM fichatecnica WHERE idProducto = ?)',
+        { replacements: [id], transaction: t }
+      );
+      await sequelize.query('DELETE FROM fichatecnica WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 5. Eliminar registros de detalle de venta asociados a las variantes de este producto
+      await sequelize.query(
+        'DELETE FROM detalleventaproducto WHERE idVariante IN (SELECT idVariante FROM variante WHERE idProducto = ?)',
+        { replacements: [id], transaction: t }
+      );
+
+      // 6. Eliminar variantes del producto (resuelve la restricción variante_ibfk_1)
+      await sequelize.query('DELETE FROM variante WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 7. Eliminar el producto de forma definitiva
+      await sequelize.query('DELETE FROM producto WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      await t.commit();
+
+      const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+      await resetAutoIncrement('producto', 'idProducto');
+      await resetAutoIncrement('variante', 'idVariante');
+
+      return { success: true, message: 'Producto eliminado correctamente' };
+    } catch (err) {
+      await t.rollback();
+      console.error('Error al eliminar producto en cascada:', err);
+      throw err;
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-// Environment Configuration
+// Environment Configuration - Wompi Enabled
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -23,13 +23,15 @@ const {
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,
-  ensureNoNegativeStock
+  ensureNoNegativeStock,
+  ensureInsumoEliminadoSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
 // Connect to Database and run schema verifications
 (async () => {
   try {
     await connectDB();
+    await ensureInsumoEliminadoSchema();
     await ensureUsuarioDocumentoSchema();
     await ensureFichaTecnicaTrashSchema();
     await ensureFichaTecnicaInsumoVariantZero();

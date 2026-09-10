@@ -13,6 +13,92 @@ class FichaTecnicaService {
       else tipoStr = 'PRODUCTO';
     }
 
+    // Resolucion inteligente de Peso y Calorias
+    let resolvedPeso = f.peso;
+    if (!resolvedPeso) {
+      const prodName = String(f.producto?.nombre || '').toLowerCase();
+      const rendText = String(f.rendimiento || '');
+      const rendMatch = rendText.match(/\((\d+(?:\.\d+)?\s*(?:g|kg|ml|oz|l))/i);
+      
+      if (rendMatch) {
+        resolvedPeso = rendMatch[1].trim();
+      } else if (prodName.includes('chili')) {
+        resolvedPeso = prodName.includes('bebida') ? '720g (combo)' : '320g';
+      } else if (prodName.includes('tocineta') && prodName.includes('papa')) {
+        resolvedPeso = prodName.includes('bebida') ? '700g (combo)' : '300g';
+      } else if (prodName.includes('agua')) {
+        resolvedPeso = prodName.includes('600ml') ? '600ml' : '500ml';
+      } else if (prodName.includes('gaseosa') || prodName.includes('coca') || prodName.includes('pepsi') || prodName.includes('postob') || prodName.includes('sprite') || prodName.includes('quatro')) {
+        resolvedPeso = '400ml';
+      } else if (prodName.includes('doble')) {
+        resolvedPeso = '540g';
+      } else if (prodName.includes('trufada') || prodName.includes('fest')) {
+        resolvedPeso = '430g';
+      } else if (prodName.includes('pollo')) {
+        resolvedPeso = '380g';
+      } else if (prodName.includes('salchipapa')) {
+        resolvedPeso = '560g';
+      } else if (prodName.includes('perro suizo')) {
+        resolvedPeso = '340g';
+      } else if (prodName.includes('perro')) {
+        resolvedPeso = '290g';
+      } else if (prodName.includes('combo')) {
+        resolvedPeso = '1.6 kg';
+      } else if (prodName.includes('espiral')) {
+        resolvedPeso = '200g';
+      } else if (prodName.includes('casco') || prodName.includes('corral')) {
+        resolvedPeso = prodName.includes('grande') ? '240g' : '160g';
+      } else if (prodName.includes('francesa')) {
+        resolvedPeso = '150g';
+      } else {
+        const textSources = [f.rendimiento, f.especificaciones, f.producto?.nombre].filter(Boolean).join(' ');
+        const pesoMatch = textSources.match(/\b(\d+(?:\.\d+)?\s*(?:ml|kg|g))\b/i);
+        resolvedPeso = pesoMatch ? pesoMatch[1].trim() : '360g';
+      }
+    }
+
+    let resolvedCalorias = f.calorias;
+    if (!resolvedCalorias) {
+      const nutText = String(f.informacionNutricional || '');
+      const calMatch = nutText.match(/(?:calorías|calorias|cal)\s*[:~]?\s*([~]?\s*\d+\s*(?:kcal|cal)?)/i);
+      if (calMatch) {
+        let val = calMatch[1].trim();
+        if (!val.toLowerCase().includes('kcal')) val += ' kcal';
+        resolvedCalorias = val;
+      } else {
+        const prodName = String(f.producto?.nombre || '').toLowerCase();
+        if (prodName.includes('agua') || prodName.includes('sin azúcar') || prodName.includes('light') || prodName.includes('zero')) {
+          resolvedCalorias = '0 kcal';
+        } else if (prodName.includes('gaseosa') || prodName.includes('coca') || prodName.includes('pepsi') || prodName.includes('postob')) {
+          resolvedCalorias = '165 kcal';
+        } else if (prodName.includes('doble')) {
+          resolvedCalorias = '~980 kcal';
+        } else if (prodName.includes('trufada') || prodName.includes('fest')) {
+          resolvedCalorias = '~790 kcal';
+        } else if (prodName.includes('combo')) {
+          resolvedCalorias = '~1800 kcal';
+        } else if (prodName.includes('salchipapa')) {
+          resolvedCalorias = '~890 kcal';
+        } else if (prodName.includes('pollo')) {
+          resolvedCalorias = '~720 kcal';
+        } else if (prodName.includes('perro suizo')) {
+          resolvedCalorias = '~680 kcal';
+        } else if (prodName.includes('perro')) {
+          resolvedCalorias = '~540 kcal';
+        } else if (prodName.includes('chili')) {
+          resolvedCalorias = prodName.includes('bebida') ? '820 kcal' : '680 kcal';
+        } else if (prodName.includes('tocineta') && prodName.includes('papa')) {
+          resolvedCalorias = prodName.includes('bebida') ? '830 kcal' : '690 kcal';
+        } else if (prodName.includes('corral') || prodName.includes('casco')) {
+          resolvedCalorias = prodName.includes('grande') ? '430 kcal' : '300 kcal';
+        } else if (prodName.includes('francesa')) {
+          resolvedCalorias = '380 kcal';
+        } else {
+          resolvedCalorias = '~650 kcal';
+        }
+      }
+    }
+
     return {
       id: f.idFichaTecnica,
       idFichaTecnica: f.idFichaTecnica,
@@ -25,6 +111,8 @@ class FichaTecnicaService {
       procedimiento: f.procedimiento || f.descripcion || '',
       tiempoPreparacion: f.tiempoPreparacion || 0,
       rendimiento: f.rendimiento || '',
+      peso: resolvedPeso,
+      calorias: resolvedCalorias,
       especificaciones: f.especificaciones || '',
       caracteristicas: f.caracteristicas || '',
       informacionNutricional: f.informacionNutricional || '',
@@ -41,7 +129,13 @@ class FichaTecnicaService {
         idInsumo: d.idInsumo,
         cantidad: Number(d.cantidad || 0),
         unidadMedida: d.unidadMedida || d.insumo?.unidadMedida || 'und',
-        insumo: d.insumo || null
+        precioUnitario: Number(d.insumo?.precioUnitario || 0),
+        insumo: d.insumo ? {
+          idInsumo: d.insumo.idInsumo,
+          nombre: d.insumo.nombre,
+          unidadMedida: d.insumo.unidadMedida,
+          precioUnitario: Number(d.insumo.precioUnitario || 0)
+        } : null
       }))
     };
   }
@@ -53,7 +147,7 @@ class FichaTecnicaService {
         {
           model: DetalleFichaInsumo,
           as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'estado'] }]
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario', 'estado'] }]
         },
         { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] },
         { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] },
@@ -80,7 +174,7 @@ class FichaTecnicaService {
         {
           model: DetalleFichaInsumo,
           as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
         },
         { model: Product, as: 'producto' },
         { model: Insumo, as: 'insumoInfo' },
@@ -100,7 +194,7 @@ class FichaTecnicaService {
         {
           model: DetalleFichaInsumo,
           as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
         },
         { model: Variante, as: 'variante' },
         { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] }
@@ -121,7 +215,7 @@ class FichaTecnicaService {
         {
           model: DetalleFichaInsumo,
           as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
         },
         { model: Variante, as: 'variante' },
         { model: InsumoPreparado, as: 'insumoPreparado', attributes: ['id', 'nombre', 'estado', 'eliminado', 'unidadMedida', 'descripcion'] },
@@ -162,8 +256,8 @@ class FichaTecnicaService {
 
     if (!f) {
       f = await FichaTecnica.create({
-        idProducto: String(idProducto),
-        idInsumo: 'No Aplica',
+        idProducto: idProducto,
+        idInsumo: null,
         idVariante: resolvedVarianteId,
         tipo: 'PRODUCTO',
         descripcion: data.descripcion || data.caracteristicas || '',
@@ -180,8 +274,8 @@ class FichaTecnicaService {
       });
     } else {
       const updatePayload = {
-        idProducto: String(idProducto),
-        idInsumo: 'No Aplica',
+        idProducto: idProducto,
+        idInsumo: null,
         idVariante: resolvedVarianteId !== null ? resolvedVarianteId : f.idVariante,
         descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),
         procedimiento: data.procedimiento !== undefined ? data.procedimiento : f.procedimiento,
@@ -227,8 +321,8 @@ class FichaTecnicaService {
 
     if (!f) {
       f = await FichaTecnica.create({
-        idProducto: 'No Aplica',
-        idInsumo: String(idPreparado),
+        idProducto: null,
+        idInsumo: idPreparado,
         idVariante: resolvedVarianteId !== null && resolvedVarianteId !== undefined ? resolvedVarianteId : null,
         tipo: 'INSUMO_PREPARADO',
         descripcion: data.descripcion || data.caracteristicas || '',
@@ -245,8 +339,8 @@ class FichaTecnicaService {
       }, { transaction: options.transaction });
     } else {
       const updatePayload = {
-        idProducto: 'No Aplica',
-        idInsumo: String(idPreparado),
+        idProducto: null,
+        idInsumo: idPreparado,
         idVariante: resolvedVarianteId !== null && resolvedVarianteId !== undefined ? resolvedVarianteId : f.idVariante,
         tipo: 'INSUMO_PREPARADO',
         descripcion: data.descripcion !== undefined ? data.descripcion : (data.caracteristicas !== undefined ? data.caracteristicas : f.descripcion),

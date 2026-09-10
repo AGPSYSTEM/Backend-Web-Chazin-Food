@@ -762,7 +762,7 @@ class VentaService {
 
           // Descuento Automático de Insumos según Ficha Técnica del Producto
           try {
-            const { FichaTecnica, DetalleFichaInsumo, Insumo, Variante } = require('../../persistence/models');
+            const { FichaTecnica, DetalleFichaInsumo, Insumo, Variante, Trazabilidad } = require('../../persistence/models');
             let targetProductId = d.idProducto;
             if (!targetProductId && chosenVarianteId) {
               const varRow = await Variante.findByPk(chosenVarianteId);
@@ -794,6 +794,22 @@ class VentaService {
                       const nuevoStock = Math.max(0, stockActual - totalADescontar);
                       insumo.stock = nuevoStock;
                       await insumo.save();
+
+                      // Registrar movimiento en trazabilidad
+                      try {
+                        await Trazabilidad.create({
+                          tipo: 'CONSUMO_VENTA',
+                          entidadNombre: insumo.nombre,
+                          detalle: `Consumo de ${totalADescontar.toFixed(2)} ${insumoUnit} por Venta #${venta.idVenta} (${itemQty}x Prod #${targetProductId})`,
+                          idInsumo: insumo.idInsumo,
+                          tipoMovimiento: 'SALIDA',
+                          cantidad: totalADescontar,
+                          motivo: `Venta #${venta.idVenta}`,
+                          usuarioId: responsibleUserId || targetUserId || null
+                        });
+                      } catch (tzErr) {
+                        console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
+                      }
                     }
                   }
                 }
@@ -803,22 +819,54 @@ class VentaService {
             console.warn('Error descontando insumos de receta:', mrpErr.message);
           }
 
-          // Guardar adiciones si fueron enviadas
+          // Guardar adiciones si fueron enviadas y descontar su insumo de inventario
           const adicList = d.idAdiciones || d.adiciones || [];
           if (Array.isArray(adicList) && adicList.length > 0) {
+            const { Adicion, Insumo, Trazabilidad } = require('../../persistence/models');
             for (const adItem of adicList) {
               const adId = typeof adItem === 'object' ? (adItem.id || adItem.idAdicion) : adItem;
+              const adCantidad = typeof adItem === 'object' ? (Number(adItem.cantidad) || 1) : 1;
+              const adPrecio = typeof adItem === 'object' ? (Number(adItem.precio) || 0) : 0;
               if (adId) {
                 try {
                   await DetalleVentaAdicion.create({
                     idDetalleVenta: createdDetalle.idDetalleVenta,
                     idAdicion: adId,
-                    cantidad: 1,
-                    precioUnitario: typeof adItem === 'object' ? (adItem.precio || 0) : 0,
-                    subtotal: typeof adItem === 'object' ? (adItem.precio || 0) : 0
+                    cantidad: adCantidad,
+                    precio: adPrecio,
+                    subtotal: adPrecio * adCantidad
                   });
+
+                  // Descontar inventario del insumo vinculado a la adición
+                  const adicRow = await Adicion.findByPk(adId);
+                  if (adicRow && adicRow.idInsumo) {
+                    const insumoAd = await Insumo.findByPk(adicRow.idInsumo);
+                    if (insumoAd) {
+                      const itemQty = Number(d.cantidad || 1);
+                      const totalAdDescontar = adCantidad * itemQty;
+                      const stockActual = Number(insumoAd.stock || 0);
+                      const nuevoStock = Math.max(0, stockActual - totalAdDescontar);
+                      insumoAd.stock = nuevoStock;
+                      await insumoAd.save();
+
+                      try {
+                        await Trazabilidad.create({
+                          tipo: 'CONSUMO_ADICION',
+                          entidadNombre: insumoAd.nombre,
+                          detalle: `Adición ${adicRow.nombre} (${totalAdDescontar} ${insumoAd.unidadMedida || 'und'}) en Venta #${venta.idVenta}`,
+                          idInsumo: insumoAd.idInsumo,
+                          tipoMovimiento: 'SALIDA',
+                          cantidad: totalAdDescontar,
+                          motivo: `Venta #${venta.idVenta} (Adición)`,
+                          usuarioId: responsibleUserId || targetUserId || null
+                        });
+                      } catch (tzAdErr) {
+                        console.warn('Error registrando trazabilidad de adición:', tzAdErr.message);
+                      }
+                    }
+                  }
                 } catch (errAd) {
-                  console.warn('Error guardando DetalleVentaAdicion:', errAd.message);
+                  console.warn('Error guardando DetalleVentaAdicion o descontando stock:', errAd.message);
                 }
               }
             }
