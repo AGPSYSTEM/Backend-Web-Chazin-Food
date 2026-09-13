@@ -61,6 +61,12 @@ class AdicionService {
 
     const { idInsumo, nombre, descripcion, imagen, precio, estado } = data;
     
+    // Si la imagen cambió o se reemplazó por un emoji u otra URL, eliminar la anterior de Cloudinary si correspondía
+    if (imagen !== undefined && adicion.imagen && adicion.imagen !== imagen) {
+      const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+      deleteImage(adicion.imagen).catch((err) => console.warn('⚠️ Error al eliminar imagen anterior de adición:', err.message));
+    }
+
     if (idInsumo !== undefined) adicion.idInsumo = idInsumo;
     if (nombre !== undefined) adicion.nombre = nombre.trim();
     if (descripcion !== undefined) adicion.descripcion = descripcion;

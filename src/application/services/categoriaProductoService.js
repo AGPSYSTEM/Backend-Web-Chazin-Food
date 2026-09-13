@@ -77,6 +77,12 @@ class CategoriaProductoService {
       throw error;
     }
 
+    // Si el icono/imagen cambió o se removió, eliminar el anterior de Cloudinary si correspondía
+    if (data.icon !== undefined && cat.icon && cat.icon !== data.icon) {
+      const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+      deleteImage(cat.icon).catch((err) => console.warn('⚠️ Error al eliminar icono anterior de categoría:', err.message));
+    }
+
     if (data.nombre) cat.nombre = data.nombre.trim();
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
     if (data.icon !== undefined) cat.icon = data.icon;
@@ -106,7 +112,15 @@ class CategoriaProductoService {
       throw error;
     }
 
+    const iconAEliminar = cat.icon;
+
     await cat.destroy();
+
+    if (iconAEliminar) {
+      const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+      deleteImage(iconAEliminar).catch((err) => console.warn('⚠️ Error al eliminar icono de categoría borrada:', err.message));
+    }
+
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
     await resequenceTableIds('categoriaproducto', 'idCategoriaProducto', ['producto']);
 

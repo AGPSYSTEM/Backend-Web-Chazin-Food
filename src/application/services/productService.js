@@ -366,6 +366,13 @@ class ProductService {
     }
 
     const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
+
+    // Si la imagen se actualiza o se quita, y existía una imagen previa en Cloudinary, eliminarla
+    if (imagen !== undefined && p.imagen && p.imagen !== imagen) {
+      const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+      deleteImage(p.imagen).catch((err) => console.warn('⚠️ Error al eliminar imagen anterior de producto:', err.message));
+    }
+
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
@@ -409,6 +416,8 @@ class ProductService {
       error.statusCode = 404;
       throw error;
     }
+
+    const imagenAEliminar = p.imagen;
 
     const { sequelize } = require('../../persistence/config/db');
     const t = await sequelize.transaction();
@@ -461,6 +470,12 @@ class ProductService {
       });
 
       await t.commit();
+
+      // Eliminar imagen de Cloudinary si existía
+      if (imagenAEliminar) {
+        const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+        deleteImage(imagenAEliminar).catch((err) => console.warn('⚠️ Error al eliminar imagen de Cloudinary del producto borrado:', err.message));
+      }
 
       const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
       await resetAutoIncrement('producto', 'idProducto');
