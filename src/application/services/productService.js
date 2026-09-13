@@ -142,6 +142,50 @@ function formatActiveEventos(rawEventos, now = new Date()) {
     });
 }
 
+function resolveComboConfig(rawConfig, prodName, catName) {
+  let cfg = null;
+  if (rawConfig) {
+    try {
+      cfg = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+    } catch (e) {
+      cfg = null;
+    }
+  }
+
+  const pLower = String(prodName || '').toLowerCase();
+  const cLower = String(catName || '').toLowerCase();
+  const isCombo = cLower.includes('combo') || pLower.includes('combo');
+
+  if (cfg && typeof cfg === 'object' && cfg.esCombo !== undefined) {
+    return {
+      esCombo: Boolean(cfg.esCombo),
+      cantidadBebidas: Math.max(1, Number(cfg.cantidadBebidas) || 1),
+      bebidasPermitidas: Array.isArray(cfg.bebidasPermitidas) ? cfg.bebidasPermitidas : []
+    };
+  }
+
+  // Fallback inteligente para combos de catálogo
+  if (isCombo) {
+    let cant = 1;
+    if (pLower.includes('familiar') || pLower.includes('4 personas') || pLower.includes('4 pers')) {
+      cant = 4;
+    } else if (pLower.includes('pareja') || pLower.includes('amigos') || pLower.includes('2 personas') || pLower.includes('duo') || pLower.includes('dúo')) {
+      cant = 2;
+    }
+    return {
+      esCombo: true,
+      cantidadBebidas: cant,
+      bebidasPermitidas: []
+    };
+  }
+
+  return {
+    esCombo: false,
+    cantidadBebidas: 0,
+    bebidasPermitidas: []
+  };
+}
+
 class ProductService {
   static async getProducts() {
     const { sequelize } = require('../../persistence/config/db');
@@ -157,7 +201,7 @@ class ProductService {
     }
 
     const products = await Product.findAll({
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -219,6 +263,7 @@ class ProductService {
           insumosCriticos: stockInfo.insumosCriticos,
           variantes,
           adiciones,
+          configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria),
           eventos: formatActiveEventos(p.eventos, now),
           ventas: realVentas,
           totalVendidos: realVentas
@@ -237,7 +282,7 @@ class ProductService {
     const realVentas = salesRows.length > 0 ? Number(salesRows[0].totalVendidos || 0) : 0;
 
     const p = await Product.findByPk(id, {
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -299,6 +344,7 @@ class ProductService {
       insumosCriticos: stockInfo.insumosCriticos,
       variantes,
       adiciones,
+      configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria),
       eventos: formatActiveEventos(p.eventos, new Date()),
       ventas: realVentas,
       totalVendidos: realVentas
@@ -306,7 +352,7 @@ class ProductService {
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado, configuracionCombo } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -342,7 +388,8 @@ class ProductService {
       imagen: imagen || '',
       categoria: categoria || '',
       estado: normalizedEstado,
-      adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
+      adiciones: adiciones ? JSON.stringify(adiciones) : '[]',
+      configuracionCombo: configuracionCombo ? (typeof configuracionCombo === 'object' ? JSON.stringify(configuracionCombo) : configuracionCombo) : null
     });
 
     if (precio !== undefined && precio !== null && precio !== '') {
@@ -365,7 +412,7 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo } = data;
 
     // Si la imagen se actualiza o se quita, y existía una imagen previa en Cloudinary, eliminarla
     if (imagen !== undefined && p.imagen && p.imagen !== imagen) {
@@ -388,6 +435,9 @@ class ProductService {
     }
 
     if (adiciones !== undefined) p.adiciones = JSON.stringify(adiciones);
+    if (configuracionCombo !== undefined) {
+      p.configuracionCombo = typeof configuracionCombo === 'object' ? JSON.stringify(configuracionCombo) : configuracionCombo;
+    }
 
     await p.save();
 

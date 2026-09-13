@@ -401,6 +401,9 @@ const Product = sequelize.define('producto', {
   adiciones: {
     type: DataTypes.TEXT
   },
+  configuracionCombo: {
+    type: DataTypes.TEXT
+  },
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
