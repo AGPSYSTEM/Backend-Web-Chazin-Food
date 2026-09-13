@@ -72,7 +72,13 @@ async function runCleanup() {
     console.log(`   ✓ Total de archivos encontrados en Cloudinary: ${allCloudinaryAssets.length}\n`);
 
     // 3. Identificar imágenes huérfanas / basura
-    const orphanAssets = allCloudinaryAssets.filter(asset => !activePublicIds.has(asset.public_id));
+    const includeSamples = process.argv.includes('--include-samples');
+    const isSample = (id) => id.startsWith('samples/') || id.startsWith('cld-sample') || id === 'sample';
+
+    const orphanAssets = allCloudinaryAssets.filter(asset => {
+      if (!includeSamples && isSample(asset.public_id)) return false;
+      return !activePublicIds.has(asset.public_id);
+    });
     const totalOrphanBytes = orphanAssets.reduce((sum, a) => sum + (a.bytes || 0), 0);
     const totalOrphanMB = (totalOrphanBytes / (1024 * 1024)).toFixed(2);
 
