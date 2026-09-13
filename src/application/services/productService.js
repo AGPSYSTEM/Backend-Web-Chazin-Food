@@ -352,7 +352,7 @@ class ProductService {
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado, configuracionCombo } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado, configuracionCombo, variantes } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -381,9 +381,15 @@ class ProductService {
 
     const normalizedEstado = estado === 'Inactivo' || estado === 0 || estado === '0' ? 0 : 1;
 
+    let initialPrice = Number(precio) || 0;
+    if (Array.isArray(variantes) && variantes.length > 0 && Number(variantes[0].precio) > 0) {
+      initialPrice = Number(variantes[0].precio);
+    }
+
     const product = await Product.create({
       idCategoriaProducto: resolvedCatId,
       nombre: nombre.trim(),
+      precio: initialPrice,
       descripcion: descripcion || '',
       imagen: imagen || '',
       categoria: categoria || '',
@@ -392,7 +398,18 @@ class ProductService {
       configuracionCombo: configuracionCombo ? (typeof configuracionCombo === 'object' ? JSON.stringify(configuracionCombo) : configuracionCombo) : null
     });
 
-    if (precio !== undefined && precio !== null && precio !== '') {
+    if (Array.isArray(variantes) && variantes.length > 0) {
+      for (const v of variantes) {
+        if (v.nombre && v.nombre.trim()) {
+          await Variante.create({
+            idProducto: product.idProducto,
+            nombre: v.nombre.trim(),
+            precio: Number(v.precio) >= 0 ? Number(v.precio) : initialPrice,
+            estado: normalizedEstado
+          });
+        }
+      }
+    } else if (precio !== undefined && precio !== null && precio !== '') {
       await Variante.create({
         idProducto: product.idProducto,
         nombre: `${nombre.trim()} - base`,
@@ -412,7 +429,7 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo, variantes } = data;
 
     // Si la imagen se actualiza o se quita, y existía una imagen previa en Cloudinary, eliminarla
     if (imagen !== undefined && p.imagen && p.imagen !== imagen) {
@@ -439,9 +456,48 @@ class ProductService {
       p.configuracionCombo = typeof configuracionCombo === 'object' ? JSON.stringify(configuracionCombo) : configuracionCombo;
     }
 
-    await p.save();
+    if (Array.isArray(variantes)) {
+      const currentVars = await Variante.findAll({ where: { idProducto: id } });
+      const incomingIds = variantes.map(v => v.idVariante || v.id).filter(Boolean);
 
-    if (precio !== undefined && precio !== null && precio !== '') {
+      // Eliminar variantes removidas
+      for (const cur of currentVars) {
+        if (!incomingIds.includes(cur.idVariante)) {
+          try {
+            await cur.destroy();
+          } catch (err) {
+            cur.estado = 0;
+            await cur.save();
+          }
+        }
+      }
+
+      // Actualizar existentes o crear nuevas
+      for (const v of variantes) {
+        if (!v.nombre || !v.nombre.trim()) continue;
+        const varId = v.idVariante || v.id;
+        const found = currentVars.find(c => c.idVariante === varId);
+        const vPrice = Number(v.precio) >= 0 ? Number(v.precio) : (Number(precio) || 0);
+        if (found) {
+          found.nombre = v.nombre.trim();
+          found.precio = vPrice;
+          found.estado = 1;
+          await found.save();
+        } else {
+          await Variante.create({
+            idProducto: id,
+            nombre: v.nombre.trim(),
+            precio: vPrice,
+            estado: 1
+          });
+        }
+      }
+
+      if (variantes.length > 0 && Number(variantes[0].precio) >= 0) {
+        p.precio = Number(variantes[0].precio);
+      }
+    } else if (precio !== undefined && precio !== null && precio !== '') {
+      p.precio = Number(precio);
       let variante = await Variante.findOne({ where: { idProducto: id } });
       if (!variante) {
         variante = await Variante.create({
@@ -456,6 +512,7 @@ class ProductService {
       }
     }
 
+    await p.save();
     return this.getProductById(id);
   }
 
