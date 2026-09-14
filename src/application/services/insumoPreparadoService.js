@@ -161,6 +161,31 @@ class InsumoPreparadoService {
       throw error;
     }
 
+    // Validar que la ficha técnica sea obligatoria al crear
+    if (!fichaTecnica) {
+      const error = new Error('La ficha técnica es obligatoria para crear un insumo preparado. Por favor completa todos los campos de la ficha técnica.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const ftIngredientes = fichaTecnica.detalles || fichaTecnica.insumos || fichaTecnica.ingredientes || [];
+    const camposFaltantes = [];
+    if (!ftIngredientes || ftIngredientes.length === 0) camposFaltantes.push('Ingredientes');
+    if (!fichaTecnica.procedimiento || !String(fichaTecnica.procedimiento).trim()) camposFaltantes.push('Procedimiento');
+    if (!fichaTecnica.tiempoPreparacion || Number(fichaTecnica.tiempoPreparacion) < 1) camposFaltantes.push('Tiempo de Preparación');
+    if (!fichaTecnica.rendimiento || !String(fichaTecnica.rendimiento).trim()) camposFaltantes.push('Rendimiento');
+    if (!fichaTecnica.condicionesAlmacenamiento || !String(fichaTecnica.condicionesAlmacenamiento).trim()) camposFaltantes.push('Condiciones de Almacenamiento');
+    if (!fichaTecnica.vidaUtil || !String(fichaTecnica.vidaUtil).trim()) camposFaltantes.push('Vida Útil');
+    if (!fichaTecnica.especificaciones || !String(fichaTecnica.especificaciones).trim()) camposFaltantes.push('Especificaciones');
+    if (!fichaTecnica.caracteristicas || !String(fichaTecnica.caracteristicas).trim()) camposFaltantes.push('Características Organolépticas');
+    if (!fichaTecnica.informacionNutricional || !String(fichaTecnica.informacionNutricional).trim()) camposFaltantes.push('Información Nutricional');
+
+    if (camposFaltantes.length > 0) {
+      const error = new Error(`Ficha técnica incompleta. Campos faltantes: ${camposFaltantes.join(', ')}`);
+      error.statusCode = 400;
+      throw error;
+    }
+
     const itemsList = insumos || componentes || [];
     let costoTotal = 0;
     itemsList.forEach(item => {

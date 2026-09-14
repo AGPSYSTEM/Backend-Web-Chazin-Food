@@ -166,7 +166,7 @@ async function ensureFichaTecnicaInsumoVariantZero() {
     }
 
     await sequelize.query("UPDATE `fichatecnica` SET `idVariante` = 0 WHERE `tipo` = 'INSUMO' AND `idVariante` IS NULL", { transaction });
-    await sequelize.query("UPDATE `fichatecnica` SET `idInsumo` = NULL WHERE `idInsumo` = 0", { transaction });
+    await sequelize.query("UPDATE `fichatecnica` SET `idInsumo` = NULL WHERE `idInsumo` = '0'", { transaction });
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction });
     await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction });
     await transaction.commit();
@@ -321,6 +321,20 @@ async function ensureCategoriaProductoIconSchema() {
   }
 }
 
+async function ensureConfiguracionComboSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `producto` LIKE 'configuracionCombo'");
+    if (cols.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `producto` ADD COLUMN `configuracionCombo` TEXT NULL AFTER `adiciones`"
+      );
+    }
+  } catch (err) {
+    console.warn("Error ensuring producto configuracionCombo schema:", err.message);
+  }
+}
+
 /**
  * Ensures table `venta` contains the `estadoAprobacion` column.
  * Also backfills existing rows: orders already in PREPARANDO/LISTO/ENTREGADO get APROBADO,
@@ -450,6 +464,7 @@ module.exports = {
   ensureEventoColumnsSchema,
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
+  ensureConfiguracionComboSchema,
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,

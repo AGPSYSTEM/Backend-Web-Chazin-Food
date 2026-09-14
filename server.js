@@ -20,6 +20,7 @@ const {
   ensureEventoColumnsSchema,
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
+  ensureConfiguracionComboSchema,
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,
@@ -37,6 +38,7 @@ const {
     await ensureFichaTecnicaInsumoVariantZero();
     await ensureEventoColumnsSchema();
     await ensureCategoriaProductoIconSchema();
+    await ensureConfiguracionComboSchema();
     await ensureVentaAprobacionSchema();
     await syncVentasTotals();
     await resequenceAllCoreTables();
