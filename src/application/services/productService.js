@@ -309,6 +309,7 @@ class ProductService {
           adiciones,
           configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
           eventos: formatActiveEventos(p.eventos, now),
+          fichaTecnica: p.fichaTecnica ? (typeof p.fichaTecnica.toJSON === 'function' ? p.fichaTecnica.toJSON() : p.fichaTecnica) : null,
           ventas: realVentas,
           totalVendidos: realVentas
         };
@@ -420,6 +421,7 @@ class ProductService {
       adiciones,
       configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
       eventos: formatActiveEventos(p.eventos, new Date()),
+      fichaTecnica: p.fichaTecnica ? (typeof p.fichaTecnica.toJSON === 'function' ? p.fichaTecnica.toJSON() : p.fichaTecnica) : null,
       ventas: realVentas,
       totalVendidos: realVentas
     };

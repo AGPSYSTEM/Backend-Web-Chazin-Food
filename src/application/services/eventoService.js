@@ -192,6 +192,17 @@ class EventoService {
     // Bidireccional: Crear producto desde el evento si se solicita
     if (crearComoProducto) {
       const pData = productoNuevo || {};
+      const fData = pData.fichaTecnica || {};
+      const listaInsumos = (Array.isArray(fData.detalles) && fData.detalles.length > 0)
+        ? fData.detalles
+        : (Array.isArray(pData.insumosFicha) ? pData.insumosFicha : []);
+
+      if (listaInsumos.length === 0) {
+        const error = new Error('La ficha técnica es obligatoria para crear un producto. Debe incluir al menos un insumo o ingrediente base para costeo y receta.');
+        error.statusCode = 400;
+        throw error;
+      }
+
       const prodNombre = pData.nombre || finalNombre;
       const prodDesc = pData.descripcion || descripcion || 'Edición especial de temporada festiva';
       const prodPrecio = pData.precio || (nuevoPrecio ? parseFloat(nuevoPrecio) * 1.15 : 25000);
