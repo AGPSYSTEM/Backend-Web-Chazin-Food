@@ -205,23 +205,39 @@ class EventoService {
         precio: prodPrecio,
         imagen: prodImagen,
         adiciones: pData.adiciones ? (typeof pData.adiciones === 'string' ? pData.adiciones : JSON.stringify(pData.adiciones)) : '[]',
+        configuracionCombo: pData.configuracionCombo ? (typeof pData.configuracionCombo === 'string' ? pData.configuracionCombo : JSON.stringify(pData.configuracionCombo)) : null,
         estado: 1
       });
 
       finalProductoId = nuevoProd.idProducto;
 
-      // Crear Variante predeterminada
-      const nuevaVariante = await Variante.create({
-        idProducto: nuevoProd.idProducto,
-        nombre: 'Edición Especial',
-        precio: nuevoPrecio || prodPrecio,
-        estado: 1
-      });
+      // Crear Variantes (si vienen variantes personalizadas, crearlas; de lo contrario crear la predeterminada)
+      let primaryVarianteId = null;
+      if (Array.isArray(pData.variantes) && pData.variantes.length > 0) {
+        for (let i = 0; i < pData.variantes.length; i++) {
+          const v = pData.variantes[i];
+          const createdV = await Variante.create({
+            idProducto: nuevoProd.idProducto,
+            nombre: v.nombre || (i === 0 ? 'Edición Especial' : `Opción #${i + 1}`),
+            precio: v.precio !== undefined && v.precio !== "" ? Number(v.precio) : (nuevoPrecio || prodPrecio),
+            estado: 1
+          });
+          if (i === 0) primaryVarianteId = createdV.idVariante;
+        }
+      } else {
+        const nuevaVariante = await Variante.create({
+          idProducto: nuevoProd.idProducto,
+          nombre: 'Edición Especial',
+          precio: nuevoPrecio || prodPrecio,
+          estado: 1
+        });
+        primaryVarianteId = nuevaVariante.idVariante;
+      }
 
       // Crear Ficha Técnica
       const nuevaFicha = await FichaTecnica.create({
         idProducto: nuevoProd.idProducto,
-        idVariante: nuevaVariante.idVariante,
+        idVariante: primaryVarianteId,
         tipo: 'PRODUCTO',
         descripcion: `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`,
         procedimiento: pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
