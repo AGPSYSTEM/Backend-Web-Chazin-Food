@@ -246,7 +246,6 @@ class EventoService {
       }
 
       // Crear Ficha Técnica Oficial Completa
-      const fData = pData.fichaTecnica || {};
       const nuevaFicha = await FichaTecnica.create({
         idProducto: nuevoProd.idProducto,
         idVariante: primaryVarianteId,
@@ -265,10 +264,6 @@ class EventoService {
       });
 
       // Si vienen insumos para la ficha técnica, asociarlos
-      const listaInsumos = (Array.isArray(fData.detalles) && fData.detalles.length > 0)
-        ? fData.detalles
-        : (Array.isArray(pData.insumosFicha) ? pData.insumosFicha : []);
-
       if (listaInsumos.length > 0) {
         for (const item of listaInsumos) {
           const insId = item.idInsumo || item.id;
