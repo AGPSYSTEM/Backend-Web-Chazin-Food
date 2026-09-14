@@ -206,7 +206,7 @@ class EventoService {
         imagen: prodImagen,
         adiciones: pData.adiciones ? (typeof pData.adiciones === 'string' ? pData.adiciones : JSON.stringify(pData.adiciones)) : '[]',
         configuracionCombo: pData.configuracionCombo ? (typeof pData.configuracionCombo === 'string' ? pData.configuracionCombo : JSON.stringify(pData.configuracionCombo)) : null,
-        estado: 1
+        estado: pData.estado === 'Inactivo' || pData.estado === 0 ? 0 : 1
       });
 
       finalProductoId = nuevoProd.idProducto;
@@ -241,20 +241,23 @@ class EventoService {
         tipo: 'PRODUCTO',
         descripcion: `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`,
         procedimiento: pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
-        tiempoPreparacion: pData.tiempoPreparacion || 12,
-        rendimiento: '1 porción',
+        tiempoPreparacion: Number(pData.tiempoPreparacion) || 12,
+        rendimiento: pData.rendimiento || '1 porción',
         estado: 1
       });
 
       // Si vienen insumos para la ficha técnica, asociarlos
       if (Array.isArray(pData.insumosFicha) && pData.insumosFicha.length > 0) {
         for (const item of pData.insumosFicha) {
-          await DetalleFichaInsumo.create({
-            idFichaTecnica: nuevaFicha.idFichaTecnica,
-            idInsumo: item.idInsumo,
-            cantidad: item.cantidad || 1,
-            unidadMedida: item.unidadMedida || 'und'
-          });
+          const insId = item.idInsumo || item.id;
+          if (insId) {
+            await DetalleFichaInsumo.create({
+              idFichaTecnica: nuevaFicha.idFichaTecnica,
+              idInsumo: Number(insId),
+              cantidad: Number(item.cantidad || 1),
+              unidadMedida: item.unidadMedida || 'und'
+            });
+          }
         }
       }
     }
