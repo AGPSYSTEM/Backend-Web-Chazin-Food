@@ -142,7 +142,7 @@ function formatActiveEventos(rawEventos, now = new Date()) {
     });
 }
 
-function resolveComboConfig(rawConfig, prodName, catName) {
+function resolveComboConfig(rawConfig, prodName, catName, prodDesc = '') {
   let cfg = null;
   if (rawConfig) {
     try {
@@ -152,10 +152,6 @@ function resolveComboConfig(rawConfig, prodName, catName) {
     }
   }
 
-  const pLower = String(prodName || '').toLowerCase();
-  const cLower = String(catName || '').toLowerCase();
-  const isCombo = cLower.includes('combo') || pLower.includes('combo');
-
   if (cfg && typeof cfg === 'object' && cfg.esCombo !== undefined) {
     return {
       esCombo: Boolean(cfg.esCombo),
@@ -164,7 +160,25 @@ function resolveComboConfig(rawConfig, prodName, catName) {
     };
   }
 
-  // Fallback inteligente para combos de catálogo
+  const pLower = String(prodName || '').toLowerCase();
+  const cLower = String(catName || '').toLowerCase();
+  const dLower = String(prodDesc || '').toLowerCase();
+
+  const isCombo =
+    cLower.includes('combo') ||
+    pLower.includes('combo') ||
+    pLower.includes('+ bebida') ||
+    pLower.includes('+bebida') ||
+    pLower.includes('con bebida') ||
+    pLower.includes('+ gaseosa') ||
+    pLower.includes('+gaseosa') ||
+    pLower.includes('con gaseosa') ||
+    dLower.includes('+ gaseosa') ||
+    dLower.includes('+ bebida') ||
+    dLower.includes('bebida a elección') ||
+    dLower.includes('gaseosa a elección');
+
+  // Fallback inteligente para combos de catálogo o productos con bebida incluida
   if (isCombo) {
     let cant = 1;
     if (pLower.includes('familiar') || pLower.includes('4 personas') || pLower.includes('4 pers')) {
@@ -263,7 +277,7 @@ class ProductService {
           insumosCriticos: stockInfo.insumosCriticos,
           variantes,
           adiciones,
-          configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria),
+          configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
           eventos: formatActiveEventos(p.eventos, now),
           ventas: realVentas,
           totalVendidos: realVentas
@@ -344,7 +358,7 @@ class ProductService {
       insumosCriticos: stockInfo.insumosCriticos,
       variantes,
       adiciones,
-      configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria),
+      configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
       eventos: formatActiveEventos(p.eventos, new Date()),
       ventas: realVentas,
       totalVendidos: realVentas
