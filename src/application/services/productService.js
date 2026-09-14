@@ -1,4 +1,4 @@
-const { Product, CategoriaProducto, Evento, Variante, FichaTecnica, DetalleFichaInsumo, Insumo } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante, FichaTecnica, DetalleFichaInsumo, Insumo, Adicion } = require('../../persistence/models');
 
 function convertUnits(amount, fromUnit, toUnit) {
   if (!amount || isNaN(amount)) return 0;
@@ -236,16 +236,46 @@ class ProductService {
       ]
     });
 
+    const activeAdiciones = await Adicion.findAll({ where: { estado: 1 } });
+    const adicMap = {};
+    activeAdiciones.forEach(a => {
+      adicMap[a.idAdicion] = {
+        idAdicion: a.idAdicion,
+        id: a.idAdicion,
+        nombre: a.nombre,
+        precio: parseFloat(a.precio || 0),
+        imagen: a.imagen || ''
+      };
+    });
+
     const now = new Date();
     return products
       .filter(p => p.idProducto !== 0 && !p.nombre?.startsWith('__SISTEMA'))
       .map(p => {
-        let adiciones = [];
+        let rawAdiciones = [];
         try {
-          adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
+          rawAdiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
         } catch (e) {
-          adiciones = [];
+          rawAdiciones = [];
         }
+
+        let adiciones = Array.isArray(rawAdiciones) ? rawAdiciones.map(a => {
+          if (typeof a === 'number' || typeof a === 'string') {
+            return adicMap[a] || null;
+          }
+          if (a && typeof a === 'object') {
+            const idAd = a.idAdicion || a.id;
+            const fromMap = idAd ? adicMap[idAd] : null;
+            return {
+              idAdicion: idAd,
+              id: idAd,
+              nombre: a.nombre || fromMap?.nombre || `Adición #${idAd}`,
+              precio: a.precio !== undefined ? Number(a.precio) : (fromMap?.precio || 0),
+              imagen: a.imagen || fromMap?.imagen || ''
+            };
+          }
+          return null;
+        }).filter(Boolean) : [];
 
         const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
         const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
@@ -322,12 +352,42 @@ class ProductService {
       throw error;
     }
 
-    let adiciones = [];
+    const activeAdiciones = await Adicion.findAll({ where: { estado: 1 } });
+    const adicMap = {};
+    activeAdiciones.forEach(a => {
+      adicMap[a.idAdicion] = {
+        idAdicion: a.idAdicion,
+        id: a.idAdicion,
+        nombre: a.nombre,
+        precio: parseFloat(a.precio || 0),
+        imagen: a.imagen || ''
+      };
+    });
+
+    let rawAdiciones = [];
     try {
-      adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
+      rawAdiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
     } catch (e) {
-      adiciones = [];
+      rawAdiciones = [];
     }
+
+    let adiciones = Array.isArray(rawAdiciones) ? rawAdiciones.map(a => {
+      if (typeof a === 'number' || typeof a === 'string') {
+        return adicMap[a] || null;
+      }
+      if (a && typeof a === 'object') {
+        const idAd = a.idAdicion || a.id;
+        const fromMap = idAd ? adicMap[idAd] : null;
+        return {
+          idAdicion: idAd,
+          id: idAd,
+          nombre: a.nombre || fromMap?.nombre || `Adición #${idAd}`,
+          precio: a.precio !== undefined ? Number(a.precio) : (fromMap?.precio || 0),
+          imagen: a.imagen || fromMap?.imagen || ''
+        };
+      }
+      return null;
+    }).filter(Boolean) : [];
 
     const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
     const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0

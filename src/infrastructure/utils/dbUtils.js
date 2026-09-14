@@ -454,6 +454,84 @@ async function ensureInsumoEliminadoSchema() {
   }
 }
 
+/**
+ * Ensures food products (Hamburguesas, Perros, Salchipapas, Combos, etc.)
+ * have their appropriate additions configured in `producto.adiciones`
+ * if they are currently null or empty '[]'.
+ */
+async function ensureProductoAdicionesDefaultSchema() {
+  const { Product, Adicion } = require('../../persistence/models');
+  try {
+    const activeAdiciones = await Adicion.findAll({ where: { estado: 1 } });
+    if (!activeAdiciones || activeAdiciones.length === 0) return;
+
+    const adicMap = {};
+    activeAdiciones.forEach(a => {
+      adicMap[a.idAdicion] = {
+        idAdicion: a.idAdicion,
+        nombre: a.nombre,
+        precio: parseFloat(a.precio || 0),
+        imagen: a.imagen || ''
+      };
+    });
+
+    const products = await Product.findAll();
+    let updatedCount = 0;
+
+    for (const prod of products) {
+      if (prod.idProducto === 0 || prod.nombre?.startsWith('__SISTEMA')) continue;
+
+      let currentAdiciones = [];
+      try {
+        currentAdiciones = typeof prod.adiciones === 'string' ? JSON.parse(prod.adiciones) : (prod.adiciones || []);
+      } catch (e) {
+        currentAdiciones = [];
+      }
+
+      // Si no tiene adiciones configuradas y pertenece a categorías de comida rápida
+      if (!Array.isArray(currentAdiciones) || currentAdiciones.length === 0) {
+        const catId = prod.idCategoriaProducto;
+        let adicIds = [];
+
+        if (catId === 3) {
+          // Hamburguesas
+          adicIds = [3, 4, 5, 6, 7, 8, 9, 10, 12, 13];
+        } else if (catId === 1) {
+          // Perros Calientes
+          adicIds = [3, 4, 5, 7, 8, 10, 12];
+        } else if (catId === 5) {
+          // Salchipapas Gourmet
+          adicIds = [3, 4, 11, 12, 13, 7, 8, 9, 10];
+        } else if (catId === 2) {
+          // Combos
+          adicIds = [3, 4, 5, 8, 9, 10, 12, 13];
+        } else if (catId === 6) {
+          // Acompañamientos / Papas con toppings
+          const pNameLower = (prod.nombre || '').toLowerCase();
+          if (!pNameLower.includes('gaseosa') && !pNameLower.includes('agua')) {
+            adicIds = [3, 4, 12, 11, 7, 8, 9, 10];
+          }
+        }
+
+        if (adicIds.length > 0) {
+          const formatted = adicIds.map(id => adicMap[id]).filter(Boolean);
+          if (formatted.length > 0) {
+            prod.adiciones = JSON.stringify(formatted);
+            await prod.save();
+            updatedCount++;
+          }
+        }
+      }
+    }
+
+    if (updatedCount > 0) {
+      console.log(`[DB] ✅ Adiciones predeterminadas configuradas exitosamente en ${updatedCount} productos de comida.`);
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando adiciones por defecto:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -469,5 +547,6 @@ module.exports = {
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,
   ensureNoNegativeStock,
-  ensureInsumoEliminadoSchema
+  ensureInsumoEliminadoSchema,
+  ensureProductoAdicionesDefaultSchema
 };
