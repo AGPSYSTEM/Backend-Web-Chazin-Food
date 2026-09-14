@@ -234,21 +234,32 @@ class EventoService {
         primaryVarianteId = nuevaVariante.idVariante;
       }
 
-      // Crear Ficha Técnica
+      // Crear Ficha Técnica Oficial Completa
+      const fData = pData.fichaTecnica || {};
       const nuevaFicha = await FichaTecnica.create({
         idProducto: nuevoProd.idProducto,
         idVariante: primaryVarianteId,
         tipo: 'PRODUCTO',
-        descripcion: `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`,
-        procedimiento: pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
-        tiempoPreparacion: Number(pData.tiempoPreparacion) || 12,
-        rendimiento: pData.rendimiento || '1 porción',
+        descripcion: fData.descripcion || `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`,
+        procedimiento: fData.procedimiento || pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
+        tiempoPreparacion: Number(fData.tiempoPreparacion || pData.tiempoPreparacion) || 12,
+        rendimiento: fData.rendimiento || pData.rendimiento || '1 porción',
+        especificaciones: fData.especificaciones || '',
+        caracteristicas: fData.caracteristicas || '',
+        informacionNutricional: fData.informacionNutricional || '',
+        condicionesAlmacenamiento: fData.condicionesAlmacenamiento || '',
+        vidaUtil: fData.vidaUtil || '',
+        observaciones: fData.observaciones || '',
         estado: 1
       });
 
       // Si vienen insumos para la ficha técnica, asociarlos
-      if (Array.isArray(pData.insumosFicha) && pData.insumosFicha.length > 0) {
-        for (const item of pData.insumosFicha) {
+      const listaInsumos = (Array.isArray(fData.detalles) && fData.detalles.length > 0)
+        ? fData.detalles
+        : (Array.isArray(pData.insumosFicha) ? pData.insumosFicha : []);
+
+      if (listaInsumos.length > 0) {
+        for (const item of listaInsumos) {
           const insId = item.idInsumo || item.id;
           if (insId) {
             await DetalleFichaInsumo.create({
