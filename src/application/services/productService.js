@@ -366,7 +366,7 @@ class ProductService {
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado, configuracionCombo, variantes } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado, configuracionCombo, variantes, fichaTecnica } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -376,6 +376,31 @@ class ProductService {
     const existing = await Product.findOne({ where: { nombre: nombre.trim() } });
     if (existing) {
       const error = new Error('Ya existe un producto registrado con ese nombre');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Validar que la ficha técnica sea obligatoria al crear un producto
+    if (!fichaTecnica) {
+      const error = new Error('La ficha técnica es obligatoria para crear un producto. Por favor completa todos los campos de la ficha técnica antes de guardar.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const ftIngredientes = fichaTecnica.detalles || fichaTecnica.insumos || fichaTecnica.ingredientes || [];
+    const camposFaltantes = [];
+    if (!ftIngredientes || ftIngredientes.length === 0) camposFaltantes.push('Ingredientes');
+    if (!fichaTecnica.procedimiento || !String(fichaTecnica.procedimiento).trim()) camposFaltantes.push('Procedimiento');
+    if (!fichaTecnica.tiempoPreparacion || Number(fichaTecnica.tiempoPreparacion) < 1) camposFaltantes.push('Tiempo de Preparación');
+    if (!fichaTecnica.rendimiento || !String(fichaTecnica.rendimiento).trim()) camposFaltantes.push('Rendimiento');
+    if (!fichaTecnica.condicionesAlmacenamiento || !String(fichaTecnica.condicionesAlmacenamiento).trim()) camposFaltantes.push('Condiciones de Almacenamiento');
+    if (!fichaTecnica.vidaUtil || !String(fichaTecnica.vidaUtil).trim()) camposFaltantes.push('Vida Útil');
+    if (!fichaTecnica.especificaciones || !String(fichaTecnica.especificaciones).trim()) camposFaltantes.push('Especificaciones');
+    if (!fichaTecnica.caracteristicas || !String(fichaTecnica.caracteristicas).trim()) camposFaltantes.push('Características Organolépticas');
+    if (!fichaTecnica.informacionNutricional || !String(fichaTecnica.informacionNutricional).trim()) camposFaltantes.push('Información Nutricional');
+
+    if (camposFaltantes.length > 0) {
+      const error = new Error(`Ficha técnica incompleta. Campos faltantes: ${camposFaltantes.join(', ')}`);
       error.statusCode = 400;
       throw error;
     }
