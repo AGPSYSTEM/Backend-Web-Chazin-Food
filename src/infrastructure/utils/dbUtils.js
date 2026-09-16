@@ -230,7 +230,8 @@ async function ensureEventoColumnsSchema() {
       { name: 'nuevoPrecio', sql: 'ALTER TABLE `evento` ADD COLUMN `nuevoPrecio` DECIMAL(10,2) NULL' },
       { name: 'accionInsumo', sql: 'ALTER TABLE `evento` ADD COLUMN `accionInsumo` VARCHAR(20) NULL' },
       { name: 'insumosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `insumosAsociados` TEXT NULL' },
-      { name: 'productosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `productosAsociados` TEXT NULL' }
+      { name: 'productosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `productosAsociados` TEXT NULL' },
+      { name: 'icono', sql: 'ALTER TABLE `evento` ADD COLUMN `icono` VARCHAR(50) NULL' }
     ];
 
     for (const col of columnsToCheck) {
