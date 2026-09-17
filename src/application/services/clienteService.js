@@ -49,8 +49,13 @@ class ClienteService {
     let ticketPromedioVal = 0;
 
     try {
+      const { Op } = require('sequelize');
       const ventasDB = await Venta.findAll({
-        where: { idCliente: c.idCliente },
+        where: {
+          idCliente: c.idCliente,
+          estadoEntrega: { [Op.ne]: 'CANCELADO' },
+          estadoAprobacion: { [Op.ne]: 'RECHAZADO' }
+        },
         order: [['idVenta', 'DESC']],
         include: [{ model: DetalleVentaProducto, as: 'detalles' }]
       });

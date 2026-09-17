@@ -951,12 +951,7 @@ class VentaService {
       }
     }
 
-    if ((estadoEnum === 'ENTREGADO' || estadoEnum === 'APROBADO') && v.idCliente) {
-      const ClienteService = require('./clienteService');
-      ClienteService.registrarCompraFidelidad(v.idCliente).catch(err =>
-        console.warn('Error registrando fidelidad en cambio de estado:', err.message)
-      );
-    }
+    // Nota: la fidelidad se registra de forma única y atómica al crear la venta en el método create()
 
     return this.getById(id);
   }
