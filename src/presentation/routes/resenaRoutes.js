@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getProductResenas,
+  getUserResenas,
   getRatingsBulk,
   getMiResena,
   createResena,
@@ -12,6 +13,7 @@ const { protect } = require('../../infrastructure/middlewares/authMiddleware');
 
 // Públicas
 router.get('/producto/:idProducto', getProductResenas);
+router.get('/usuario/:idUsuario', getUserResenas);
 router.get('/ratings', getRatingsBulk); // ?ids=1,2,3
 
 // Protegidas (requieren sesión)

@@ -140,6 +140,14 @@ class CompraService {
     return this.getById(compra.idCompra);
   }
 
+  /**
+   * Ajusta el stock de los insumos asociados a una compra.
+   * signo = +1 para sumar (compra recibida), -1 para restar (reversa/anulación).
+   *
+   * CORRECCIÓN: Lee el stock actual desde la BD y calcula el nuevo valor antes de guardarlo.
+   * Esto evita el bug de duplicación que ocurría con sequelize.literal(CAST...) cuando
+   * el valor era NULL o cuando había problemas de tipo en la BD.
+   */
   static async _ajustarStockPorCompra(compra, signo) {
     if (!compra || !compra.idCompra) return;
 
@@ -165,6 +173,7 @@ class CompraService {
     const proveedorNombre = proveedor ? proveedor.nombre : `Proveedor #${compraCompleta.idProveedor}`;
     const numeroFactura = `COMP-${String(idCompra).padStart(4, '0')}`;
 
+    // Agrupar cantidades por insumo para manejar correctamente detalles duplicados
     const mapaAgrupado = new Map();
     for (const d of detalles) {
       const idIns = Number(d.idInsumo);
@@ -191,26 +200,40 @@ class CompraService {
 
     for (const [idIns, entry] of mapaAgrupado.entries()) {
       try {
-        const cantidadAjuste = signo * entry.cantidadTotal;
-        console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${idCompra} (estado=${estadoNormalizado}): ${cantidadAjuste >= 0 ? "+" : ""}${cantidadAjuste}`);
+        const cantidadAjuste = entry.cantidadTotal; // siempre positivo
+
+        // CORRECCIÓN: Leer stock actual desde BD y calcular nuevo valor de forma segura
+        // Esto evita el bug de duplicación que ocurría con sequelize.literal
+        const insumo = await Insumo.findByPk(idIns);
+        if (!insumo) {
+          console.warn(`[COMPRA STOCK] Insumo #${idIns} no encontrado, saltando...`);
+          continue;
+        }
+
+        const stockActual = parseFloat(insumo.stock) || 0;
+        const nuevoStock = signo > 0
+          ? stockActual + cantidadAjuste
+          : Math.max(0, stockActual - cantidadAjuste);
+
+        console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${idCompra}: stock=${stockActual} ${signo > 0 ? "+" : "-"}${cantidadAjuste} = ${nuevoStock}`);
+
+        // Actualizar con valor absoluto calculado (NO con literal SQL relativo)
         await Insumo.update(
-          { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${cantidadAjuste}`) },
+          { stock: nuevoStock },
           { where: { idInsumo: idIns } }
         );
+
         try {
-          const insumo = await Insumo.findByPk(idIns);
-          if (insumo) {
-            await TrazabilidadService.create({
-              tipo: 'compra',
-              entidadNombre: insumo.nombre,
-              detalle: `${signo > 0 ? "Reabastecimiento" : "Reversa"} por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')} | Estado final: ${estadoNormalizado}`,
-              idInsumo: idIns,
-              tipoMovimiento: tipoMovimiento,
-              cantidad: Math.abs(cantidadAjuste),
-              motivo: motivoAjuste,
-              skipStockUpdate: true
-            });
-          }
+          await TrazabilidadService.create({
+            tipo: 'compra',
+            entidadNombre: insumo.nombre,
+            detalle: `${signo > 0 ? "Reabastecimiento" : "Reversa"} por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')} | Estado final: ${estadoNormalizado}`,
+            idInsumo: idIns,
+            tipoMovimiento: tipoMovimiento,
+            cantidad: cantidadAjuste,
+            motivo: motivoAjuste,
+            skipStockUpdate: true
+          });
         } catch (tzErr) {
           console.warn(`[COMPRA STOCK] Error registrando trazabilidad para insumo #${idIns}:`, tzErr.message);
         }
@@ -220,41 +243,72 @@ class CompraService {
     }
   }
 
+  /**
+   * Actualiza el estado de una compra y ajusta el stock si corresponde.
+   *
+   * CORRECCIÓN ANTI-DUPLICACIÓN:
+   * 1. Usa una transacción con bloqueo de fila (LOCK.UPDATE) para prevenir
+   *    race conditions causadas por doble-click o peticiones concurrentes.
+   * 2. Guarda el nuevo estado en la BD y hace commit ANTES de ajustar el stock.
+   *    Así, si llega una segunda petición concurrente, verá el estado ya actualizado
+   *    y no volverá a ajustar el stock.
+   */
   static async updateEstado(id, estado) {
-    const c = await Compra.findByPk(id);
-    if (!c) {
-      const error = new Error('Compra no encontrada');
-      error.statusCode = 404;
-      throw error;
-    }
-    const estadoAnterior = normalizarEstado(c.estado);
-    const estadoNuevo = normalizarEstado(estado);
-    console.log(`[COMPRA UPDATE_ESTADO] #${id}: ${estadoAnterior} → ${estadoNuevo}`);
+    const t = await sequelize.transaction();
+    let estadoAnterior;
+    let estadoNuevo;
+    try {
+      const c = await Compra.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!c) {
+        await t.rollback();
+        const error = new Error('Compra no encontrada');
+        error.statusCode = 404;
+        throw error;
+      }
 
-    if (estadoAnterior !== estadoNuevo) {
+      estadoAnterior = normalizarEstado(c.estado);
+      estadoNuevo = normalizarEstado(estado);
+      console.log(`[COMPRA UPDATE_ESTADO] #${id}: ${estadoAnterior} → ${estadoNuevo}`);
+
+      if (estadoAnterior === estadoNuevo) {
+        console.log(`[COMPRA UPDATE_ESTADO] #${id}: estado no cambió (${estadoNuevo}) - sin acción`);
+        await t.commit();
+        return this.getById(id);
+      }
+
+      // Guardar el nuevo estado en BD y hacer COMMIT antes de ajustar stock.
+      // Esto previene que una segunda petición concurrente duplique el ajuste,
+      // ya que verá el nuevo estado y no ejecutará la misma transición.
+      c.estado = estadoNuevo;
+      await c.save({ transaction: t });
+      await t.commit();
+    } catch (err) {
+      try { if (!t.finished) await t.rollback(); } catch (_) {}
+      console.error(`[COMPRA UPDATE_ESTADO] #${id}: ERROR en transacción:`, err.message);
+      throw err;
+    }
+
+    // Ajustar stock FUERA de la transacción (ya cerrada con commit)
+    try {
       if (esEstadoRecibida(estadoAnterior) && esEstadoCancelada(estadoNuevo)) {
         console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición RECIBIDA→CANCELADA (resta stock)`);
-        await this._ajustarStockPorCompra(c, -1);
+        await this._ajustarStockPorCompra({ idCompra: id, estado: estadoAnterior }, -1);
       } else if (esEstadoPendiente(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
         console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición PENDIENTE→RECIBIDA (suma stock)`);
-        const compraValidada = { ...c.toJSON ? c.toJSON() : c, estado: estadoNuevo };
-        await this._ajustarStockPorCompra(compraValidada, +1);
+        await this._ajustarStockPorCompra({ idCompra: id, estado: estadoNuevo }, +1);
       } else if (esEstadoCancelada(estadoAnterior) && esEstadoRecibida(estadoNuevo)) {
         console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición CANCELADA→RECIBIDA (suma stock)`);
-        const compraValidada = { ...c.toJSON ? c.toJSON() : c, estado: estadoNuevo };
-        await this._ajustarStockPorCompra(compraValidada, +1);
+        await this._ajustarStockPorCompra({ idCompra: id, estado: estadoNuevo }, +1);
       } else if (esEstadoRecibida(estadoAnterior) && esEstadoPendiente(estadoNuevo)) {
         console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición RECIBIDA→PENDIENTE (resta stock)`);
-        await this._ajustarStockPorCompra(c, -1);
+        await this._ajustarStockPorCompra({ idCompra: id, estado: estadoAnterior }, -1);
       } else {
         console.log(`[COMPRA UPDATE_ESTADO] #${id}: transición ${estadoAnterior}→${estadoNuevo} sin impacto en stock`);
       }
-    } else {
-      console.log(`[COMPRA UPDATE_ESTADO] #${id}: estado no cambió (${estadoNuevo}) - sin acción`);
+    } catch (stockErr) {
+      console.error(`[COMPRA UPDATE_ESTADO] #${id}: ERROR al ajustar stock (estado ya guardado):`, stockErr.message);
     }
 
-    c.estado = estadoNuevo;
-    await c.save();
     return this.getById(id);
   }
 
@@ -297,9 +351,20 @@ class CompraService {
 
       try {
         const operacion = diff > 0 ? "SUMAR" : "RESTAR";
-        console.log(`[COMPRA STOCK] DIF ${operacion} insumo #${idIns} compra #${idCompra} (estadoFinal=${estadoFinalCompraNormalizado || "N/A"}): diff=${diff} (anterior=${viejo}, nuevo=${nuevo})`);
+        // CORRECCIÓN: Leer stock actual y calcular nuevo valor de forma segura
+        const insumo = await Insumo.findByPk(idIns);
+        if (!insumo) {
+          console.warn(`[COMPRA STOCK] Insumo #${idIns} no encontrado en _aplicarDiferenciaStock`);
+          continue;
+        }
+        const stockActual = parseFloat(insumo.stock) || 0;
+        const nuevoStock = diff > 0
+          ? stockActual + diff
+          : Math.max(0, stockActual + diff); // diff ya es negativo
+
+        console.log(`[COMPRA STOCK] DIF ${operacion} insumo #${idIns} compra #${idCompra}: stock=${stockActual} + diff=${diff} = ${nuevoStock}`);
         await Insumo.update(
-          { stock: sequelize.literal(`CAST(stock AS DECIMAL(10,2)) + ${diff}`) },
+          { stock: nuevoStock },
           { where: { idInsumo: idIns } }
         );
       } catch (err) {
@@ -368,6 +433,9 @@ class CompraService {
         mapaNuevo = await this._agruparCantidadesPorInsumo(detallesFinales);
       }
 
+      await t.commit();
+
+      // Ajustar stock FUERA de la transacción (ya cerrada)
       if (anteriorRecibida && nuevaRecibida) {
         console.log(`[COMPRA UPDATE] #${id}: ✅ ajustando diferencia (sigue RECIBIDA)`);
         await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
@@ -381,11 +449,10 @@ class CompraService {
         console.log(`[COMPRA UPDATE] #${id}: ⛔ GUARDIA TOTAL ACTIVADA - SIN CAMBIO DE STOCK (estado anterior y nuevo NO SON RECIBIDA). Se omiten cálculos.`);
       }
 
-      await t.commit();
-      console.log(`[COMPRA UPDATE] #${id}: commit OK (FIN)`);
+      console.log(`[COMPRA UPDATE] #${id}: FIN`);
       return this.getById(id);
     } catch (err) {
-      try { await t.rollback(); } catch (_) {}
+      try { if (!t.finished) await t.rollback(); } catch (_) {}
       console.error(`[COMPRA UPDATE] #${id}: ERROR - rollback:`, err.message);
       throw err;
     }
