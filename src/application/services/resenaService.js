@@ -38,6 +38,36 @@ class ResenaService {
   }
 
   /**
+   * Obtiene todas las reseñas activas hechas por un usuario con info del producto.
+   */
+  static async getByUsuario(idUsuario) {
+    const resenas = await Resena.findAll({
+      where: { idUsuario, estado: 1 },
+      include: [
+        {
+          model: Product,
+          as: 'producto',
+          attributes: ['idProducto', 'nombre', 'imagen', 'categoria', 'precio']
+        }
+      ],
+      order: [['fechaResena', 'DESC']]
+    });
+
+    return resenas.map(r => ({
+      id: r.idResena,
+      idResena: r.idResena,
+      idProducto: r.idProducto,
+      productoNombre: r.producto?.nombre || 'Producto no disponible',
+      productoImagen: r.producto?.imagen || null,
+      productoCategoria: r.producto?.categoria || '',
+      puntuacion: r.puntuacion,
+      comentario: r.comentario,
+      fecha: r.fechaResena,
+      fechaResena: r.fechaResena
+    }));
+  }
+
+  /**
    * Obtiene el resumen de rating de múltiples productos a la vez (para lista de productos).
    * Retorna { [idProducto]: { promedio, total } }
    */

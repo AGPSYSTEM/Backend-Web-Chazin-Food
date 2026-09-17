@@ -10,6 +10,16 @@ const getProductResenas = async (req, res, next) => {
   }
 };
 
+const getUserResenas = async (req, res, next) => {
+  try {
+    const { idUsuario } = req.params;
+    const data = await ResenaService.getByUsuario(parseInt(idUsuario, 10));
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getRatingsBulk = async (req, res, next) => {
   try {
     // expects ?ids=1,2,3
@@ -69,6 +79,7 @@ const deleteResena = async (req, res, next) => {
 
 module.exports = {
   getProductResenas,
+  getUserResenas,
   getRatingsBulk,
   getMiResena,
   createResena,
