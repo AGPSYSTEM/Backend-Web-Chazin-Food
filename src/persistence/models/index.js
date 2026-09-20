@@ -859,6 +859,10 @@ const Variante = sequelize.define('variante', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
   },
+  imagen: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1

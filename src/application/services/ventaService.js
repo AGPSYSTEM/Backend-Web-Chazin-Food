@@ -760,9 +760,9 @@ class VentaService {
             observaciones: d.observaciones || d.observacion || d.nombre || null
           });
 
-          // Descuento Automático de Insumos según Ficha Técnica del Producto
+          // Descuento Automático de Insumos según Ficha Técnica del Producto o Variante específica
           try {
-            const { FichaTecnica, DetalleFichaInsumo, Insumo, Variante, Trazabilidad } = require('../../persistence/models');
+            const { Insumo, Variante, Trazabilidad } = require('../../persistence/models');
             let targetProductId = d.idProducto;
             if (!targetProductId && chosenVarianteId) {
               const varRow = await Variante.findByPk(chosenVarianteId);
@@ -773,43 +773,61 @@ class VentaService {
               if (varRow && varRow.idProducto) targetProductId = varRow.idProducto;
             }
 
-            if (targetProductId) {
-              const ficha = await FichaTecnica.findOne({
-                where: { idProducto: targetProductId, estado: 1 },
-                include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
-              });
+            const recipeResult = await VentaService.resolveRecipeOrInsumoForDetail(d, chosenVarianteId, targetProductId);
+            const itemQty = Number(d.cantidad || 1);
 
-              if (ficha && Array.isArray(ficha.detalles)) {
-                const itemQty = Number(d.cantidad || 1);
-                for (const det of ficha.detalles) {
-                  const cantPorPlato = Number(det.cantidad || 0);
-                  const recipeUnit = det.unidadMedida || 'und';
-                  if (cantPorPlato > 0 && det.idInsumo) {
-                    const insumo = await Insumo.findByPk(det.idInsumo);
-                    if (insumo) {
-                      const insumoUnit = insumo.unidadMedida || recipeUnit;
-                      const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
-                      const totalADescontar = cantConvertida * itemQty;
-                      const stockActual = Number(insumo.stock || 0);
-                      const nuevoStock = Math.max(0, stockActual - totalADescontar);
-                      insumo.stock = nuevoStock;
-                      await insumo.save();
+            if (recipeResult.directInsumoId) {
+              const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
+              if (insumo) {
+                const totalADescontar = itemQty;
+                const stockActual = Number(insumo.stock || 0);
+                const nuevoStock = Math.max(0, stockActual - totalADescontar);
+                insumo.stock = nuevoStock;
+                await insumo.save();
 
-                      // Registrar movimiento en trazabilidad
-                      try {
-                        await Trazabilidad.create({
-                          tipo: 'CONSUMO_VENTA',
-                          entidadNombre: insumo.nombre,
-                          detalle: `Consumo de ${totalADescontar.toFixed(2)} ${insumoUnit} por Venta #${venta.idVenta} (${itemQty}x Prod #${targetProductId})`,
-                          idInsumo: insumo.idInsumo,
-                          tipoMovimiento: 'SALIDA',
-                          cantidad: totalADescontar,
-                          motivo: `Venta #${venta.idVenta}`,
-                          usuarioId: responsibleUserId || targetUserId || null
-                        });
-                      } catch (tzErr) {
-                        console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
-                      }
+                try {
+                  await Trazabilidad.create({
+                    tipo: 'CONSUMO_VENTA',
+                    entidadNombre: insumo.nombre,
+                    detalle: `Consumo de ${totalADescontar.toFixed(2)} und por Venta #${venta.idVenta} (${itemQty}x ${insumo.nombre})`,
+                    idInsumo: insumo.idInsumo,
+                    tipoMovimiento: 'SALIDA',
+                    cantidad: totalADescontar,
+                    motivo: `Venta #${venta.idVenta}`,
+                    usuarioId: responsibleUserId || targetUserId || null
+                  });
+                } catch (tzErr) {
+                  console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
+                }
+              }
+            } else if (recipeResult.ficha && Array.isArray(recipeResult.ficha.detalles)) {
+              for (const det of recipeResult.ficha.detalles) {
+                const cantPorPlato = Number(det.cantidad || 0);
+                const recipeUnit = det.unidadMedida || 'und';
+                if (cantPorPlato > 0 && det.idInsumo) {
+                  const insumo = await Insumo.findByPk(det.idInsumo);
+                  if (insumo) {
+                    const insumoUnit = insumo.unidadMedida || recipeUnit;
+                    const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                    const totalADescontar = cantConvertida * itemQty;
+                    const stockActual = Number(insumo.stock || 0);
+                    const nuevoStock = Math.max(0, stockActual - totalADescontar);
+                    insumo.stock = nuevoStock;
+                    await insumo.save();
+
+                    try {
+                      await Trazabilidad.create({
+                        tipo: 'CONSUMO_VENTA',
+                        entidadNombre: insumo.nombre,
+                        detalle: `Consumo de ${totalADescontar.toFixed(2)} ${insumoUnit} por Venta #${venta.idVenta} (${itemQty}x Prod #${recipeResult.targetProductId || targetProductId})`,
+                        idInsumo: insumo.idInsumo,
+                        tipoMovimiento: 'SALIDA',
+                        cantidad: totalADescontar,
+                        motivo: `Venta #${venta.idVenta}`,
+                        usuarioId: responsibleUserId || targetUserId || null
+                      });
+                    } catch (tzErr) {
+                      console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
                     }
                   }
                 }
@@ -914,32 +932,35 @@ class VentaService {
       try {
         const saleData = await this.getById(id);
         if (saleData && Array.isArray(saleData.detalles)) {
-          const { FichaTecnica, DetalleFichaInsumo, Insumo, Variante } = require('../../persistence/models');
+          const { Insumo, Variante } = require('../../persistence/models');
           for (const d of saleData.detalles) {
             let prodId = d.idProducto;
             if (!prodId && d.idVariante) {
               const varRow = await Variante.findByPk(d.idVariante);
               if (varRow) prodId = varRow.idProducto;
             }
-            if (prodId) {
-              const ficha = await FichaTecnica.findOne({
-                where: { idProducto: prodId, estado: 1 },
-                include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
-              });
-              if (ficha && Array.isArray(ficha.detalles)) {
-                const itemQty = Number(d.cantidad || 1);
-                for (const det of ficha.detalles) {
-                  const cantPorPlato = Number(det.cantidad || 0);
-                  const recipeUnit = det.unidadMedida || 'und';
-                  if (cantPorPlato > 0 && det.idInsumo) {
-                    const insumo = await Insumo.findByPk(det.idInsumo);
-                    if (insumo) {
-                      const insumoUnit = insumo.unidadMedida || recipeUnit;
-                      const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
-                      const totalARestaurar = cantConvertida * itemQty;
-                      insumo.stock = Number(insumo.stock || 0) + totalARestaurar;
-                      await insumo.save();
-                    }
+
+            const recipeResult = await VentaService.resolveRecipeOrInsumoForDetail(d, d.idVariante, prodId);
+            const itemQty = Number(d.cantidad || 1);
+
+            if (recipeResult.directInsumoId) {
+              const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
+              if (insumo) {
+                insumo.stock = Number(insumo.stock || 0) + itemQty;
+                await insumo.save();
+              }
+            } else if (recipeResult.ficha && Array.isArray(recipeResult.ficha.detalles)) {
+              for (const det of recipeResult.ficha.detalles) {
+                const cantPorPlato = Number(det.cantidad || 0);
+                const recipeUnit = det.unidadMedida || 'und';
+                if (cantPorPlato > 0 && det.idInsumo) {
+                  const insumo = await Insumo.findByPk(det.idInsumo);
+                  if (insumo) {
+                    const insumoUnit = insumo.unidadMedida || recipeUnit;
+                    const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                    const totalARestaurar = cantConvertida * itemQty;
+                    insumo.stock = Number(insumo.stock || 0) + totalARestaurar;
+                    await insumo.save();
                   }
                 }
               }
@@ -954,6 +975,121 @@ class VentaService {
     // Nota: la fidelidad se registra de forma única y atómica al crear la venta en el método create()
 
     return this.getById(id);
+  }
+
+  static async resolveRecipeOrInsumoForDetail(d, chosenVarianteId, targetProductId) {
+    const { FichaTecnica, DetalleFichaInsumo, Variante, Product } = require('../../persistence/models');
+    const { Op } = require('sequelize');
+
+    // Revisar todo el texto descriptivo del ítem
+    const rawText = [
+      d.observaciones,
+      d.observacion,
+      d.nombre,
+      d.sabor,
+      d.saborSeleccionado
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    const isExplicitOriginal = rawText.includes('original') || rawText.includes('clásica') || rawText.includes('clasica') || rawText.includes('regular');
+    const hasDietKeyword = rawText.includes('sin azúcar') || rawText.includes('sin azucar') || rawText.includes('light') || rawText.includes('zero') || rawText.includes('black');
+
+    const isCoca = (targetProductId === 8) || (d.idProducto === 8) || (d.idProducto === 16) || rawText.includes('coca');
+    const isPepsi = (targetProductId === 11) || (d.idProducto === 11) || rawText.includes('pepsi');
+
+    // 1. Caso Coca-Cola: Distinguir con total precisión entre Original y Sin Azúcar / Light
+    if (isCoca) {
+      const isLightSale = !isExplicitOriginal && (
+        (d.idProducto === 16) ||
+        (d.idVariante === 20 && !rawText.includes('original')) ||
+        (d.idVariante === 76 && !rawText.includes('original')) ||
+        (d.idVariante === 77 && !rawText.includes('original')) ||
+        hasDietKeyword
+      );
+
+      if (isLightSale) {
+        // Descontar Coca-Cola Sin Azúcar / Light (Insumo 32)
+        try {
+          const fichaLight = await FichaTecnica.findOne({
+            where: { [Op.or]: [{ idProducto: 16 }, { idVariante: 20 }], estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (fichaLight && Array.isArray(fichaLight.detalles) && fichaLight.detalles.length > 0) {
+            return { ficha: fichaLight, targetProductId: 16, resolvedName: 'Coca-Cola Sin Azúcar / Light 400ml' };
+          }
+        } catch (e) {}
+        return { directInsumoId: 32, targetProductId: 16, resolvedName: 'Coca-Cola Sin Azúcar / Light 400ml' };
+      } else {
+        // Descontar Coca-Cola Original (Insumo 29)
+        try {
+          const fichaOrig = await FichaTecnica.findOne({
+            where: { idProducto: 8, idVariante: null, estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (fichaOrig && Array.isArray(fichaOrig.detalles) && fichaOrig.detalles.length > 0) {
+            return { ficha: fichaOrig, targetProductId: 8, resolvedName: 'Coca-Cola Original 400ml' };
+          }
+        } catch (e) {}
+        return { directInsumoId: 29, targetProductId: 8, resolvedName: 'Coca-Cola Original 400ml' };
+      }
+    }
+
+    // 2. Caso Pepsi: Distinguir entre Regular y Light / Black
+    if (isPepsi) {
+      const isPepsiLight = !isExplicitOriginal && (
+        (d.idVariante === 22 && !rawText.includes('regular') && !rawText.includes('original')) ||
+        hasDietKeyword
+      );
+      if (isPepsiLight) {
+        try {
+          const fichaPepsiLight = await FichaTecnica.findOne({
+            where: { idVariante: 22, estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (fichaPepsiLight && Array.isArray(fichaPepsiLight.detalles) && fichaPepsiLight.detalles.length > 0) {
+            return { ficha: fichaPepsiLight, targetProductId: 11, resolvedName: 'Pepsi Light / Black 400ml' };
+          }
+        } catch (e) {}
+        return { directInsumoId: 34, targetProductId: 11, resolvedName: 'Pepsi Light / Black 400ml' };
+      } else {
+        return { directInsumoId: 33, targetProductId: 11, resolvedName: 'Pepsi Regular 400ml' };
+      }
+    }
+
+    // 3. Demás casos generales
+    const varId = chosenVarianteId || d.idVariante;
+    let varRow = null;
+    if (varId) {
+      try {
+        varRow = await Variante.findByPk(varId);
+      } catch (e) {}
+    }
+
+    if (varId) {
+      try {
+        const fichaVar = await FichaTecnica.findOne({
+          where: { idVariante: varId, estado: 1 },
+          include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+        });
+        if (fichaVar && Array.isArray(fichaVar.detalles) && fichaVar.detalles.length > 0) {
+          return { ficha: fichaVar, targetProductId: fichaVar.idProducto || targetProductId, resolvedName: varRow?.nombre };
+        }
+      } catch (e) {}
+    }
+
+    const finalProdId = d.idProducto || targetProductId;
+    if (finalProdId) {
+      try {
+        const fichaBase = await FichaTecnica.findOne({
+          where: { idProducto: finalProdId, estado: 1 },
+          include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+        });
+        if (fichaBase) {
+          return { ficha: fichaBase, targetProductId: finalProdId };
+        }
+      } catch (e) {}
+    }
+
+    return { ficha: null, targetProductId: finalProdId };
   }
 
   static async cancelar(id) {

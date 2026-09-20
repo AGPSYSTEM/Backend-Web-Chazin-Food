@@ -218,7 +218,7 @@ class ProductService {
       attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
-        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio', 'imagen'] },
         { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
         {
           model: FichaTecnica,
@@ -283,8 +283,8 @@ class ProductService {
           : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
 
         const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
-          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
-          : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0), imagen: v.imagen || '' }))
+          : [];
 
         const stockInfo = calculateProductStock(p.fichaTecnica);
         const realVentas = Number(salesMap[p.idProducto] || 0);
@@ -330,7 +330,7 @@ class ProductService {
       attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
-        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio', 'imagen'] },
         { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
         {
           model: FichaTecnica,
@@ -396,8 +396,8 @@ class ProductService {
       : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
 
     const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
-      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
-      : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0), imagen: v.imagen || '' }))
+      : [];
 
     const stockInfo = calculateProductStock(p.fichaTecnica);
 
@@ -506,17 +506,11 @@ class ProductService {
             idProducto: product.idProducto,
             nombre: v.nombre.trim(),
             precio: Number(v.precio) >= 0 ? Number(v.precio) : initialPrice,
+            imagen: v.imagen || null,
             estado: normalizedEstado
           });
         }
       }
-    } else if (precio !== undefined && precio !== null && precio !== '') {
-      await Variante.create({
-        idProducto: product.idProducto,
-        nombre: `${nombre.trim()} - base`,
-        precio: Number(precio) || 0,
-        estado: normalizedEstado
-      });
     }
 
     return this.getProductById(product.idProducto);
@@ -582,6 +576,9 @@ class ProductService {
         if (found) {
           found.nombre = v.nombre.trim();
           found.precio = vPrice;
+          if (v.imagen !== undefined) {
+            found.imagen = v.imagen || null;
+          }
           found.estado = 1;
           await found.save();
         } else {
@@ -589,6 +586,7 @@ class ProductService {
             idProducto: id,
             nombre: v.nombre.trim(),
             precio: vPrice,
+            imagen: v.imagen || null,
             estado: 1
           });
         }
