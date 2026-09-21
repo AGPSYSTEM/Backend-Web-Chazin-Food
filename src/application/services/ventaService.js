@@ -126,7 +126,7 @@ class VentaService {
           pAdiciones = d.adiciones.map(da => ({
             idAdicion: da.idAdicion,
             nombre: da.adicion?.nombre || `Adición #${da.idAdicion}`,
-            precio: parseFloat(da.precioUnitario || da.adicion?.precio || 0),
+            precio: parseFloat(da.precio !== undefined && da.precio !== null ? da.precio : (da.precioUnitario || da.adicion?.precioAdicion || da.adicion?.precio || 0)),
             cantidad: Number(da.cantidad || 1)
           }));
         }
@@ -840,13 +840,18 @@ class VentaService {
           // Guardar adiciones si fueron enviadas y descontar su insumo de inventario
           const adicList = d.idAdiciones || d.adiciones || [];
           if (Array.isArray(adicList) && adicList.length > 0) {
-            const { Adicion, Insumo, Trazabilidad } = require('../../persistence/models');
+            const { Insumo, Trazabilidad } = require('../../persistence/models');
             for (const adItem of adicList) {
-              const adId = typeof adItem === 'object' ? (adItem.id || adItem.idAdicion) : adItem;
+              const adId = typeof adItem === 'object' ? (adItem.id || adItem.idAdicion || adItem.idInsumo) : adItem;
               const adCantidad = typeof adItem === 'object' ? (Number(adItem.cantidad) || 1) : 1;
-              const adPrecio = typeof adItem === 'object' ? (Number(adItem.precio) || 0) : 0;
+              let adPrecio = typeof adItem === 'object' ? (Number(adItem.precio !== undefined ? adItem.precio : adItem.precioAdicion) || 0) : 0;
               if (adId) {
                 try {
+                  const insumoAd = await Insumo.findByPk(adId);
+                  if (insumoAd && adPrecio <= 0 && insumoAd.precioAdicion) {
+                    adPrecio = Number(insumoAd.precioAdicion) || 0;
+                  }
+
                   await DetalleVentaAdicion.create({
                     idDetalleVenta: createdDetalle.idDetalleVenta,
                     idAdicion: adId,
@@ -856,31 +861,27 @@ class VentaService {
                   });
 
                   // Descontar inventario del insumo vinculado a la adición
-                  const adicRow = await Adicion.findByPk(adId);
-                  if (adicRow && adicRow.idInsumo) {
-                    const insumoAd = await Insumo.findByPk(adicRow.idInsumo);
-                    if (insumoAd) {
-                      const itemQty = Number(d.cantidad || 1);
-                      const totalAdDescontar = adCantidad * itemQty;
-                      const stockActual = Number(insumoAd.stock || 0);
-                      const nuevoStock = Math.max(0, stockActual - totalAdDescontar);
-                      insumoAd.stock = nuevoStock;
-                      await insumoAd.save();
+                  if (insumoAd) {
+                    const itemQty = Number(d.cantidad || 1);
+                    const totalAdDescontar = adCantidad * itemQty;
+                    const stockActual = Number(insumoAd.stock || 0);
+                    const nuevoStock = Math.max(0, stockActual - totalAdDescontar);
+                    insumoAd.stock = nuevoStock;
+                    await insumoAd.save();
 
-                      try {
-                        await Trazabilidad.create({
-                          tipo: 'CONSUMO_ADICION',
-                          entidadNombre: insumoAd.nombre,
-                          detalle: `Adición ${adicRow.nombre} (${totalAdDescontar} ${insumoAd.unidadMedida || 'und'}) en Venta #${venta.idVenta}`,
-                          idInsumo: insumoAd.idInsumo,
-                          tipoMovimiento: 'SALIDA',
-                          cantidad: totalAdDescontar,
-                          motivo: `Venta #${venta.idVenta} (Adición)`,
-                          usuarioId: responsibleUserId || targetUserId || null
-                        });
-                      } catch (tzAdErr) {
-                        console.warn('Error registrando trazabilidad de adición:', tzAdErr.message);
-                      }
+                    try {
+                      await Trazabilidad.create({
+                        tipo: 'CONSUMO_ADICION',
+                        entidadNombre: insumoAd.nombre,
+                        detalle: `Adición ${insumoAd.nombre} (${totalAdDescontar} ${insumoAd.unidadMedida || 'und'}) en Venta #${venta.idVenta}`,
+                        idInsumo: insumoAd.idInsumo,
+                        tipoMovimiento: 'SALIDA',
+                        cantidad: totalAdDescontar,
+                        motivo: `Venta #${venta.idVenta} (Adición)`,
+                        usuarioId: responsibleUserId || targetUserId || null
+                      });
+                    } catch (tzAdErr) {
+                      console.warn('Error registrando trazabilidad de adición:', tzAdErr.message);
                     }
                   }
                 } catch (errAd) {

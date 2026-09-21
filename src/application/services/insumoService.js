@@ -18,6 +18,9 @@ function formatInsumo(i) {
     idProveedor: i.idProveedor,
     descripcion: i.descripcion || '',
     estado: i.estado,
+    esAdicion: i.esAdicion ? 1 : 0,
+    precioAdicion: parseFloat(i.precioAdicion || 0),
+    imagen: i.imagen || '',
     categoria: catNombre,
     categoriaNombre: catNombre,
     proveedor: provNombre,
@@ -111,6 +114,9 @@ class InsumoService {
         precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? parseFloat(precioUnitario) : 0,
         idProveedor: idProveedor ? parseInt(idProveedor) : null,
         descripcion: descripcion || '',
+        esAdicion: insumoData.esAdicion ? 1 : 0,
+        precioAdicion: insumoData.precioAdicion !== undefined && insumoData.precioAdicion !== null ? parseFloat(insumoData.precioAdicion) : 0,
+        imagen: insumoData.imagen || null,
         estado: 1
       }, { transaction });
 
@@ -179,6 +185,9 @@ class InsumoService {
       if (precioUnitario !== undefined) insumo.precioUnitario = parseFloat(precioUnitario);
       if (idProveedor !== undefined) insumo.idProveedor = idProveedor ? parseInt(idProveedor) : null;
       if (descripcion !== undefined) insumo.descripcion = descripcion;
+      if (insumoData.esAdicion !== undefined) insumo.esAdicion = insumoData.esAdicion ? 1 : 0;
+      if (insumoData.precioAdicion !== undefined) insumo.precioAdicion = parseFloat(insumoData.precioAdicion || 0);
+      if (insumoData.imagen !== undefined) insumo.imagen = insumoData.imagen || null;
       if (estado !== undefined) {
         insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
       }

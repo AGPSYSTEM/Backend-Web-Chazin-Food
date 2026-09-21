@@ -461,17 +461,18 @@ async function ensureInsumoEliminadoSchema() {
  * if they are currently null or empty '[]'.
  */
 async function ensureProductoAdicionesDefaultSchema() {
-  const { Product, Adicion } = require('../../persistence/models');
+  const { Product, Insumo } = require('../../persistence/models');
   try {
-    const activeAdiciones = await Adicion.findAll({ where: { estado: 1 } });
+    const activeAdiciones = await Insumo.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
     if (!activeAdiciones || activeAdiciones.length === 0) return;
 
     const adicMap = {};
     activeAdiciones.forEach(a => {
-      adicMap[a.idAdicion] = {
-        idAdicion: a.idAdicion,
+      adicMap[a.idInsumo] = {
+        idAdicion: a.idInsumo,
+        idInsumo: a.idInsumo,
         nombre: a.nombre,
-        precio: parseFloat(a.precio || 0),
+        precio: parseFloat(a.precioAdicion || 0),
         imagen: a.imagen || ''
       };
     });
@@ -533,6 +534,39 @@ async function ensureProductoAdicionesDefaultSchema() {
   }
 }
 
+async function ensureInsumoAdicionSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [cols] = await sequelize.query("DESCRIBE insumo");
+    const colNames = cols.map(c => c.Field);
+    if (!colNames.includes('esAdicion')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `esAdicion` TINYINT(1) NOT NULL DEFAULT 0 AFTER `estado`");
+    }
+    if (!colNames.includes('precioAdicion')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `precioAdicion` DECIMAL(10, 2) NOT NULL DEFAULT 0.00 AFTER `esAdicion`");
+    }
+    if (!colNames.includes('imagen')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `imagen` VARCHAR(255) NULL AFTER `precioAdicion`");
+    }
+    await sequelize.query("DROP TABLE IF EXISTS `adicion`");
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error verificando schema de adiciones en insumo:', err.message);
+  }
+}
+
+async function ensureVarianteImagenSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `variante` LIKE 'imagen'");
+    if (cols.length === 0) {
+      await sequelize.query("ALTER TABLE `variante` ADD COLUMN `imagen` VARCHAR(255) NULL AFTER `precio`");
+      console.log('[DB Migration] Columna imagen agregada a tabla variante');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] Error asegurando columna imagen en variante:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -544,10 +578,12 @@ module.exports = {
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
   ensureConfiguracionComboSchema,
+  ensureVarianteImagenSchema,
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,
   ensureNoNegativeStock,
   ensureInsumoEliminadoSchema,
+  ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema
 };

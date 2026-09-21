@@ -241,6 +241,24 @@ const Insumo = sequelize.define('insumo', {
     type: DataTypes.TINYINT,
     defaultValue: 1
   },
+  esAdicion: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
+  },
+  precioAdicion: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
+  imagen: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
+  idAdicion: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idInsumo;
+    }
+  },
   eliminado: {
     type: DataTypes.TINYINT,
     defaultValue: 0
@@ -797,42 +815,8 @@ const Evento = sequelize.define('evento', {
   }
 }, { tableName: 'evento', timestamps: false });
 
-const Adicion = sequelize.define('adicion', {
-  idAdicion: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-    field: 'idAdicion'
-  },
-  id: {
-    type: DataTypes.VIRTUAL,
-    get() {
-      return this.idAdicion;
-    }
-  },
-  idInsumo: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  },
-  nombre: {
-    type: DataTypes.STRING(100),
-    allowNull: false
-  },
-  descripcion: {
-    type: DataTypes.STRING(255)
-  },
-  imagen: {
-    type: DataTypes.STRING(255)
-  },
-  precio: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false
-  },
-  estado: {
-    type: DataTypes.TINYINT,
-    defaultValue: 1
-  }
-}, { tableName: 'adicion', timestamps: false });
+// Adicion está unificada directamente en la tabla insumo
+const Adicion = Insumo;
 
 const Variante = sequelize.define('variante', {
   idVariante: {
@@ -1072,8 +1056,7 @@ const Resena = sequelize.define('resena', {
 }, { tableName: 'resena', timestamps: false });
 
 // Additional Relationships
-Adicion.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
-Insumo.hasMany(Adicion, { foreignKey: 'idInsumo' });
+Insumo.hasMany(DetalleVentaAdicion, { foreignKey: 'idAdicion', as: 'ventasAdiciones' });
 
 Variante.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
 Product.hasMany(Variante, { foreignKey: 'idProducto', as: 'variantes' });
@@ -1096,7 +1079,8 @@ Venta.hasMany(Devolucion, { foreignKey: 'idVenta', as: 'devoluciones' });
 
 DetalleVentaAdicion.belongsTo(DetalleVentaProducto, { foreignKey: 'idDetalleVenta', as: 'detalleVenta' });
 DetalleVentaProducto.hasMany(DetalleVentaAdicion, { foreignKey: 'idDetalleVenta', as: 'adiciones' });
-DetalleVentaAdicion.belongsTo(Adicion, { foreignKey: 'idAdicion', as: 'adicion' });
+DetalleVentaAdicion.belongsTo(Insumo, { foreignKey: 'idAdicion', as: 'insumo' });
+DetalleVentaAdicion.belongsTo(Insumo, { foreignKey: 'idAdicion', as: 'adicion' });
 
 DetalleVentaProducto.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
 

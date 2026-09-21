@@ -237,14 +237,14 @@ class ProductService {
       ]
     });
 
-    const activeAdiciones = await Adicion.findAll({ where: { estado: 1 } });
+    const activeAdiciones = await Adicion.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
     const adicMap = {};
     activeAdiciones.forEach(a => {
       adicMap[a.idAdicion] = {
         idAdicion: a.idAdicion,
         id: a.idAdicion,
         nombre: a.nombre,
-        precio: parseFloat(a.precio || 0),
+        precio: parseFloat(a.precioAdicion || 0),
         imagen: a.imagen || ''
       };
     });
@@ -354,14 +354,14 @@ class ProductService {
       throw error;
     }
 
-    const activeAdiciones = await Adicion.findAll({ where: { estado: 1 } });
+    const activeAdiciones = await Adicion.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
     const adicMap = {};
     activeAdiciones.forEach(a => {
       adicMap[a.idAdicion] = {
         idAdicion: a.idAdicion,
         id: a.idAdicion,
         nombre: a.nombre,
-        precio: parseFloat(a.precio || 0),
+        precio: parseFloat(a.precioAdicion || 0),
         imagen: a.imagen || ''
       };
     });

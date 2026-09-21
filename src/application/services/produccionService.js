@@ -150,7 +150,7 @@ class ProduccionService {
                 idAdicion: a.idAdicion,
                 nombre: a.adicion?.nombre || `Adición #${a.idAdicion}`,
                 cantidad: Number(a.cantidad) || 1,
-                precio: parseFloat(a.precioUnitario || 0)
+                precio: parseFloat(a.precio !== undefined && a.precio !== null ? a.precio : (a.precioUnitario || a.adicion?.precioAdicion || a.adicion?.precio || 0))
               }));
             }
 

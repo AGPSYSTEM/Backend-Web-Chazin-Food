@@ -21,11 +21,13 @@ const {
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
   ensureConfiguracionComboSchema,
+  ensureVarianteImagenSchema,
   ensureVentaAprobacionSchema,
   ensureUsuarioDocumentoSchema,
   ensureResenaSchema,
   ensureNoNegativeStock,
   ensureInsumoEliminadoSchema,
+  ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
@@ -34,6 +36,8 @@ const {
   try {
     await connectDB();
     await ensureInsumoEliminadoSchema();
+    await ensureInsumoAdicionSchema();
+    await ensureVarianteImagenSchema();
     await ensureUsuarioDocumentoSchema();
     await ensureFichaTecnicaTrashSchema();
     await ensureFichaTecnicaInsumoVariantZero();
