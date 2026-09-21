@@ -1,5 +1,15 @@
 const { Evento, Product, Variante, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
 
+const stripEmojis = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .replace(/^\s*[-–—:]\s*/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 function evaluarVigenciaEvento(e, now = new Date()) {
   const rawInicio = e.fechaInicio;
   const rawFin = e.fechaFin;
@@ -281,15 +291,19 @@ class EventoService {
       }
     }
 
+    const cleanNombre = stripEmojis(finalNombre);
+    const cleanDesc = stripEmojis(descripcion || '');
+    const cleanIcon = stripEmojis(icono || '') || 'party';
+
     const created = await Evento.create({
-      nombreEvento: finalNombre.trim(),
-      descripcion: descripcion || '',
+      nombreEvento: cleanNombre,
+      descripcion: cleanDesc,
       fechaInicio: isTemporal ? fechaInicio : null,
       fechaFin: isTemporal ? fechaFin : null,
       estado: estado === 'Inactivo' || estado === 0 ? 0 : 1,
       idProducto: finalProductoId,
       tipoEvento: tipoEvento || 'EDICION_LIMITADA',
-      icono: icono || '🎉',
+      icono: cleanIcon,
       descuento: descuento || null,
       nuevoPrecio: nuevoPrecio || null,
       accionInsumo: accion || null,
@@ -315,9 +329,10 @@ class EventoService {
     const finalNombre = nombreEvento || nombre;
 
     if (finalNombre !== undefined && finalNombre.trim()) {
-      e.nombreEvento = finalNombre.trim();
+      e.nombreEvento = stripEmojis(finalNombre);
     }
-    if (descripcion !== undefined) e.descripcion = descripcion;
+    if (descripcion !== undefined) e.descripcion = stripEmojis(descripcion);
+    if (icono !== undefined) e.icono = stripEmojis(icono) || 'party';
     if (isTemporal !== undefined) {
       if (isTemporal) {
         if (fechaInicio !== undefined) e.fechaInicio = fechaInicio;

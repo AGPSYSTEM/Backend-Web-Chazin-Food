@@ -107,7 +107,7 @@ async function run() {
     if (!eventoFest) {
       console.log('Creating Event for Burger Fest...');
       eventoFest = await Evento.create({
-        nombreEvento: '🔥 Chazin Burger Fest 2026 - Edición Limitada',
+        nombreEvento: 'Chazin Burger Fest 2026 - Edición Limitada',
         descripcion: 'Participante oficial en el festival gastronómico del año. Receta conmemorativa de tiempo limitado con $4.000 de ahorro directo, pan brioche artesanal y salsa trufada secreta.',
         idProducto: prod.idProducto,
         tipoEvento: 'EDICION_LIMITADA',

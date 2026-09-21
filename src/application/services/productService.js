@@ -122,6 +122,7 @@ function formatActiveEventos(rawEventos, now = new Date()) {
         idEvento: e.idEvento,
         idProducto: e.idProducto,
         tipoEvento: e.tipoEvento,
+        icono: e.icono || 'party',
         descuento: e.descuento,
         nuevoPrecio: e.nuevoPrecio,
         nombreEvento: e.nombreEvento,
