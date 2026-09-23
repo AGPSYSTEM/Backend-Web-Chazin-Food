@@ -247,15 +247,59 @@ class ProduccionService {
               };
             }
 
+            // Detección de promoción 2x1 ("Paga 1 y lleva 2")
+            const hasActive2x1Event = Boolean(
+              Array.isArray(prod?.eventos) && prod.eventos.some(e =>
+                (e.estado === 1 || e.estado === 'Activo' || e.estado === undefined) &&
+                (e.tipoEvento === 'PROMOCION_2X1' || (e.nombreEvento && e.nombreEvento.toLowerCase().includes('2x1')) || (e.descripcion && e.descripcion.toLowerCase().includes('lleva 2')))
+              )
+            );
+
+            const isPromo2x1 = Boolean(
+              hasActive2x1Event ||
+              (itemNombre && (itemNombre.toLowerCase().includes("2x1") || itemNombre.toLowerCase().includes("lleva 2") || itemNombre.toLowerCase().includes("paga 1"))) ||
+              (itemObs && (itemObs.toLowerCase().includes("2x1") || itemObs.toLowerCase().includes("lleva 2") || itemObs.toLowerCase().includes("paga 1"))) ||
+              (matchedObsProd && (matchedObsProd.is2x1Promo || (matchedObsProd.nombre && matchedObsProd.nombre.toLowerCase().includes("2x1")) || (matchedObsProd.observaciones && matchedObsProd.observaciones.toLowerCase().includes("2x1")))) ||
+              (matchedObsProd?.cantidadCocina && Number(matchedObsProd.cantidadCocina) > qty) ||
+              (d.observaciones && (d.observaciones.toLowerCase().includes("2x1") || d.observaciones.toLowerCase().includes("lleva 2")))
+            );
+
+            const kitchenQty = isPromo2x1 ? (Number(matchedObsProd?.cantidadCocina) || qty * 2) : qty;
+            totalItemsCount += (kitchenQty - qty);
+
+            let displayObs = itemObs;
+            if (isPromo2x1 && !displayObs.toLowerCase().includes("promo 2x1")) {
+              displayObs = `🔥 ¡PROMO 2x1!: Preparar ${kitchenQty} unidades (${qty} pagada + ${kitchenQty - qty} gratis)${displayObs ? ' • ' + displayObs : ''}`;
+            }
+
+            // Si es promo 2x1, escalar los insumos de la receta a la cantidad exacta de cocina
+            if (receta && kitchenQty > 1 && Array.isArray(receta.ingredientes)) {
+              receta.ingredientes = receta.ingredientes.map(ing => {
+                const parts = String(ing.cantidad).split(' ');
+                const num = parseFloat(parts[0]);
+                const unit = parts.slice(1).join(' ');
+                if (!isNaN(num)) {
+                  return {
+                    ...ing,
+                    cantidad: `${num * kitchenQty} ${unit}`
+                  };
+                }
+                return ing;
+              });
+              receta.rendimiento = `${kitchenQty} porciones (Promo 2x1)`;
+            }
+
             productosList.push({
               id: d.idDetalleVenta,
               idProducto: prod?.idProducto || null,
               idVariante: d.idVariante,
               nombre: itemNombre,
-              cantidad: qty,
+              cantidad: kitchenQty,
+              cantidadFacturada: qty,
+              isPromo2x1: isPromo2x1,
               precioUnitario: parseFloat(d.precioUnitario || 0),
               total: parseFloat(d.subtotal || 0),
-              observaciones: itemObs,
+              observaciones: displayObs,
               adiciones: itemAdiciones,
               receta
             });
@@ -263,10 +307,24 @@ class ProduccionService {
         } else if (Array.isArray(obsObj.productos) && obsObj.productos.length > 0) {
           for (const p of obsObj.productos) {
             const qty = Number(p.cantidad) || 1;
-            totalItemsCount += qty;
             let pObs = p.observaciones || p.nota || "";
             if (pObs.toLowerCase().trim() === (p.nombre || "").toLowerCase().trim()) {
               pObs = "";
+            }
+
+            const isPromo2x1Fallback = Boolean(
+              p.is2x1Promo ||
+              (p.nombre && (p.nombre.toLowerCase().includes("2x1") || p.nombre.toLowerCase().includes("lleva 2") || p.nombre.toLowerCase().includes("paga 1"))) ||
+              (pObs && (pObs.toLowerCase().includes("2x1") || pObs.toLowerCase().includes("lleva 2") || pObs.toLowerCase().includes("paga 1"))) ||
+              (p.cantidadCocina && Number(p.cantidadCocina) > qty)
+            );
+
+            const kitchenQtyFallback = isPromo2x1Fallback ? (Number(p.cantidadCocina) || qty * 2) : qty;
+            totalItemsCount += (kitchenQtyFallback - qty);
+
+            let displayObsFallback = pObs;
+            if (isPromo2x1Fallback && !displayObsFallback.toLowerCase().includes("promo 2x1")) {
+              displayObsFallback = `🔥 ¡PROMO 2x1!: Preparar ${kitchenQtyFallback} unidades (${qty} pagada + ${kitchenQtyFallback - qty} gratis)${displayObsFallback ? ' • ' + displayObsFallback : ''}`;
             }
 
             productosList.push({
@@ -274,10 +332,12 @@ class ProduccionService {
               idProducto: p.idProducto || null,
               idVariante: p.idVariante || null,
               nombre: p.nombre || "Producto",
-              cantidad: qty,
+              cantidad: kitchenQtyFallback,
+              cantidadFacturada: qty,
+              isPromo2x1: isPromo2x1Fallback,
               precioUnitario: parseFloat(p.precio || p.precioUnitario || 0),
               total: parseFloat(p.total || 0),
-              observaciones: pObs,
+              observaciones: displayObsFallback,
               adiciones: p.adiciones || [],
               receta: p.receta || null
             });
