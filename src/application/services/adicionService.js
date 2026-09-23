@@ -12,6 +12,7 @@ function formatAdicion(insumo) {
     stock: parseFloat(insumo.stock || 0),
     unidadMedida: insumo.unidadMedida,
     estado: insumo.estado,
+    esAdicion: 1,
     insumo: {
       idInsumo: insumo.idInsumo,
       nombre: insumo.nombre

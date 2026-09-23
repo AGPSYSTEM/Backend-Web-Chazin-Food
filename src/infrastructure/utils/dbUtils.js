@@ -231,7 +231,8 @@ async function ensureEventoColumnsSchema() {
       { name: 'accionInsumo', sql: 'ALTER TABLE `evento` ADD COLUMN `accionInsumo` VARCHAR(20) NULL' },
       { name: 'insumosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `insumosAsociados` TEXT NULL' },
       { name: 'productosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `productosAsociados` TEXT NULL' },
-      { name: 'icono', sql: 'ALTER TABLE `evento` ADD COLUMN `icono` VARCHAR(50) NULL' }
+      { name: 'icono', sql: 'ALTER TABLE `evento` ADD COLUMN `icono` VARCHAR(50) NULL' },
+      { name: 'imagen', sql: 'ALTER TABLE `evento` ADD COLUMN `imagen` VARCHAR(500) NULL' }
     ];
 
     for (const col of columnsToCheck) {
@@ -456,6 +457,23 @@ async function ensureInsumoEliminadoSchema() {
 }
 
 /**
+ * Ensures 'idCategoriaInsumo' column in 'insumo' allows NULL
+ * so that deleting categories or assigning unclassified items does not violate FK constraints.
+ */
+async function ensureInsumoCategoriaNullableSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'idCategoriaInsumo'");
+    if (cols.length > 0 && cols[0].Null === 'NO') {
+      await sequelize.query('ALTER TABLE `insumo` MODIFY `idCategoriaInsumo` INT NULL');
+      console.log('[DB] ✅ Columna insumo.idCategoriaInsumo modificada a NULL exitosamente.');
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando columna idCategoriaInsumo nullable:', err.message);
+  }
+}
+
+/**
  * Ensures food products (Hamburguesas, Perros, Salchipapas, Combos, etc.)
  * have their appropriate additions configured in `producto.adiciones`
  * if they are currently null or empty '[]'.
@@ -584,6 +602,7 @@ module.exports = {
   ensureResenaSchema,
   ensureNoNegativeStock,
   ensureInsumoEliminadoSchema,
+  ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema
 };

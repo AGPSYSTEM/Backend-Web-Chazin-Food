@@ -27,6 +27,7 @@ const {
   ensureResenaSchema,
   ensureNoNegativeStock,
   ensureInsumoEliminadoSchema,
+  ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema
 } = require('./src/infrastructure/utils/dbUtils');
@@ -36,6 +37,7 @@ const {
   try {
     await connectDB();
     await ensureInsumoEliminadoSchema();
+    await ensureInsumoCategoriaNullableSchema();
     await ensureInsumoAdicionSchema();
     await ensureVarianteImagenSchema();
     await ensureUsuarioDocumentoSchema();

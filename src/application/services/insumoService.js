@@ -1,4 +1,4 @@
-const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
+const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo, Trazabilidad, DetalleInsumoPreparadoInsumo } = require('../../persistence/models');
 const database = require('../../persistence/config/db');
 
 function formatInsumo(i) {
@@ -314,6 +314,16 @@ class InsumoService {
 
     // Eliminar también cualquier referencia a este insumo como ingrediente en detalles de otras fichas
     await DetalleFichaInsumo.destroy({ where: { idInsumo: id } });
+
+    // Eliminar referencias en detalle de insumos preparados si las hubiera
+    if (DetalleInsumoPreparadoInsumo) {
+      await DetalleInsumoPreparadoInsumo.destroy({ where: { idInsumo: id } }).catch(() => {});
+    }
+
+    // Eliminar registros de trazabilidad asociados a este insumo
+    if (Trazabilidad) {
+      await Trazabilidad.destroy({ where: { idInsumo: id } }).catch(() => {});
+    }
 
     await insumo.destroy();
 

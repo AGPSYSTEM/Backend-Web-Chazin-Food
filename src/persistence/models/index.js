@@ -794,6 +794,10 @@ const Evento = sequelize.define('evento', {
     type: DataTypes.STRING(50),
     allowNull: true
   },
+  imagen: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
   nombreEvento: {
     type: DataTypes.STRING(120),
     allowNull: false

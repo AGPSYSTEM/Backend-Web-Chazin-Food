@@ -83,38 +83,74 @@ class ClienteService {
       console.warn(`Error cargando ventas para cliente #${c.idCliente}:`, err.message);
     }
 
-    const calculatedTierFromPurchases = comprasCount >= 9 ? 'VIP' : comprasCount >= 6 ? 'Frecuente' : comprasCount >= 3 ? 'Regular' : 'Nuevo';
-    const calculatedCicloFromPurchases = comprasCount % 3;
+    const isMostradorClient = (c.idCliente === 26) || 
+      (cleanDireccion && cleanDireccion.toLowerCase().includes('mostrador')) ||
+      (meta.tipo && String(meta.tipo).toLowerCase().includes('mostrador'));
 
-    // Dynamic Fidelity Assessment (Tiers: Nuevo, Regular 5%, Frecuente 10%, VIP 15% with 30-day streak and grace periods)
-    const fidelidadActual = meta.fidelidad || {
-      tipo: meta.tipo || calculatedTierFromPurchases,
-      comprasCiclo: meta.ciclo !== undefined ? Number(meta.ciclo) : (meta.comprasCiclo !== undefined ? Number(meta.comprasCiclo) : calculatedCicloFromPurchases),
-      comprasTotales: comprasCount,
-      fechaInicioNivel: meta.inicio || meta.fechaInicioNivel || null,
-      fechaVencimientoNivel: meta.vence || meta.fechaVencimientoNivel || null
-    };
+    const hasAccount = !!c.idUsuario && !!c.usuario;
 
-    const fidelidadEvaluada = FidelidadService.evaluarEstadoFidelidad(fidelidadActual, comprasCount);
-    const tipo = fidelidadEvaluada.tipo;
-    const descuentoPorcentaje = fidelidadEvaluada.descuentoPorcentaje;
+    let tipo = 'Nuevo';
+    let descuentoPorcentaje = 0;
+    let fidelidadEvaluada;
 
-    // Persist fixed dates / degradation into DB so remaining days decrement consistently
-    const needsDatePersistence = fidelidadEvaluada.tipo !== 'Nuevo' && (!meta.vence || !meta.inicio);
-    const needsStatePersistence = meta.tipo && meta.tipo !== fidelidadEvaluada.tipo;
-    if (needsDatePersistence || needsStatePersistence) {
-      try {
-        const compactMeta = {
-          direccion: cleanDireccion,
-          tipo: fidelidadEvaluada.tipo,
-          ciclo: fidelidadEvaluada.comprasCiclo,
-          inicio: fidelidadEvaluada.fechaInicioNivel,
-          vence: fidelidadEvaluada.fechaVencimientoNivel
-        };
-        c.direccion = JSON.stringify(compactMeta);
-        await c.save();
-      } catch (saveErr) {
-        console.warn(`Error persistiendo fidelidad evaluada para cliente #${c.idCliente}:`, saveErr.message);
+    if (isMostradorClient) {
+      tipo = 'Mostrador';
+      descuentoPorcentaje = 0;
+      fidelidadEvaluada = {
+        tipo: 'Mostrador',
+        descuentoPorcentaje: 0,
+        comprasCiclo: 0,
+        comprasTotales: comprasCount,
+        diasRestantes: 0,
+        enGracia: false,
+        tieneCuenta: false
+      };
+    } else if (!hasAccount) {
+      tipo = 'Nuevo';
+      descuentoPorcentaje = 0;
+      fidelidadEvaluada = {
+        tipo: 'Nuevo',
+        descuentoPorcentaje: 0,
+        comprasCiclo: 0,
+        comprasTotales: comprasCount,
+        diasRestantes: 0,
+        enGracia: false,
+        tieneCuenta: false
+      };
+    } else {
+      const calculatedTierFromPurchases = comprasCount >= 9 ? 'VIP' : comprasCount >= 6 ? 'Frecuente' : comprasCount >= 3 ? 'Regular' : 'Nuevo';
+      const calculatedCicloFromPurchases = comprasCount % 3;
+
+      // Dynamic Fidelity Assessment (Tiers: Nuevo, Regular 5%, Frecuente 10%, VIP 15% with 30-day streak and grace periods)
+      const fidelidadActual = meta.fidelidad || {
+        tipo: meta.tipo || calculatedTierFromPurchases,
+        comprasCiclo: meta.ciclo !== undefined ? Number(meta.ciclo) : (meta.comprasCiclo !== undefined ? Number(meta.comprasCiclo) : calculatedCicloFromPurchases),
+        comprasTotales: comprasCount,
+        fechaInicioNivel: meta.inicio || meta.fechaInicioNivel || null,
+        fechaVencimientoNivel: meta.vence || meta.fechaVencimientoNivel || null
+      };
+
+      fidelidadEvaluada = FidelidadService.evaluarEstadoFidelidad(fidelidadActual, comprasCount);
+      tipo = fidelidadEvaluada.tipo;
+      descuentoPorcentaje = fidelidadEvaluada.descuentoPorcentaje;
+
+      // Persist fixed dates / degradation into DB so remaining days decrement consistently
+      const needsDatePersistence = fidelidadEvaluada.tipo !== 'Nuevo' && (!meta.vence || !meta.inicio);
+      const needsStatePersistence = meta.tipo && meta.tipo !== fidelidadEvaluada.tipo;
+      if (needsDatePersistence || needsStatePersistence) {
+        try {
+          const compactMeta = {
+            direccion: cleanDireccion,
+            tipo: fidelidadEvaluada.tipo,
+            ciclo: fidelidadEvaluada.comprasCiclo,
+            inicio: fidelidadEvaluada.fechaInicioNivel,
+            vence: fidelidadEvaluada.fechaVencimientoNivel
+          };
+          c.direccion = JSON.stringify(compactMeta);
+          await c.save();
+        } catch (saveErr) {
+          console.warn(`Error persistiendo fidelidad evaluada para cliente #${c.idCliente}:`, saveErr.message);
+        }
       }
     }
 
@@ -456,10 +492,11 @@ class ClienteService {
   }
 
   static async registrarCompraFidelidad(idCliente) {
-    if (!idCliente) return null;
+    if (!idCliente || Number(idCliente) === 26) return null;
     try {
       const c = await Cliente.findByPk(idCliente);
-      if (!c) return null;
+      if (!c || !c.idUsuario) return null;
+      if (c.direccion && c.direccion.toLowerCase().includes('mostrador')) return null;
 
       let meta = {};
       let cleanDir = '';

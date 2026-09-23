@@ -123,6 +123,7 @@ class EventoService {
         idProducto: e.idProducto,
         tipoEvento: e.tipoEvento,
         icono: e.icono || '🎉',
+        imagen: e.imagen || null,
         descuento: e.descuento,
         nuevoPrecio: e.nuevoPrecio,
         accionInsumo: e.accionInsumo,
@@ -169,6 +170,7 @@ class EventoService {
       idProducto: e.idProducto,
       tipoEvento: e.tipoEvento,
       icono: e.icono || '🎉',
+      imagen: e.imagen || null,
       descuento: e.descuento,
       nuevoPrecio: e.nuevoPrecio,
       accionInsumo: e.accionInsumo,
@@ -188,7 +190,7 @@ class EventoService {
   static async create(data) {
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, icono, descuento, nuevoPrecio, accion, insumos, productos, isTemporal,
+      productoId, tipoEvento, icono, imagen, descuento, nuevoPrecio, accion, insumos, productos, isTemporal,
       crearComoProducto, productoNuevo
     } = data;
     const finalNombre = nombreEvento || nombre;
@@ -304,6 +306,7 @@ class EventoService {
       idProducto: finalProductoId,
       tipoEvento: tipoEvento || 'EDICION_LIMITADA',
       icono: cleanIcon,
+      imagen: imagen ? imagen.trim() : (productoNuevo?.imagen ? productoNuevo.imagen.trim() : null),
       descuento: descuento || null,
       nuevoPrecio: nuevoPrecio || null,
       accionInsumo: accion || null,
@@ -324,7 +327,7 @@ class EventoService {
 
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, icono, descuento, nuevoPrecio, accion, insumos, productos, isTemporal
+      productoId, tipoEvento, icono, imagen, descuento, nuevoPrecio, accion, insumos, productos, isTemporal
     } = data;
     const finalNombre = nombreEvento || nombre;
 
@@ -350,6 +353,7 @@ class EventoService {
     if (productoId !== undefined) e.idProducto = productoId;
     if (tipoEvento !== undefined) e.tipoEvento = tipoEvento;
     if (icono !== undefined) e.icono = icono;
+    if (imagen !== undefined) e.imagen = imagen ? imagen.trim() : null;
     if (descuento !== undefined) e.descuento = descuento;
     if (nuevoPrecio !== undefined) e.nuevoPrecio = nuevoPrecio;
     if (accion !== undefined) e.accionInsumo = accion;

@@ -84,7 +84,7 @@ function calculateProductStock(ficha) {
   };
 }
 
-function formatActiveEventos(rawEventos, now = new Date()) {
+function formatActiveEventos(rawEventos, now = new Date(), targetProduct = null) {
   if (!Array.isArray(rawEventos)) return [];
   return rawEventos
     .filter((e) => {
@@ -117,22 +117,71 @@ function formatActiveEventos(rawEventos, now = new Date()) {
           ? '¡Termina hoy!'
           : `Quedan ${diasRestantes} días`;
 
+      let parsedProdsAssoc = [];
+      try {
+        parsedProdsAssoc = typeof e.productosAsociados === 'string'
+          ? JSON.parse(e.productosAsociados)
+          : (e.productosAsociados || []);
+      } catch (err) {
+        parsedProdsAssoc = [];
+      }
+
+      let parsedInsumosAssoc = [];
+      try {
+        parsedInsumosAssoc = typeof e.insumosAsociados === 'string'
+          ? JSON.parse(e.insumosAsociados)
+          : (e.insumosAsociados || []);
+      } catch (err) {
+        parsedInsumosAssoc = [];
+      }
+
+      let effectiveDescuento = e.descuento;
+      let effectiveNuevoPrecio = e.nuevoPrecio;
+
+      if (targetProduct) {
+        const pId = Number(targetProduct.idProducto || targetProduct.id);
+        const pName = String(targetProduct.nombre || '').toLowerCase().trim();
+
+        const matchedAssoc = Array.isArray(parsedProdsAssoc)
+          ? parsedProdsAssoc.find(pa =>
+              (pa.idProducto && Number(pa.idProducto) === pId) ||
+              (pa.nombre && String(pa.nombre).toLowerCase().trim() === pName)
+            )
+          : null;
+
+        if (matchedAssoc) {
+          if (matchedAssoc.descuento !== undefined && matchedAssoc.descuento !== null) {
+            effectiveDescuento = matchedAssoc.descuento;
+          }
+          if (matchedAssoc.nuevoPrecio !== undefined && matchedAssoc.nuevoPrecio !== null) {
+            effectiveNuevoPrecio = matchedAssoc.nuevoPrecio;
+          }
+        }
+
+        const basePrice = Number(targetProduct.precio || 0);
+        if (basePrice > 0 && effectiveDescuento && Number(effectiveDescuento) > 0 && (!effectiveNuevoPrecio || Number(effectiveNuevoPrecio) <= 0)) {
+          effectiveNuevoPrecio = Math.round(basePrice * (1 - (Number(effectiveDescuento) / 100)));
+        }
+      }
+
       return {
         id: e.idEvento,
         idEvento: e.idEvento,
         idProducto: e.idProducto,
         tipoEvento: e.tipoEvento,
+        tipo: e.tipoEvento,
         icono: e.icono || 'party',
-        descuento: e.descuento,
-        nuevoPrecio: e.nuevoPrecio,
+        descuento: effectiveDescuento,
+        nuevoPrecio: effectiveNuevoPrecio,
         nombreEvento: e.nombreEvento,
+        nombre: e.nombreEvento,
         descripcion: e.descripcion,
         fechaInicio: e.fechaInicio,
         fechaFin: e.fechaFin,
         estado: e.estado,
         accionInsumo: e.accionInsumo || null,
-        insumosAsociados: e.insumosAsociados ? (typeof e.insumosAsociados === 'string' ? JSON.parse(e.insumosAsociados) : e.insumosAsociados) : [],
-        productosAsociados: e.productosAsociados ? (typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : e.productosAsociados) : [],
+        insumosAsociados: parsedInsumosAssoc,
+        productosAsociados: parsedProdsAssoc,
         vigencia: {
           diasRestantes,
           horasRestantes,
@@ -238,6 +287,7 @@ class ProductService {
     });
 
     const activeAdiciones = await Adicion.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
+    const allActiveEvents = await Evento.findAll({ where: { estado: 1 } }).catch(() => []);
     const adicMap = {};
     activeAdiciones.forEach(a => {
       adicMap[a.idAdicion] = {
@@ -290,6 +340,32 @@ class ProductService {
         const stockInfo = calculateProductStock(p.fichaTecnica);
         const realVentas = Number(salesMap[p.idProducto] || 0);
 
+        const pId = Number(p.idProducto);
+        const pName = String(p.nombre || '').toLowerCase().trim();
+
+        const matchingEvents = allActiveEvents.filter(e => {
+          if (e.idProducto && Number(e.idProducto) === pId) return true;
+          let prodsAssoc = [];
+          try {
+            prodsAssoc = typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : (e.productosAsociados || []);
+          } catch(err) {}
+          if (Array.isArray(prodsAssoc) && prodsAssoc.length > 0) {
+            return prodsAssoc.some(pa =>
+              (pa.idProducto && Number(pa.idProducto) === pId) ||
+              (pa.nombre && String(pa.nombre).toLowerCase().trim() === pName)
+            );
+          }
+          if (!e.idProducto && (!prodsAssoc || prodsAssoc.length === 0)) {
+            return true;
+          }
+          return false;
+        });
+
+        const combinedEventsMap = new Map();
+        (p.eventos || []).forEach(e => combinedEventsMap.set(e.idEvento, e));
+        matchingEvents.forEach(e => combinedEventsMap.set(e.idEvento, e));
+        const combinedEvents = Array.from(combinedEventsMap.values());
+
         return {
           _id: p.idProducto,
           id: p.idProducto,
@@ -309,7 +385,7 @@ class ProductService {
           variantes,
           adiciones,
           configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
-          eventos: formatActiveEventos(p.eventos, now),
+          eventos: formatActiveEventos(combinedEvents, now, { idProducto: p.idProducto, nombre: p.nombre, precio: realPrecio }),
           fichaTecnica: p.fichaTecnica ? (typeof p.fichaTecnica.toJSON === 'function' ? p.fichaTecnica.toJSON() : p.fichaTecnica) : null,
           ventas: realVentas,
           totalVendidos: realVentas
@@ -402,6 +478,33 @@ class ProductService {
 
     const stockInfo = calculateProductStock(p.fichaTecnica);
 
+    const allActiveEvents = await Evento.findAll({ where: { estado: 1 } }).catch(() => []);
+    const pId = Number(p.idProducto);
+    const pName = String(p.nombre || '').toLowerCase().trim();
+
+    const matchingEvents = allActiveEvents.filter(e => {
+      if (e.idProducto && Number(e.idProducto) === pId) return true;
+      let prodsAssoc = [];
+      try {
+        prodsAssoc = typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : (e.productosAsociados || []);
+      } catch(err) {}
+      if (Array.isArray(prodsAssoc) && prodsAssoc.length > 0) {
+        return prodsAssoc.some(pa =>
+          (pa.idProducto && Number(pa.idProducto) === pId) ||
+          (pa.nombre && String(pa.nombre).toLowerCase().trim() === pName)
+        );
+      }
+      if (!e.idProducto && (!prodsAssoc || prodsAssoc.length === 0)) {
+        return true;
+      }
+      return false;
+    });
+
+    const combinedEventsMap = new Map();
+    (p.eventos || []).forEach(e => combinedEventsMap.set(e.idEvento, e));
+    matchingEvents.forEach(e => combinedEventsMap.set(e.idEvento, e));
+    const combinedEvents = Array.from(combinedEventsMap.values());
+
     return {
       _id: p.idProducto,
       id: p.idProducto,
@@ -421,7 +524,7 @@ class ProductService {
       variantes,
       adiciones,
       configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
-      eventos: formatActiveEventos(p.eventos, new Date()),
+      eventos: formatActiveEventos(combinedEvents, new Date(), { idProducto: p.idProducto, nombre: p.nombre, precio: realPrecio }),
       fichaTecnica: p.fichaTecnica ? (typeof p.fichaTecnica.toJSON === 'function' ? p.fichaTecnica.toJSON() : p.fichaTecnica) : null,
       ventas: realVentas,
       totalVendidos: realVentas

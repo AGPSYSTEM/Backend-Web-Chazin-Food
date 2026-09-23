@@ -180,6 +180,11 @@ class VentaService {
       total = Math.max(0, subtotal - descuentoAplicado);
     }
 
+    const isMostradorSale = (v.idCliente === 26) ||
+      (clienteNombre && String(clienteNombre).toLowerCase().includes('mostrador')) ||
+      (clienteObj && clienteObj.direccion && String(clienteObj.direccion).toLowerCase().includes('mostrador')) ||
+      (!clienteObj.idUsuario);
+
     // Dynamic extraction of client fidelity
     let clientMeta = {};
     if (clienteObj && clienteObj.direccion) {
@@ -192,7 +197,13 @@ class VentaService {
       }
     }
     const FidelidadService = require('./fidelidadService');
-    const fidelidadInfo = FidelidadService.evaluarEstadoFidelidad(clientMeta.fidelidad || {
+    const fidelidadInfo = isMostradorSale ? {
+      tipo: null,
+      descuentoPorcentaje: 0,
+      comprasCiclo: 0,
+      enGracia: false,
+      tieneCuenta: false
+    } : FidelidadService.evaluarEstadoFidelidad(clientMeta.fidelidad || {
       tipo: clientMeta.tipo || (clienteObj.idUsuario ? 'Nuevo' : 'Mostrador'),
       comprasCiclo: clientMeta.ciclo !== undefined ? Number(clientMeta.ciclo) : (clientMeta.comprasCiclo || 0),
       comprasTotales: clientMeta.comprasTotales || 0,
@@ -201,7 +212,7 @@ class VentaService {
     });
 
     // Calculate clear discount percentage
-    let descuentoPorcentaje = obsData.descuentoPorcentaje || fidelidadInfo.descuentoPorcentaje || 0;
+    let descuentoPorcentaje = obsData.descuentoPorcentaje || (isMostradorSale ? 0 : fidelidadInfo.descuentoPorcentaje) || 0;
     if (descuentoAplicado > 0 && subtotal > 0) {
       descuentoPorcentaje = Math.round((descuentoAplicado / subtotal) * 100);
     } else if (subtotal > total && subtotal > 0) {
@@ -248,11 +259,11 @@ class VentaService {
       idUsuario: v.idUsuario,
       responsable,
       clienteFidelidad: {
-        tipo: fidelidadInfo.tipo,
-        descuentoPorcentaje: fidelidadInfo.descuentoPorcentaje,
-        comprasCiclo: fidelidadInfo.comprasCiclo,
-        enGracia: fidelidadInfo.enGracia,
-        tieneCuenta: !!clienteObj.idUsuario
+        tipo: isMostradorSale ? null : fidelidadInfo.tipo,
+        descuentoPorcentaje: isMostradorSale ? 0 : (fidelidadInfo.descuentoPorcentaje || 0),
+        comprasCiclo: isMostradorSale ? 0 : (fidelidadInfo.comprasCiclo || 0),
+        enGracia: isMostradorSale ? false : !!fidelidadInfo.enGracia,
+        tieneCuenta: !isMostradorSale && !!clienteObj.idUsuario
       },
       fecha: v.fechaVenta,
       fechaVenta: v.fechaVenta,
@@ -277,25 +288,36 @@ class VentaService {
   }
 
   static async getAll(filter = {}) {
-    const { periodo, estado, search } = filter;
+    const filterObj = typeof filter === 'string' ? { periodo: filter } : (filter || {});
+    const { periodo, estado, search } = filterObj;
     const { Op } = require('sequelize');
     const where = {};
 
-    if (periodo && periodo !== 'todos') {
+    const normalizedPeriod = String(periodo || '').toLowerCase().trim();
+    if (normalizedPeriod && !['todos', 'personalizado', 'all', ''].includes(normalizedPeriod)) {
       const now = new Date();
-      if (periodo === 'hoy') {
+      if (normalizedPeriod === 'hoy') {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfDay };
-      } else if (periodo === '7dias') {
+      } else if (normalizedPeriod === '7dias' || normalizedPeriod === '7_dias') {
         const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
         where.fechaVenta = { [Op.gte]: sevenDaysAgo };
-      } else if (periodo === 'mes') {
+      } else if (normalizedPeriod === 'mes' || normalizedPeriod === 'este_mes') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfMonth };
-      } else if (periodo === 'ano') {
+      } else if (normalizedPeriod === 'ano' || normalizedPeriod === 'este_ano' || normalizedPeriod === 'año') {
         const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfYear };
       }
+    } else if (filterObj.fechaInicio || filterObj.fechaFin) {
+      const fechaFilter = {};
+      if (filterObj.fechaInicio) fechaFilter[Op.gte] = new Date(filterObj.fechaInicio);
+      if (filterObj.fechaFin) {
+        const endD = new Date(filterObj.fechaFin);
+        endD.setHours(23, 59, 59, 999);
+        fechaFilter[Op.lte] = endD;
+      }
+      where.fechaVenta = fechaFilter;
     }
 
     if (estado && estado !== 'Todos') {
@@ -367,7 +389,8 @@ class VentaService {
   }
 
   static async getStats(filter = {}) {
-    const list = await this.getAll(filter);
+    const filterObj = typeof filter === 'string' ? { periodo: filter } : (filter || {});
+    const list = await this.getAll(filterObj);
     const totalVentasSum = list.reduce((acc, v) => acc + Number(v.total || 0), 0);
     const pedidosCount = list.length;
     const ticketPromedioVal = pedidosCount > 0 ? Math.round(totalVentasSum / pedidosCount) : 0;
@@ -589,10 +612,15 @@ class VentaService {
     let finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
 
     const ClienteService = require('./clienteService');
-    if (finalDescuento === 0 && finalClienteId) {
+    const isMostradorSale = (Number(finalClienteId) === 26) ||
+      (data.clienteNombre && String(data.clienteNombre).toLowerCase().includes('mostrador')) ||
+      (parsedObs.clienteNombre && String(parsedObs.clienteNombre).toLowerCase().includes('mostrador')) ||
+      (!data.idCliente && isStaff);
+
+    if (finalDescuento === 0 && finalClienteId && !isMostradorSale) {
       try {
         const clienteInfo = await ClienteService.getById(finalClienteId);
-        if (clienteInfo && Number(clienteInfo.descuentoPorcentaje) > 0) {
+        if (clienteInfo && clienteInfo.tieneCuenta && clienteInfo.tipo && ['Regular', 'Frecuente', 'VIP'].includes(clienteInfo.tipo) && Number(clienteInfo.descuentoPorcentaje) > 0) {
           finalDescuento = Math.round(finalSubtotal * (Number(clienteInfo.descuentoPorcentaje) / 100));
         }
       } catch (e) {
@@ -894,8 +922,8 @@ class VentaService {
       }
     }
 
-    // Trigger client loyalty progression
-    if (finalClienteId) {
+    // Trigger client loyalty progression (strictly only for registered customer accounts, never for Cliente Mostrador)
+    if (finalClienteId && !isMostradorSale) {
       ClienteService.registrarCompraFidelidad(finalClienteId).catch(err =>
         console.warn('Error registrando fidelidad:', err.message)
       );
