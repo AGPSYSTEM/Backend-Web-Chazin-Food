@@ -4,7 +4,7 @@ class CategoryService {
   static async getAllCategories() {
     const categories = await CategoriaInsumo.findAll();
     const list = await Promise.all(categories.map(async (cat) => {
-      const cantidad = await Insumo.count({ where: { idCategoriaInsumo: cat.id } });
+      const cantidad = await Insumo.count({ where: { idCategoriaInsumo: cat.id, eliminado: 0 } });
       return {
         id: cat.id,
         idCategoriaInsumo: cat.id,
@@ -24,7 +24,7 @@ class CategoryService {
       error.statusCode = 404;
       throw error;
     }
-    const cantidad = await Insumo.count({ where: { idCategoriaInsumo: id } });
+    const cantidad = await Insumo.count({ where: { idCategoriaInsumo: id, eliminado: 0 } });
     return {
       id: cat.id,
       idCategoriaInsumo: cat.id,
@@ -84,12 +84,15 @@ class CategoryService {
       throw error;
     }
 
-    const cantidadInsumos = await Insumo.count({ where: { idCategoriaInsumo: id } });
+    const cantidadInsumos = await Insumo.count({ where: { idCategoriaInsumo: id, eliminado: 0 } });
     if (cantidadInsumos > 0) {
       const error = new Error('No se puede eliminar la categoría porque cuenta con insumos asociados');
       error.statusCode = 400;
       throw error;
     }
+
+    // Desasociar insumos en papelera / eliminados
+    await Insumo.update({ idCategoriaInsumo: null }, { where: { idCategoriaInsumo: id } });
 
     await cat.destroy();
 

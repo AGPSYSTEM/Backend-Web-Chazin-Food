@@ -1,5 +1,33 @@
 const { Venta, DetalleVentaProducto, Cliente, User, Role } = require('../../persistence/models');
 
+function convertUnits(amount, fromUnit, toUnit) {
+  if (!amount || isNaN(amount)) return 0;
+  if (!fromUnit || !toUnit) return Number(amount);
+
+  const from = String(fromUnit).toLowerCase().trim();
+  const to = String(toUnit).toLowerCase().trim();
+
+  if (from === to) return Number(amount);
+
+  const isKg = (u) => u.includes('kg') || u.includes('kilo');
+  const isGr = (u) => u.includes('gr') || u.includes('gram');
+  const isMg = (u) => u.includes('mg') || u.includes('miligram');
+  const isLt = (u) => u.includes('lt') || u.includes('litro');
+  const isMl = (u) => u.includes('ml') || u.includes('mililitro') || u.includes('cc');
+
+  if (isKg(from) && isGr(to)) return Number(amount) * 1000;
+  if (isGr(from) && isKg(to)) return Number(amount) / 1000;
+  if (isKg(from) && isMg(to)) return Number(amount) * 1000000;
+  if (isMg(from) && isKg(to)) return Number(amount) / 1000000;
+  if (isGr(from) && isMg(to)) return Number(amount) * 1000;
+  if (isMg(from) && isGr(to)) return Number(amount) / 1000;
+
+  if (isLt(from) && isMl(to)) return Number(amount) * 1000;
+  if (isMl(from) && isLt(to)) return Number(amount) / 1000;
+
+  return Number(amount);
+}
+
 class VentaService {
   static formatVenta(v) {
     let obsData = {};
@@ -23,33 +51,20 @@ class VentaService {
 
     const numeroVenta = obsData.codigoPedido || obsData.numeroVenta || `VEN-${String(v.idVenta).padStart(4, '0')}`;
     
-    // Dynamic format of date/time (Formato 12 horas con AM/PM)
-    let horario = obsData.horario;
-    if (!horario && v.fechaVenta) {
+    // Dynamic format of date/time in local Colombia timezone (Formato 12 horas con AM/PM)
+    let horario = null;
+    let fechaFormatted = null;
+    if (v.fechaVenta) {
       const d = new Date(v.fechaVenta);
-      let h = d.getHours();
-      const m = String(d.getMinutes()).padStart(2, '0');
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      h = h % 12;
-      h = h ? h : 12;
-      horario = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
-    }
-    // Si el horario guardado es en formato 24h (ej: "23:56"), convertirlo a 12h AM/PM
-    if (horario && typeof horario === 'string') {
-      if (horario.includes('–')) {
-        horario = horario.split('–')[0].trim();
-      }
-      if (/^\d{1,2}:\d{2}$/.test(horario.trim())) {
-        const parts = horario.trim().split(':');
-        let h = parseInt(parts[0], 10);
-        const m = parts[1];
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12;
-        h = h ? h : 12;
-        horario = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+      if (!isNaN(d.getTime())) {
+        horario = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+        fechaFormatted = d.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' });
       }
     }
-    horario = horario || null;
+    if (!horario && obsData.horario) {
+      horario = obsData.horario;
+    }
+    horario = horario || "12:30 PM";
 
     const tipoEntrega = obsData.tipoEntrega || (
       (v.observaciones || "").toLowerCase().includes("recoger") || (v.observaciones || "").toLowerCase().includes("para llevar") || (v.observaciones || "").toLowerCase().includes("llevar")
@@ -68,29 +83,84 @@ class VentaService {
     // Dynamic products from db details or order metadata
     let productos = [];
     if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
-      productos = obsData.productos;
+      productos = obsData.productos.map(p => {
+        const itemAdds = (p.adiciones || []).map(a => {
+          if (typeof a === 'object' && a !== null) {
+            return {
+              idAdicion: a.idAdicion || a.id,
+              nombre: a.nombre,
+              precio: Number(a.precio || 0),
+              cantidad: Number(a.cantidad || 1)
+            };
+          }
+          return {
+            nombre: String(a),
+            precio: 0,
+            cantidad: 1
+          };
+        });
+
+        const addsSum = itemAdds.reduce((s, a) => s + (Number(a.precio || 0) * Number(a.cantidad || 1)), 0);
+        const pQty = Number(p.cantidad || 1);
+        const pUnit = Number(p.precioUnitario || p.precio || 0);
+        const pTot = Number(p.total || 0) > 0 ? Number(p.total) : (pUnit + addsSum) * pQty;
+
+        return {
+          id: p.id || p.idVariante || p.idDetalleVenta,
+          idVariante: p.idVariante || p.id,
+          nombre: p.nombre || p.nombreProducto || "Producto",
+          cantidad: pQty,
+          precioUnitario: pUnit,
+          total: pTot,
+          observaciones: p.observaciones || p.observacion || p.especificaciones || p.nota || "",
+          adiciones: itemAdds
+        };
+      });
     } else if (v.detalles && v.detalles.length > 0) {
       productos = v.detalles.map(d => {
-        let pName = null;
+        let pName = d.variante?.producto?.nombre || d.variante?.nombre || null;
         let pAdiciones = [];
+        let pObs = "";
+
+        if (d.adiciones && d.adiciones.length > 0) {
+          pAdiciones = d.adiciones.map(da => ({
+            idAdicion: da.idAdicion,
+            nombre: da.adicion?.nombre || `Adición #${da.idAdicion}`,
+            precio: parseFloat(da.precio !== undefined && da.precio !== null ? da.precio : (da.precioUnitario || da.adicion?.precioAdicion || da.adicion?.precio || 0)),
+            cantidad: Number(da.cantidad || 1)
+          }));
+        }
+
         if (d.observaciones) {
           try {
-            const parsedObs = typeof d.observaciones === 'string' && d.observaciones.startsWith('{')
-              ? JSON.parse(d.observaciones)
-              : { nombre: d.observaciones };
-            pName = parsedObs.nombre || parsedObs.nombreProducto || null;
-            pAdiciones = parsedObs.adiciones || [];
+            if (typeof d.observaciones === 'string' && d.observaciones.startsWith('{')) {
+              const parsedObs = JSON.parse(d.observaciones);
+              pName = pName || parsedObs.nombre || parsedObs.nombreProducto;
+              pObs = parsedObs.observaciones || parsedObs.observacion || parsedObs.nota || "";
+              if (pAdiciones.length === 0 && Array.isArray(parsedObs.adiciones)) {
+                pAdiciones = parsedObs.adiciones.map(a => typeof a === 'object' ? a : { nombre: String(a), precio: 0, cantidad: 1 });
+              }
+            } else {
+              pObs = d.observaciones;
+            }
           } catch (e) {
-            pName = typeof d.observaciones === 'string' ? d.observaciones : null;
+            pObs = d.observaciones;
           }
         }
+
+        const addsSum = pAdiciones.reduce((s, a) => s + (Number(a.precio || 0) * Number(a.cantidad || 1)), 0);
+        const pQty = Number(d.cantidad || 1);
+        const pUnit = parseFloat(d.precioUnitario || 0);
+        const pTot = parseFloat(d.subtotal || 0) > 0 ? parseFloat(d.subtotal) : (pUnit + addsSum) * pQty;
+
         return {
           id: d.idDetalleVenta || d.idVariante,
           idVariante: d.idVariante,
-          nombre: pName,
-          cantidad: d.cantidad,
-          precioUnitario: parseFloat(d.precioUnitario || 0),
-          total: parseFloat(d.subtotal || 0),
+          nombre: pName || `Producto #${d.idVariante}`,
+          cantidad: pQty,
+          precioUnitario: pUnit,
+          total: pTot,
+          observaciones: pObs,
           adiciones: pAdiciones
         };
       });
@@ -99,37 +169,60 @@ class VentaService {
       productos = [];
     }
 
-    const subtotal = parseFloat(v.subtotal) || 0;
-    const total = parseFloat(v.total) || 0;
-    const iva = Math.round(subtotal * 0.19);
+    let subtotal = parseFloat(v.subtotal) || 0;
+    let total = parseFloat(v.total) || 0;
+    let descuentoAplicado = parseFloat(v.descuentoAplicado || 0);
 
-    let descuentoPorcentaje = obsData.descuentoPorcentaje || 0;
-    if (!descuentoPorcentaje && parseFloat(v.descuentoAplicado || 0) > 0 && (subtotal > 0 || total > 0)) {
-      const base = subtotal > total ? subtotal : total + parseFloat(v.descuentoAplicado);
-      descuentoPorcentaje = Math.round((parseFloat(v.descuentoAplicado) / base) * 100);
-    } else if (!descuentoPorcentaje && clienteObj && clienteObj.direccion) {
+    // Si total o subtotal está en 0 en base de datos, calcular de productos o detalles
+    if ((total === 0 || subtotal === 0) && Array.isArray(productos) && productos.length > 0) {
+      subtotal = productos.reduce((acc, p) => acc + Number(p.total || 0), 0);
+      descuentoAplicado = descuentoAplicado || (subtotal * (Number(obsData.descuentoPorcentaje || 0) / 100));
+      total = Math.max(0, subtotal - descuentoAplicado);
+    }
+
+    const isMostradorSale = (v.idCliente === 26) ||
+      (clienteNombre && String(clienteNombre).toLowerCase().includes('mostrador')) ||
+      (clienteObj && clienteObj.direccion && String(clienteObj.direccion).toLowerCase().includes('mostrador')) ||
+      (!clienteObj.idUsuario);
+
+    // Dynamic extraction of client fidelity
+    let clientMeta = {};
+    if (clienteObj && clienteObj.direccion) {
       try {
         if (clienteObj.direccion.trim().startsWith('{')) {
-          const meta = JSON.parse(clienteObj.direccion);
-          if (meta.descuentoPorcentaje !== undefined) {
-            descuentoPorcentaje = parseFloat(meta.descuentoPorcentaje);
-          } else if (meta.tipo) {
-            const t = meta.tipo;
-            descuentoPorcentaje = t === 'VIP' ? 15 : t === 'Frecuente' ? 10 : t === 'Regular' ? 5 : 0;
-          }
+          clientMeta = JSON.parse(clienteObj.direccion);
         }
-      } catch (e) {}
-    }
-
-    let precioOriginal = subtotal > total ? subtotal : total;
-    if (descuentoPorcentaje > 0 && total > 0) {
-      if (parseFloat(v.descuentoAplicado || 0) > 0) {
-        precioOriginal = total + parseFloat(v.descuentoAplicado);
-      } else if (precioOriginal === total) {
-        precioOriginal = Math.round(total / (1 - (descuentoPorcentaje / 100)));
+      } catch (e) {
+        clientMeta = {};
       }
     }
-    const montoDescuento = Math.max(0, precioOriginal - total);
+    const FidelidadService = require('./fidelidadService');
+    const fidelidadInfo = isMostradorSale ? {
+      tipo: null,
+      descuentoPorcentaje: 0,
+      comprasCiclo: 0,
+      enGracia: false,
+      tieneCuenta: false
+    } : FidelidadService.evaluarEstadoFidelidad(clientMeta.fidelidad || {
+      tipo: clientMeta.tipo || (clienteObj.idUsuario ? 'Nuevo' : 'Mostrador'),
+      comprasCiclo: clientMeta.ciclo !== undefined ? Number(clientMeta.ciclo) : (clientMeta.comprasCiclo || 0),
+      comprasTotales: clientMeta.comprasTotales || 0,
+      fechaInicioNivel: clientMeta.inicio || clientMeta.fechaInicioNivel || null,
+      fechaVencimientoNivel: clientMeta.vence || clientMeta.fechaVencimientoNivel || null
+    });
+
+    // Calculate clear discount percentage
+    let descuentoPorcentaje = obsData.descuentoPorcentaje || (isMostradorSale ? 0 : fidelidadInfo.descuentoPorcentaje) || 0;
+    if (descuentoAplicado > 0 && subtotal > 0) {
+      descuentoPorcentaje = Math.round((descuentoAplicado / subtotal) * 100);
+    } else if (subtotal > total && subtotal > 0) {
+      descuentoAplicado = subtotal - total;
+      descuentoPorcentaje = Math.round((descuentoAplicado / subtotal) * 100);
+    }
+
+    const iva = Math.round(subtotal * 0.19);
+    const precioOriginal = subtotal > total ? subtotal : (total + descuentoAplicado);
+    const montoDescuento = descuentoAplicado;
 
     let estadoStr = 'Pendiente';
     if (v.estadoEntrega === 'PREPARANDO') estadoStr = 'En Preparación';
@@ -138,18 +231,43 @@ class VentaService {
     else if (v.estadoEntrega === 'CANCELADO') estadoStr = 'Anulada';
     else if (v.estadoEntrega) estadoStr = v.estadoEntrega;
 
+    const responsable = v.usuario ? {
+      idUsuario: v.usuario.idUsuario,
+      nombre: `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim(),
+      email: v.usuario.email,
+      rol: v.usuario.rolInfo?.nombre || (v.usuario.idRol === 1 ? 'Administrador' : v.usuario.idRol === 2 ? 'Vendedor' : 'Empleado'),
+      tieneCuenta: true,
+      estado: v.usuario.estado || 'Activo'
+    } : {
+      idUsuario: null,
+      nombre: 'Sistema / Online',
+      rol: 'Online',
+      tieneCuenta: false,
+      estado: 'Activo'
+    };
+
     return {
       id: v.idVenta,
       idVenta: v.idVenta,
       idDescuento: v.idDescuento || null,
+      tipoVenta: v.tipoVenta || (tipoEntrega === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
       numeroVenta,
       codigoPedido: numeroVenta,
       clienteNombre,
       cliente: clienteNombre,
       idCliente: v.idCliente,
       idUsuario: v.idUsuario,
+      responsable,
+      clienteFidelidad: {
+        tipo: isMostradorSale ? null : fidelidadInfo.tipo,
+        descuentoPorcentaje: isMostradorSale ? 0 : (fidelidadInfo.descuentoPorcentaje || 0),
+        comprasCiclo: isMostradorSale ? 0 : (fidelidadInfo.comprasCiclo || 0),
+        enGracia: isMostradorSale ? false : !!fidelidadInfo.enGracia,
+        tieneCuenta: !isMostradorSale && !!clienteObj.idUsuario
+      },
       fecha: v.fechaVenta,
       fechaVenta: v.fechaVenta,
+      fechaFormatted,
       horario,
       tipoEntrega,
       metodoPago,
@@ -161,7 +279,7 @@ class VentaService {
       precioOriginal,
       descuentoPorcentaje,
       montoDescuento,
-      descuentoAplicado: parseFloat(v.descuentoAplicado || 0) || montoDescuento,
+      descuentoAplicado,
       total,
       observaciones: v.observaciones,
       productos,
@@ -169,16 +287,100 @@ class VentaService {
     };
   }
 
-  static async getAll() {
+  static async getAll(filter = {}) {
+    const filterObj = typeof filter === 'string' ? { periodo: filter } : (filter || {});
+    const { periodo, estado, search } = filterObj;
+    const { Op } = require('sequelize');
+    const where = {};
+
+    const normalizedPeriod = String(periodo || '').toLowerCase().trim();
+    if (normalizedPeriod && !['todos', 'personalizado', 'all', ''].includes(normalizedPeriod)) {
+      const now = new Date();
+      if (normalizedPeriod === 'hoy') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        where.fechaVenta = { [Op.gte]: startOfDay };
+      } else if (normalizedPeriod === '7dias' || normalizedPeriod === '7_dias') {
+        const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        where.fechaVenta = { [Op.gte]: sevenDaysAgo };
+      } else if (normalizedPeriod === 'mes' || normalizedPeriod === 'este_mes') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        where.fechaVenta = { [Op.gte]: startOfMonth };
+      } else if (normalizedPeriod === 'ano' || normalizedPeriod === 'este_ano' || normalizedPeriod === 'año') {
+        const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        where.fechaVenta = { [Op.gte]: startOfYear };
+      }
+    } else if (filterObj.fechaInicio || filterObj.fechaFin) {
+      const fechaFilter = {};
+      if (filterObj.fechaInicio) fechaFilter[Op.gte] = new Date(filterObj.fechaInicio);
+      if (filterObj.fechaFin) {
+        const endD = new Date(filterObj.fechaFin);
+        endD.setHours(23, 59, 59, 999);
+        fechaFilter[Op.lte] = endD;
+      }
+      where.fechaVenta = fechaFilter;
+    }
+
+    if (estado && estado !== 'Todos') {
+      if (estado === 'Pendiente') {
+        where.estadoEntrega = { [Op.in]: ['PENDIENTE', 'Pendiente'] };
+      } else if (estado === 'En Preparación') {
+        where.estadoEntrega = { [Op.in]: ['PREPARANDO', 'En Preparación'] };
+      } else if (estado === 'Completada') {
+        where.estadoEntrega = { [Op.in]: ['ENTREGADO', 'LISTO', 'Completada'] };
+      } else if (estado === 'Anulada') {
+        where.estadoEntrega = { [Op.in]: ['CANCELADO', 'Anulada'] };
+      }
+    }
+
+    const { Variante, Product, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaAdicion, Adicion } = require('../../persistence/models');
     const ventas = await Venta.findAll({
+      where,
       include: [
         { 
           model: Cliente, 
           as: 'cliente',
           include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
         },
-        { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
-        { model: DetalleVentaProducto, as: 'detalles' }
+        { 
+          model: User, 
+          as: 'usuario', 
+          attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'estado', 'idRol'],
+          include: [{ model: Role, as: 'rolInfo', attributes: ['idRol', 'nombre'] }]
+        },
+        { 
+          model: DetalleVentaProducto, 
+          as: 'detalles',
+          include: [
+            {
+              model: Variante,
+              as: 'variante',
+              include: [
+                {
+                  model: Product,
+                  as: 'producto',
+                  include: [
+                    {
+                      model: FichaTecnica,
+                      as: 'fichaTecnica',
+                      include: [
+                        {
+                          model: DetalleFichaInsumo,
+                          as: 'detalles',
+                          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              model: DetalleVentaAdicion,
+              as: 'adiciones',
+              include: [{ model: Adicion, as: 'adicion' }]
+            }
+          ]
+        }
       ],
       order: [['idVenta', 'DESC']]
     });
@@ -186,7 +388,35 @@ class VentaService {
     return ventas.map(v => this.formatVenta(v));
   }
 
+  static async getStats(filter = {}) {
+    const filterObj = typeof filter === 'string' ? { periodo: filter } : (filter || {});
+    const list = await this.getAll(filterObj);
+    const totalVentasSum = list.reduce((acc, v) => acc + Number(v.total || 0), 0);
+    const pedidosCount = list.length;
+    const ticketPromedioVal = pedidosCount > 0 ? Math.round(totalVentasSum / pedidosCount) : 0;
+    const descOtorgadosSum = list.reduce((acc, v) => acc + Number(v.montoDescuento || v.descuentoAplicado || 0), 0);
+    const uniqueClientsCount = new Set(list.map(v => v.idCliente || v.clienteNombre || v.cliente).filter(Boolean)).size || 1;
+    const frecuenciaVal = pedidosCount > 0 ? parseFloat((pedidosCount / uniqueClientsCount).toFixed(1)) : 0.0;
+    const tasaDescuentoVal = (totalVentasSum + descOtorgadosSum) > 0
+      ? parseFloat(((descOtorgadosSum / (totalVentasSum + descOtorgadosSum)) * 100).toFixed(1))
+      : 0.0;
+
+    return {
+      totalVentas: totalVentasSum,
+      totalVentasFormatted: `$${totalVentasSum.toLocaleString('es-CO')}`,
+      pedidosCount,
+      ticketPromedio: ticketPromedioVal,
+      ticketPromedioFormatted: `$${ticketPromedioVal.toLocaleString('es-CO')}`,
+      totalDescuentos: descOtorgadosSum,
+      totalDescuentosFormatted: `$${descOtorgadosSum.toLocaleString('es-CO')}`,
+      frecuenciaCompra: frecuenciaVal,
+      tasaDescuento: tasaDescuentoVal,
+      uniqueClientsCount
+    };
+  }
+
   static async getById(id) {
+    const { Variante, Product, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaAdicion, Adicion } = require('../../persistence/models');
     const v = await Venta.findByPk(id, {
       include: [
         { 
@@ -195,7 +425,40 @@ class VentaService {
           include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] }]
         },
         { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
-        { model: DetalleVentaProducto, as: 'detalles' }
+        { 
+          model: DetalleVentaProducto, 
+          as: 'detalles',
+          include: [
+            {
+              model: Variante,
+              as: 'variante',
+              include: [
+                {
+                  model: Product,
+                  as: 'producto',
+                  include: [
+                    {
+                      model: FichaTecnica,
+                      as: 'fichaTecnica',
+                      include: [
+                        {
+                          model: DetalleFichaInsumo,
+                          as: 'detalles',
+                          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              model: DetalleVentaAdicion,
+              as: 'adiciones',
+              include: [{ model: Adicion, as: 'adicion' }]
+            }
+          ]
+        }
       ]
     });
     if (!v) {
@@ -204,6 +467,30 @@ class VentaService {
       throw error;
     }
     return this.formatVenta(v);
+  }
+
+  static async getOrCreateClienteMostrador() {
+    let mostrador = await Cliente.findOne({
+      where: {
+        idUsuario: null
+      }
+    });
+
+    if (!mostrador) {
+      const metaStr = JSON.stringify({
+        nombre: 'Cliente',
+        apellidos: 'Mostrador',
+        tipo: 'Nuevo',
+        descuentoPorcentaje: 0,
+        estado: 'Activo'
+      });
+      mostrador = await Cliente.create({
+        idUsuario: null,
+        direccion: metaStr,
+        estado: 1
+      });
+    }
+    return mostrador;
   }
 
   static async create(data) {
@@ -217,7 +504,9 @@ class VentaService {
     }
 
     // Strict Validation 2: Check user exists in DB
-    const userObj = await User.findByPk(targetUserId);
+    const userObj = await User.findByPk(targetUserId, {
+      include: [{ model: Role, as: 'rolInfo' }]
+    });
     if (!userObj) {
       const error = new Error('El usuario especificado no existe en el sistema.');
       error.statusCode = 404;
@@ -231,31 +520,74 @@ class VentaService {
       throw error;
     }
 
-    // Strict Validation 4 & 5: Check client linked to user
-    let clienteObj = await Cliente.findOne({ where: { idUsuario: targetUserId } });
-    
-    // Auto-associate client ONLY if this user has no client entry yet
-    if (!clienteObj) {
-      clienteObj = await Cliente.create({
-        idUsuario: targetUserId,
-        direccion: data.direccion || '',
-        estado: 1
-      });
+    // Determine if the operating user is staff (Admin, Vendedor, Cocinero)
+    const userRole = userObj.idRol || (userObj.rolInfo ? userObj.rolInfo.nombre : null);
+    const isStaff = (userRole === 1 || userRole === 2 || userRole === 3 || 
+                     String(userRole).toLowerCase().includes('admin') || 
+                     String(userRole).toLowerCase().includes('vendedor') || 
+                     String(userRole).toLowerCase().includes('cocinero'));
+
+    let finalClienteId = null;
+
+    if (isStaff) {
+      // Staff (Vendedor/Admin) creating POS sale -> seller is employee, NOT customer
+      if (data.idCliente) {
+        finalClienteId = Number(data.idCliente);
+      } else {
+        const mostrador = await this.getOrCreateClienteMostrador();
+        finalClienteId = mostrador.idCliente;
+      }
+    } else {
+      // Regular customer placing an order online
+      let clienteObj = await Cliente.findOne({ where: { idUsuario: targetUserId } });
+      if (!clienteObj) {
+        clienteObj = await Cliente.create({
+          idUsuario: targetUserId,
+          direccion: data.direccion || '',
+          estado: 1
+        });
+      }
+
+      let clientMeta = {};
+      if (clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
+        try { clientMeta = JSON.parse(clienteObj.direccion); } catch (e) { clientMeta = {}; }
+      }
+
+      if (clienteObj.estado === 0 || clientMeta.estado === 'Inactivo' || clientMeta.estado === 0) {
+        const error = new Error('No puedes realizar el pedido porque tu cliente está inactivo.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      finalClienteId = clienteObj.idCliente;
     }
 
-    // Strict Validation 6: Check client is ACTIVE
-    let clientMeta = {};
-    if (clienteObj.direccion && clienteObj.direccion.trim().startsWith('{')) {
-      try { clientMeta = JSON.parse(clienteObj.direccion); } catch (e) { clientMeta = {}; }
+    // Determinar y normalizar tipoVenta (PUNTO_DE_VENTA vs DOMICILIO)
+    const rawTipoVenta = String(data.tipoVenta || "").toUpperCase();
+    const rawEntrega = String(data.tipoEntrega || (data.mesa ? "En Mesa" : "")).toLowerCase();
+    let resolvedTipoVenta = "PUNTO_DE_VENTA";
+
+    if (rawTipoVenta.includes("DOMICILIO") || rawTipoVenta.includes("LINEA") || rawEntrega.includes("domicilio")) {
+      resolvedTipoVenta = "DOMICILIO";
+    } else {
+      resolvedTipoVenta = "PUNTO_DE_VENTA";
     }
 
-    if (clienteObj.estado === 0 || clientMeta.estado === 'Inactivo' || clientMeta.estado === 0) {
-      const error = new Error('No puedes realizar el pedido porque tu cliente está inactivo.');
-      error.statusCode = 403;
-      throw error;
-    }
+    // Si es venta rápida (PUNTO_DE_VENTA), asegurar que se asocie al responsable con rol Vendedor o Administrador
+    let responsibleUserId = targetUserId;
+    if (resolvedTipoVenta === "PUNTO_DE_VENTA") {
+      if (!isStaff) {
+        const { Op } = require('sequelize');
+        const sellerUser = await User.findOne({
+          include: [{ model: Role, as: 'rolInfo', where: { nombre: { [Op.like]: '%Vendedor%' } } }],
+          where: { estado: { [Op.in]: [1, 'ACTIVO', '1'] } }
+        }).catch(() => null);
 
-    const finalClienteId = clienteObj.idCliente;
+        if (sellerUser) {
+          responsibleUserId = sellerUser.idUsuario;
+        }
+      }
+    }
 
     let parsedObs = {};
     if (typeof data.observaciones === 'string' && data.observaciones.startsWith('{')) {
@@ -264,39 +596,99 @@ class VentaService {
       parsedObs = data.observaciones;
     }
 
+    const rawDetails = data.detalles || data.items || [];
+
+    let calculatedSubtotal = 0;
+    for (const it of rawDetails) {
+      const itPrice = Number(it.precioUnitario || it.precio || 0);
+      const itQty = Number(it.cantidad || 1);
+      const itAdds = Array.isArray(it.adiciones)
+        ? it.adiciones.reduce((s, a) => s + (Number(a.precio || a.precioUnitario || 0)), 0)
+        : 0;
+      calculatedSubtotal += (itPrice + itAdds) * itQty;
+    }
+
+    const finalSubtotal = Number(data.subtotal) > 0 ? Number(data.subtotal) : calculatedSubtotal;
+    let finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
+
+    const ClienteService = require('./clienteService');
+    const isMostradorSale = (Number(finalClienteId) === 26) ||
+      (data.clienteNombre && String(data.clienteNombre).toLowerCase().includes('mostrador')) ||
+      (parsedObs.clienteNombre && String(parsedObs.clienteNombre).toLowerCase().includes('mostrador')) ||
+      (!data.idCliente && isStaff);
+
+    if (finalDescuento === 0 && finalClienteId && !isMostradorSale) {
+      try {
+        const clienteInfo = await ClienteService.getById(finalClienteId);
+        if (clienteInfo && clienteInfo.tieneCuenta && clienteInfo.tipo && ['Regular', 'Frecuente', 'VIP'].includes(clienteInfo.tipo) && Number(clienteInfo.descuentoPorcentaje) > 0) {
+          finalDescuento = Math.round(finalSubtotal * (Number(clienteInfo.descuentoPorcentaje) / 100));
+        }
+      } catch (e) {
+        // Continue without blocking
+      }
+    }
+
+    const finalTotal = Math.max(0, finalSubtotal - finalDescuento);
+
+    const now = new Date();
+    const formattedHorario = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+
     const obsObj = {
-      horario: data.horario || parsedObs.horario || "12:30 – 12:48",
-      tipoEntrega: data.tipoEntrega || parsedObs.tipoEntrega || "Domicilio",
+      horario: data.horario || parsedObs.horario || formattedHorario,
+      tipoEntrega: data.tipoEntrega || parsedObs.tipoEntrega || (data.mesa ? "En Mesa" : "Recoger"),
       metodoPago: data.metodoPago || parsedObs.metodoPago || "Efectivo",
-      direccion: data.direccion || parsedObs.direccion || "",
+      direccion: data.direccion || parsedObs.direccion || "Recoger en Local",
       estadoPago: data.estadoPago || parsedObs.estadoPago || "Pagado",
       codigoPedido: data.codigoPedido || data.numeroVenta || parsedObs.codigoPedido || `VEN-${String(Date.now()).slice(-4)}`,
       clienteNombre: data.clienteNombre || parsedObs.clienteNombre || `${userObj.nombre} ${userObj.apellidos || ''}`.trim(),
-      productos: data.productos || parsedObs.productos || [],
-      especificaciones: parsedObs.especificaciones || "",
-      efectivoConCuanto: parsedObs.efectivoConCuanto || "",
-      vueltoEfectivo: parsedObs.vueltoEfectivo || 0,
-      transferenciaReferencia: parsedObs.transferenciaReferencia || ""
+      productos: (Array.isArray(data.productos) && data.productos.length > 0)
+        ? data.productos
+        : (Array.isArray(parsedObs.productos) && parsedObs.productos.length > 0)
+          ? parsedObs.productos
+          : rawDetails.map(it => {
+              const itPrice = Number(it.precioUnitario || it.precio || 0);
+              const itQty = Number(it.cantidad || 1);
+              const itAdds = Array.isArray(it.adiciones)
+                ? it.adiciones.reduce((s, a) => s + (Number(a.precio || a.precioUnitario || 0)), 0)
+                : 0;
+              return {
+                idVariante: it.idVariante || it.varianteId,
+                nombre: it.nombre || it.observaciones || it.observacion || "Producto",
+                cantidad: itQty,
+                precioUnitario: itPrice,
+                total: Number(it.subtotal || it.total) > 0 ? Number(it.subtotal || it.total) : (itPrice + itAdds) * itQty,
+                observaciones: it.observaciones || it.observacion || "",
+                adiciones: it.adiciones || it.idAdiciones || []
+              };
+            }),
+      especificaciones: data.observacion || parsedObs.especificaciones || data.observaciones || "",
+      efectivoConCuanto: parsedObs.efectivoConCuanto || (data.datosPago ? data.datosPago.efectivoConCuanto : null) || "",
+      vueltoEfectivo: parsedObs.vueltoEfectivo || (data.datosPago ? data.datosPago.vueltoEfectivo : null) || 0,
+      transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",
+      transferBanco: parsedObs.transferBanco || (data.datosPago ? data.datosPago.transferBanco : null) || "",
+      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || "",
+      estadoAprobacion: data.estadoAprobacion || parsedObs.estadoAprobacion || 'PENDIENTE'
     };
 
     const obsStr = JSON.stringify(obsObj);
 
     const venta = await Venta.create({
       idCliente: finalClienteId,
-      idUsuario: targetUserId,
+      idUsuario: responsibleUserId,
       idDescuento: data.idDescuento || null,
-      subtotal: data.subtotal || data.total || 0,
-      descuentoAplicado: data.descuentoAplicado || 0,
-      total: data.total || 0,
-      estadoEntrega: data.estadoEntrega || 'PENDIENTE',
-      observaciones: obsStr
+      tipoVenta: resolvedTipoVenta,
+      subtotal: finalSubtotal,
+      descuentoAplicado: finalDescuento,
+      total: finalTotal,
+      estadoEntrega: data.estadoEntrega || data.estado || 'ENTREGADO',
+      observaciones: obsStr,
+      estadoAprobacion: data.estadoAprobacion || 'PENDIENTE'
     });
 
-    if (data.detalles && data.detalles.length > 0) {
-      const { sequelize } = require('../../persistence/models');
-      const detallesToInsert = [];
+    if (rawDetails.length > 0) {
+      const { sequelize, DetalleVentaAdicion } = require('../../persistence/models');
 
-      for (const d of data.detalles) {
+      for (const d of rawDetails) {
         let chosenVarianteId = null;
 
         // 1. Verificar si d.idVariante existe directamente en la tabla `variante`
@@ -354,7 +746,7 @@ class VentaService {
             );
 
             let finalProdId = targetProdId;
-            let varNombre = d.observaciones || d.nombre || 'Estándar';
+            let varNombre = d.observaciones || d.observacion || d.nombre || 'Estándar';
             let varPrecio = d.precioUnitario || d.precio || 0;
 
             if (!prodCheck || prodCheck.length === 0) {
@@ -369,12 +761,11 @@ class VentaService {
               varPrecio = prodCheck[0].precio;
             }
 
-            const [result] = await sequelize.query(
+            await sequelize.query(
               'INSERT INTO variante (idProducto, nombre, precio, estado) VALUES (:idProducto, :nombre, :precio, 1)',
               { replacements: { idProducto: finalProdId, nombre: String(varNombre).slice(0, 80), precio: varPrecio } }
             );
 
-            // Obtener el ID insertado
             const [newVarRow] = await sequelize.query(
               'SELECT idVariante FROM variante WHERE idProducto = :idProducto ORDER BY idVariante DESC LIMIT 1',
               { replacements: { idProducto: finalProdId } }
@@ -388,20 +779,154 @@ class VentaService {
         }
 
         if (chosenVarianteId) {
-          detallesToInsert.push({
+          const createdDetalle = await DetalleVentaProducto.create({
             idVenta: venta.idVenta,
             idVariante: chosenVarianteId,
             cantidad: d.cantidad || 1,
             precioUnitario: d.precioUnitario || d.precio || 0,
             subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
-            observaciones: d.observaciones || d.nombre || null
+            observaciones: d.observaciones || d.observacion || d.nombre || null
           });
+
+          // Descuento Automático de Insumos según Ficha Técnica del Producto o Variante específica
+          try {
+            const { Insumo, Variante, Trazabilidad } = require('../../persistence/models');
+            let targetProductId = d.idProducto;
+            if (!targetProductId && chosenVarianteId) {
+              const varRow = await Variante.findByPk(chosenVarianteId);
+              if (varRow && varRow.idProducto) targetProductId = varRow.idProducto;
+            }
+            if (!targetProductId && d.idVariante) {
+              const varRow = await Variante.findByPk(d.idVariante);
+              if (varRow && varRow.idProducto) targetProductId = varRow.idProducto;
+            }
+
+            const recipeResult = await VentaService.resolveRecipeOrInsumoForDetail(d, chosenVarianteId, targetProductId);
+            const itemQty = Number(d.cantidad || 1);
+
+            if (recipeResult.directInsumoId) {
+              const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
+              if (insumo) {
+                const totalADescontar = itemQty;
+                const stockActual = Number(insumo.stock || 0);
+                const nuevoStock = Math.max(0, stockActual - totalADescontar);
+                insumo.stock = nuevoStock;
+                await insumo.save();
+
+                try {
+                  await Trazabilidad.create({
+                    tipo: 'CONSUMO_VENTA',
+                    entidadNombre: insumo.nombre,
+                    detalle: `Consumo de ${totalADescontar.toFixed(2)} und por Venta #${venta.idVenta} (${itemQty}x ${insumo.nombre})`,
+                    idInsumo: insumo.idInsumo,
+                    tipoMovimiento: 'SALIDA',
+                    cantidad: totalADescontar,
+                    motivo: `Venta #${venta.idVenta}`,
+                    usuarioId: responsibleUserId || targetUserId || null
+                  });
+                } catch (tzErr) {
+                  console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
+                }
+              }
+            } else if (recipeResult.ficha && Array.isArray(recipeResult.ficha.detalles)) {
+              for (const det of recipeResult.ficha.detalles) {
+                const cantPorPlato = Number(det.cantidad || 0);
+                const recipeUnit = det.unidadMedida || 'und';
+                if (cantPorPlato > 0 && det.idInsumo) {
+                  const insumo = await Insumo.findByPk(det.idInsumo);
+                  if (insumo) {
+                    const insumoUnit = insumo.unidadMedida || recipeUnit;
+                    const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                    const totalADescontar = cantConvertida * itemQty;
+                    const stockActual = Number(insumo.stock || 0);
+                    const nuevoStock = Math.max(0, stockActual - totalADescontar);
+                    insumo.stock = nuevoStock;
+                    await insumo.save();
+
+                    try {
+                      await Trazabilidad.create({
+                        tipo: 'CONSUMO_VENTA',
+                        entidadNombre: insumo.nombre,
+                        detalle: `Consumo de ${totalADescontar.toFixed(2)} ${insumoUnit} por Venta #${venta.idVenta} (${itemQty}x Prod #${recipeResult.targetProductId || targetProductId})`,
+                        idInsumo: insumo.idInsumo,
+                        tipoMovimiento: 'SALIDA',
+                        cantidad: totalADescontar,
+                        motivo: `Venta #${venta.idVenta}`,
+                        usuarioId: responsibleUserId || targetUserId || null
+                      });
+                    } catch (tzErr) {
+                      console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (mrpErr) {
+            console.warn('Error descontando insumos de receta:', mrpErr.message);
+          }
+
+          // Guardar adiciones si fueron enviadas y descontar su insumo de inventario
+          const adicList = d.idAdiciones || d.adiciones || [];
+          if (Array.isArray(adicList) && adicList.length > 0) {
+            const { Insumo, Trazabilidad } = require('../../persistence/models');
+            for (const adItem of adicList) {
+              const adId = typeof adItem === 'object' ? (adItem.id || adItem.idAdicion || adItem.idInsumo) : adItem;
+              const adCantidad = typeof adItem === 'object' ? (Number(adItem.cantidad) || 1) : 1;
+              let adPrecio = typeof adItem === 'object' ? (Number(adItem.precio !== undefined ? adItem.precio : adItem.precioAdicion) || 0) : 0;
+              if (adId) {
+                try {
+                  const insumoAd = await Insumo.findByPk(adId);
+                  if (insumoAd && adPrecio <= 0 && insumoAd.precioAdicion) {
+                    adPrecio = Number(insumoAd.precioAdicion) || 0;
+                  }
+
+                  await DetalleVentaAdicion.create({
+                    idDetalleVenta: createdDetalle.idDetalleVenta,
+                    idAdicion: adId,
+                    cantidad: adCantidad,
+                    precio: adPrecio,
+                    subtotal: adPrecio * adCantidad
+                  });
+
+                  // Descontar inventario del insumo vinculado a la adición
+                  if (insumoAd) {
+                    const itemQty = Number(d.cantidad || 1);
+                    const totalAdDescontar = adCantidad * itemQty;
+                    const stockActual = Number(insumoAd.stock || 0);
+                    const nuevoStock = Math.max(0, stockActual - totalAdDescontar);
+                    insumoAd.stock = nuevoStock;
+                    await insumoAd.save();
+
+                    try {
+                      await Trazabilidad.create({
+                        tipo: 'CONSUMO_ADICION',
+                        entidadNombre: insumoAd.nombre,
+                        detalle: `Adición ${insumoAd.nombre} (${totalAdDescontar} ${insumoAd.unidadMedida || 'und'}) en Venta #${venta.idVenta}`,
+                        idInsumo: insumoAd.idInsumo,
+                        tipoMovimiento: 'SALIDA',
+                        cantidad: totalAdDescontar,
+                        motivo: `Venta #${venta.idVenta} (Adición)`,
+                        usuarioId: responsibleUserId || targetUserId || null
+                      });
+                    } catch (tzAdErr) {
+                      console.warn('Error registrando trazabilidad de adición:', tzAdErr.message);
+                    }
+                  }
+                } catch (errAd) {
+                  console.warn('Error guardando DetalleVentaAdicion o descontando stock:', errAd.message);
+                }
+              }
+            }
+          }
         }
       }
+    }
 
-      if (detallesToInsert.length > 0) {
-        await DetalleVentaProducto.bulkCreate(detallesToInsert);
-      }
+    // Trigger client loyalty progression (strictly only for registered customer accounts, never for Cliente Mostrador)
+    if (finalClienteId && !isMostradorSale) {
+      ClienteService.registrarCompraFidelidad(finalClienteId).catch(err =>
+        console.warn('Error registrando fidelidad:', err.message)
+      );
     }
 
     return this.getById(venta.idVenta);
@@ -422,9 +947,209 @@ class VentaService {
     else if (estado === 'Completada' || estado === 'Entregado') estadoEnum = 'ENTREGADO';
     else if (estado === 'Anulada' || estado === 'CANCELADO') estadoEnum = 'CANCELADO';
 
+    const estadoAnterior = v.estadoEntrega;
     v.estadoEntrega = estadoEnum;
+    if (estadoEnum === 'CANCELADO') {
+      v.estadoAprobacion = 'RECHAZADO';
+    } else if (estadoEnum === 'PREPARANDO' || estadoEnum === 'LISTO' || estadoEnum === 'ENTREGADO') {
+      v.estadoAprobacion = 'APROBADO';
+    }
     await v.save();
+
+    // Reintegrar insumos si la venta fue anulada/cancelada y no estaba ya cancelada
+    if (estadoEnum === 'CANCELADO' && estadoAnterior !== 'CANCELADO') {
+      try {
+        const saleData = await this.getById(id);
+        if (saleData && Array.isArray(saleData.detalles)) {
+          const { Insumo, Variante } = require('../../persistence/models');
+          for (const d of saleData.detalles) {
+            let prodId = d.idProducto;
+            if (!prodId && d.idVariante) {
+              const varRow = await Variante.findByPk(d.idVariante);
+              if (varRow) prodId = varRow.idProducto;
+            }
+
+            const recipeResult = await VentaService.resolveRecipeOrInsumoForDetail(d, d.idVariante, prodId);
+            const itemQty = Number(d.cantidad || 1);
+
+            if (recipeResult.directInsumoId) {
+              const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
+              if (insumo) {
+                insumo.stock = Number(insumo.stock || 0) + itemQty;
+                await insumo.save();
+              }
+            } else if (recipeResult.ficha && Array.isArray(recipeResult.ficha.detalles)) {
+              for (const det of recipeResult.ficha.detalles) {
+                const cantPorPlato = Number(det.cantidad || 0);
+                const recipeUnit = det.unidadMedida || 'und';
+                if (cantPorPlato > 0 && det.idInsumo) {
+                  const insumo = await Insumo.findByPk(det.idInsumo);
+                  if (insumo) {
+                    const insumoUnit = insumo.unidadMedida || recipeUnit;
+                    const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                    const totalARestaurar = cantConvertida * itemQty;
+                    insumo.stock = Number(insumo.stock || 0) + totalARestaurar;
+                    await insumo.save();
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (restockErr) {
+        console.warn('Error reintegrando insumos por cancelación:', restockErr.message);
+      }
+    }
+
+    // Nota: la fidelidad se registra de forma única y atómica al crear la venta en el método create()
+
     return this.getById(id);
+  }
+
+  static async resolveRecipeOrInsumoForDetail(d, chosenVarianteId, targetProductId) {
+    const { FichaTecnica, DetalleFichaInsumo, Variante, Product } = require('../../persistence/models');
+    const { Op } = require('sequelize');
+
+    // Revisar todo el texto descriptivo del ítem
+    const rawText = [
+      d.observaciones,
+      d.observacion,
+      d.nombre,
+      d.sabor,
+      d.saborSeleccionado
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    const isExplicitOriginal = rawText.includes('original') || rawText.includes('clásica') || rawText.includes('clasica') || rawText.includes('regular');
+    const hasDietKeyword = rawText.includes('sin azúcar') || rawText.includes('sin azucar') || rawText.includes('light') || rawText.includes('zero') || rawText.includes('black');
+
+    const isCoca = (targetProductId === 8) || (d.idProducto === 8) || (d.idProducto === 16) || rawText.includes('coca');
+    const isPepsi = (targetProductId === 11) || (d.idProducto === 11) || rawText.includes('pepsi');
+
+    // 1. Caso Coca-Cola: Distinguir con total precisión entre Original y Sin Azúcar / Light
+    if (isCoca) {
+      const isLightSale = !isExplicitOriginal && (
+        (d.idProducto === 16) ||
+        (d.idVariante === 20 && !rawText.includes('original')) ||
+        (d.idVariante === 76 && !rawText.includes('original')) ||
+        (d.idVariante === 77 && !rawText.includes('original')) ||
+        hasDietKeyword
+      );
+
+      if (isLightSale) {
+        // Descontar Coca-Cola Sin Azúcar / Light (Insumo 32)
+        try {
+          const fichaLight = await FichaTecnica.findOne({
+            where: { [Op.or]: [{ idProducto: 16 }, { idVariante: 20 }], estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (fichaLight && Array.isArray(fichaLight.detalles) && fichaLight.detalles.length > 0) {
+            return { ficha: fichaLight, targetProductId: 16, resolvedName: 'Coca-Cola Sin Azúcar / Light 400ml' };
+          }
+        } catch (e) {}
+        return { directInsumoId: 32, targetProductId: 16, resolvedName: 'Coca-Cola Sin Azúcar / Light 400ml' };
+      } else {
+        // Descontar Coca-Cola Original (Insumo 29)
+        try {
+          const fichaOrig = await FichaTecnica.findOne({
+            where: { idProducto: 8, idVariante: null, estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (fichaOrig && Array.isArray(fichaOrig.detalles) && fichaOrig.detalles.length > 0) {
+            return { ficha: fichaOrig, targetProductId: 8, resolvedName: 'Coca-Cola Original 400ml' };
+          }
+        } catch (e) {}
+        return { directInsumoId: 29, targetProductId: 8, resolvedName: 'Coca-Cola Original 400ml' };
+      }
+    }
+
+    // 2. Caso Pepsi: Distinguir entre Regular y Light / Black
+    if (isPepsi) {
+      const isPepsiLight = !isExplicitOriginal && (
+        (d.idVariante === 22 && !rawText.includes('regular') && !rawText.includes('original')) ||
+        hasDietKeyword
+      );
+      if (isPepsiLight) {
+        try {
+          const fichaPepsiLight = await FichaTecnica.findOne({
+            where: { idVariante: 22, estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (fichaPepsiLight && Array.isArray(fichaPepsiLight.detalles) && fichaPepsiLight.detalles.length > 0) {
+            return { ficha: fichaPepsiLight, targetProductId: 11, resolvedName: 'Pepsi Light / Black 400ml' };
+          }
+        } catch (e) {}
+        return { directInsumoId: 34, targetProductId: 11, resolvedName: 'Pepsi Light / Black 400ml' };
+      } else {
+        return { directInsumoId: 33, targetProductId: 11, resolvedName: 'Pepsi Regular 400ml' };
+      }
+    }
+
+    // 3. Caso Postobón y Bebidas Específicas por Sabor
+    const isUva = rawText.includes('uva') || (targetProductId === 38) || (d.idProducto === 38);
+    const isNaranja = rawText.includes('naranja') || (targetProductId === 39) || (d.idProducto === 39);
+    const isColombiana = (rawText.includes('colombiana') || (targetProductId === 12) || (d.idProducto === 12)) && !isUva && !isNaranja && !rawText.includes('manzana');
+    const isManzana = (rawText.includes('manzana') || (targetProductId === 9) || (d.idProducto === 9)) && !isUva && !isNaranja && !isColombiana;
+    const isSprite = rawText.includes('sprite') || (targetProductId === 13) || (d.idProducto === 13);
+    const isQuatro = rawText.includes('cuatro') || rawText.includes('quatro') || (targetProductId === 14) || (d.idProducto === 14);
+    const isAgua = rawText.includes('agua') || rawText.includes('cristal') || (targetProductId === 10) || (d.idProducto === 10);
+
+    if (isUva) {
+      return { directInsumoId: 47, targetProductId: 38, resolvedName: 'Gaseosa Uva Postobón 400ml' };
+    }
+    if (isNaranja) {
+      return { directInsumoId: 48, targetProductId: 39, resolvedName: 'Gaseosa Naranja Postobón 400ml' };
+    }
+    if (isColombiana) {
+      return { directInsumoId: 35, targetProductId: 12, resolvedName: 'Gaseosa Colombiana Postobón 400ml' };
+    }
+    if (isManzana) {
+      return { directInsumoId: 30, targetProductId: 9, resolvedName: 'Manzana Postobón 400ml' };
+    }
+    if (isSprite) {
+      return { directInsumoId: 36, targetProductId: 13, resolvedName: 'Gaseosa Sprite 400ml' };
+    }
+    if (isQuatro) {
+      return { directInsumoId: 37, targetProductId: 14, resolvedName: 'Gaseosa Cuatro Toronja 400ml' };
+    }
+    if (isAgua) {
+      return { directInsumoId: 31, targetProductId: 10, resolvedName: 'Agua Cristal sin Gas 500ml' };
+    }
+
+    // 4. Demás casos generales (Platos, combos, etc.)
+    const varId = chosenVarianteId || d.idVariante;
+    let varRow = null;
+    if (varId) {
+      try {
+        varRow = await Variante.findByPk(varId);
+      } catch (e) {}
+    }
+
+    if (varId) {
+      try {
+        const fichaVar = await FichaTecnica.findOne({
+          where: { idVariante: varId, estado: 1 },
+          include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+        });
+        if (fichaVar && Array.isArray(fichaVar.detalles) && fichaVar.detalles.length > 0) {
+          return { ficha: fichaVar, targetProductId: fichaVar.idProducto || targetProductId, resolvedName: varRow?.nombre };
+        }
+      } catch (e) {}
+    }
+
+    const finalProdId = d.idProducto || targetProductId;
+    if (finalProdId) {
+      try {
+        const fichaBase = await FichaTecnica.findOne({
+          where: { idProducto: finalProdId, estado: 1 },
+          include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+        });
+        if (fichaBase) {
+          return { ficha: fichaBase, targetProductId: finalProdId };
+        }
+      } catch (e) {}
+    }
+
+    return { ficha: null, targetProductId: finalProdId };
   }
 
   static async cancelar(id) {

@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
+const { Op } = require('sequelize');
 const { User, Role, Cliente } = require('../../persistence/models');
+const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName, formatNombreCompleto } = require('../../infrastructure/utils/validationUtils');
 const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
@@ -22,23 +24,30 @@ class UserService {
       order: [['fechaRegistro', 'DESC']]
     });
 
-    return users.map(user => ({
-      _id: user.idUsuario,
-      id: user.idUsuario,
-      idUsuario: user.idUsuario,
-      nombre: user.nombre,
-      apellidos: user.apellidos || '',
-      apellido: user.apellidos || '',
-      tipoDocumento: user.tipoDocumento || '',
-      telefono: user.telefono || '',
-      email: user.email,
-      correo: user.email,
-      idRol: user.idRol,
-      rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
-      estado: user.estado,
-      direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
-      fechaRegistro: user.fechaRegistro
-    }));
+    return users.map(user => {
+      const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
+      const cleanTel = sanitizeTelefono(user.telefono);
+      const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+      return {
+        _id: user.idUsuario,
+        id: user.idUsuario,
+        idUsuario: user.idUsuario,
+        nombre: cleanNom,
+        apellidos: cleanApe,
+        apellido: cleanApe,
+        tipoDocumento: user.tipoDocumento || 'C.C.',
+        numeroDocumento: docVal,
+        documento: docVal,
+        telefono: cleanTel,
+        email: user.email,
+        correo: user.email,
+        idRol: user.idRol,
+        rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
+        estado: user.estado,
+        direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
+        fechaRegistro: user.fechaRegistro
+      };
+    });
   }
 
   static async getUserById(id) {
@@ -52,15 +61,21 @@ class UserService {
       throw error;
     }
 
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
+    const cleanTel = sanitizeTelefono(user.telefono);
+    const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+
     return {
       _id: user.idUsuario,
       id: user.idUsuario,
       idUsuario: user.idUsuario,
-      nombre: user.nombre,
-      apellidos: user.apellidos || '',
-      apellido: user.apellidos || '',
-      tipoDocumento: user.tipoDocumento || '',
-      telefono: user.telefono || '',
+      nombre: cleanNom,
+      apellidos: cleanApe,
+      apellido: cleanApe,
+      tipoDocumento: user.tipoDocumento || 'C.C.',
+      numeroDocumento: docVal,
+      documento: docVal,
+      telefono: cleanTel,
       email: user.email,
       correo: user.email,
       idRol: user.idRol,
@@ -72,18 +87,23 @@ class UserService {
   }
 
   static async createUser(userData) {
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
-    const finalEmail = email || correo;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, documento, numeroDocumento, telefono, direccion, estado } = userData;
+    const finalEmail = (email || correo || '').trim().toLowerCase();
     const finalPassword = contrasena || contraseña || password || '123456';
-    const finalApellido = apellidos || apellido || '';
+    const rawApellido = apellidos || apellido || '';
+    const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(nombre, rawApellido);
+    const cleanTel = sanitizeTelefono(telefono);
+    const targetTipoDoc = tipoDocumento || 'C.C.';
+    const cleanDoc = sanitizeDocumento(documento || numeroDocumento || '', targetTipoDoc);
     const finalRolId = idRol || rol_id || 1;
 
-    if (!nombre || !finalEmail) {
+    if (!cleanNom || !finalEmail) {
       const error = new Error('Nombre y correo son requeridos');
       error.statusCode = 400;
       throw error;
     }
 
+    // 1. Email Uniqueness Validation
     const existing = await User.findOne({ where: { email: finalEmail } });
     if (existing) {
       const error = new Error('El usuario ya existe con este correo');
@@ -91,14 +111,42 @@ class UserService {
       throw error;
     }
 
+    // 2. Full Name Uniqueness Validation
+    const newFullName = formatNombreCompleto(cleanNom, cleanApe).toLowerCase();
+    const allUsers = await User.findAll({ attributes: ['idUsuario', 'nombre', 'apellidos'] });
+    const duplicateName = allUsers.some(u => formatNombreCompleto(u.nombre, u.apellidos).toLowerCase() === newFullName);
+    if (duplicateName) {
+      const error = new Error(`Ya existe un usuario registrado con el nombre "${formatNombreCompleto(cleanNom, cleanApe)}"`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Document Uniqueness Validation
+    if (cleanDoc) {
+      const existingDoc = await User.findOne({
+        where: {
+          [Op.or]: [
+            { numeroDocumento: cleanDoc },
+            ...(!isNaN(parseInt(cleanDoc)) ? [{ idUsuario: parseInt(cleanDoc) }] : [])
+          ]
+        }
+      });
+      if (existingDoc) {
+        const error = new Error(`Ya existe un usuario registrado con el número de documento "${cleanDoc}"`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(finalPassword, salt);
 
     const user = await User.create({
-      nombre,
-      apellidos: finalApellido,
-      tipoDocumento: tipoDocumento || '',
-      telefono: telefono || '',
+      nombre: cleanNom,
+      apellidos: cleanApe,
+      tipoDocumento: targetTipoDoc,
+      numeroDocumento: cleanDoc || null,
+      telefono: cleanTel,
       email: finalEmail,
       contrasena: hashedPassword,
       idRol: finalRolId,
@@ -108,7 +156,7 @@ class UserService {
 
     if (direccion) {
       const cleanDir = getCleanDireccion(direccion);
-      const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
+      const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0, nombre: cleanNom, apellidos: cleanApe, telefono: cleanTel });
       await Cliente.create({
         idUsuario: user.idUsuario,
         direccion: metaStr
@@ -136,14 +184,77 @@ class UserService {
       throw error;
     }
 
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, documento, numeroDocumento, telefono, direccion, estado } = userData;
     const isPasswordOnly = Boolean((contrasena || contraseña || password) && !nombre && !email && !correo && !telefono && !idRol && !estado);
     
-    if (nombre) user.nombre = nombre;
-    if (apellidos !== undefined || apellido !== undefined) user.apellidos = apellidos || apellido || '';
-    if (email || correo) user.email = email || correo;
+    // 1. Name & Uniqueness Check (ignoring current user)
+    if (nombre !== undefined || apellidos !== undefined || apellido !== undefined) {
+      const rawNom = nombre !== undefined ? nombre : user.nombre;
+      const rawApe = (apellidos !== undefined || apellido !== undefined) ? (apellidos || apellido || '') : user.apellidos;
+      const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(rawNom, rawApe);
+      const newFullName = formatNombreCompleto(cleanNom, cleanApe).toLowerCase();
+      const currentFullName = formatNombreCompleto(user.nombre, user.apellidos).toLowerCase();
+
+      if (newFullName && newFullName !== currentFullName) {
+        const otherUsers = await User.findAll({
+          where: { idUsuario: { [Op.ne]: id } },
+          attributes: ['idUsuario', 'nombre', 'apellidos']
+        });
+        const duplicateName = otherUsers.some(u => formatNombreCompleto(u.nombre, u.apellidos).toLowerCase() === newFullName);
+        if (duplicateName) {
+          const error = new Error(`Ya existe un usuario registrado con el nombre "${formatNombreCompleto(cleanNom, cleanApe)}"`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+      user.nombre = cleanNom;
+      user.apellidos = cleanApe;
+    }
+
+    // 2. Email & Uniqueness Check (ignoring current user)
+    const finalEmail = (email || correo || '').trim().toLowerCase();
+    if (finalEmail && finalEmail !== (user.email || '').toLowerCase()) {
+      const existingEmail = await User.findOne({
+        where: {
+          email: finalEmail,
+          idUsuario: { [Op.ne]: id }
+        }
+      });
+      if (existingEmail) {
+        const error = new Error('Ya existe un usuario registrado con este correo electrónico');
+        error.statusCode = 400;
+        throw error;
+      }
+      user.email = finalEmail;
+    }
+
+    // 3. Document Type & Number Uniqueness Check (ignoring current user)
     if (tipoDocumento !== undefined) user.tipoDocumento = tipoDocumento;
-    if (telefono !== undefined) user.telefono = telefono;
+    const rawDoc = documento !== undefined ? documento : (numeroDocumento !== undefined ? numeroDocumento : undefined);
+    if (rawDoc !== undefined) {
+      const targetTipoDoc = user.tipoDocumento || 'C.C.';
+      const cleanDoc = sanitizeDocumento(rawDoc, targetTipoDoc);
+      const currentDoc = String(user.numeroDocumento || user.idUsuario || '');
+      if (cleanDoc && cleanDoc !== currentDoc) {
+        const existingDoc = await User.findOne({
+          where: {
+            idUsuario: { [Op.ne]: id },
+            [Op.or]: [
+              { numeroDocumento: cleanDoc },
+              ...(!isNaN(parseInt(cleanDoc)) ? [{ idUsuario: parseInt(cleanDoc) }] : [])
+            ]
+          }
+        });
+        if (existingDoc) {
+          const error = new Error(`Ya existe un usuario registrado con el número de documento "${cleanDoc}"`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+      user.numeroDocumento = cleanDoc;
+    }
+
+    if (telefono !== undefined) user.telefono = sanitizeTelefono(telefono);
     if (idRol || rol_id) user.idRol = idRol || rol_id;
     if (estado) user.estado = estado;
 
@@ -163,10 +274,22 @@ class UserService {
           try { meta = JSON.parse(cliente.direccion); } catch (e) { meta = {}; }
         }
         meta.direccion = cleanDir;
+        meta.nombre = user.nombre;
+        meta.apellidos = user.apellidos;
+        meta.email = user.email;
+        meta.telefono = user.telefono;
         cliente.direccion = JSON.stringify(meta);
         await cliente.save();
       } else {
-        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0 });
+        const metaStr = JSON.stringify({
+          direccion: cleanDir,
+          tipo: 'Nuevo',
+          descuentoPorcentaje: 0,
+          nombre: user.nombre,
+          apellidos: user.apellidos,
+          email: user.email,
+          telefono: user.telefono
+        });
         await Cliente.create({ idUsuario: id, direccion: metaStr });
       }
     }

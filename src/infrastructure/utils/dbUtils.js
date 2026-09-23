@@ -140,7 +140,7 @@ async function ensureFichaTecnicaInsumoVariantZero() {
       );
     } else if (!productZero && !productByName) {
       await sequelize.query(
-        "INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `precio`, `stock`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, 0, 0, '__SISTEMA_VARIANTE_CERO__')",
+        "INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `precio`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, 0, '__SISTEMA_VARIANTE_CERO__')",
         { transaction }
       );
     }
@@ -166,6 +166,7 @@ async function ensureFichaTecnicaInsumoVariantZero() {
     }
 
     await sequelize.query("UPDATE `fichatecnica` SET `idVariante` = 0 WHERE `tipo` = 'INSUMO' AND `idVariante` IS NULL", { transaction });
+    await sequelize.query("UPDATE `fichatecnica` SET `idInsumo` = NULL WHERE `idInsumo` = '0'", { transaction });
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction });
     await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction });
     await transaction.commit();
@@ -216,11 +217,392 @@ async function ensureFichaTecnicaColombiaTimezone() {
   }
 }
 
+/**
+ * Ensures table `evento` contains required idProducto and promotion columns
+ */
+async function ensureEventoColumnsSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const columnsToCheck = [
+      { name: 'idProducto', sql: 'ALTER TABLE `evento` ADD COLUMN `idProducto` INT NULL' },
+      { name: 'tipoEvento', sql: 'ALTER TABLE `evento` ADD COLUMN `tipoEvento` VARCHAR(50) NULL' },
+      { name: 'descuento', sql: 'ALTER TABLE `evento` ADD COLUMN `descuento` DECIMAL(10,2) NULL' },
+      { name: 'nuevoPrecio', sql: 'ALTER TABLE `evento` ADD COLUMN `nuevoPrecio` DECIMAL(10,2) NULL' },
+      { name: 'accionInsumo', sql: 'ALTER TABLE `evento` ADD COLUMN `accionInsumo` VARCHAR(20) NULL' },
+      { name: 'insumosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `insumosAsociados` TEXT NULL' },
+      { name: 'productosAsociados', sql: 'ALTER TABLE `evento` ADD COLUMN `productosAsociados` TEXT NULL' },
+      { name: 'icono', sql: 'ALTER TABLE `evento` ADD COLUMN `icono` VARCHAR(50) NULL' },
+      { name: 'imagen', sql: 'ALTER TABLE `evento` ADD COLUMN `imagen` VARCHAR(500) NULL' }
+    ];
+
+    for (const col of columnsToCheck) {
+      const [existing] = await sequelize.query(`SHOW COLUMNS FROM \`evento\` LIKE '${col.name}'`);
+      if (!existing || existing.length === 0) {
+        await sequelize.query(col.sql);
+        console.log(`[DB Migration] Columna ${col.name} agregada a tabla evento`);
+      }
+    }
+  } catch (err) {
+    console.warn("Error ensuring evento columns schema:", err.message);
+  }
+}
+
+/**
+ * Automatically syncs and repairs any sales in table `venta` where `total = 0` or `subtotal = 0`
+ * by calculating the real sum from `observaciones` (JSON products) or `detalleventaproducto`.
+ */
+async function syncVentasTotals() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [ventasZero] = await sequelize.query(
+      "SELECT idVenta, subtotal, total, descuentoAplicado, observaciones FROM `venta` WHERE total = 0 OR subtotal = 0"
+    );
+
+    if (ventasZero && ventasZero.length > 0) {
+      for (const v of ventasZero) {
+        let obsData = {};
+        if (v.observaciones) {
+          try {
+            obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+              ? JSON.parse(v.observaciones)
+              : {};
+          } catch (e) {}
+        }
+
+        let calcSubtotal = 0;
+        if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
+          calcSubtotal = obsData.productos.reduce((s, p) => {
+            const itemAdds = Array.isArray(p.adiciones)
+              ? p.adiciones.reduce((sa, a) => sa + (Number(a.precio || 0)), 0)
+              : 0;
+            const pUnit = Number(p.precioUnitario || p.precio || 0) + itemAdds;
+            const pTot = Number(p.total || 0) > 0 ? Number(p.total) : pUnit * Number(p.cantidad || 1);
+            return s + pTot;
+          }, 0);
+        }
+
+        if (calcSubtotal === 0) {
+          const [detalles] = await sequelize.query(
+            "SELECT cantidad, precioUnitario, subtotal FROM `detalleventaproducto` WHERE idVenta = :idVenta",
+            { replacements: { idVenta: v.idVenta } }
+          );
+          if (detalles && detalles.length > 0) {
+            calcSubtotal = detalles.reduce((s, d) => s + (Number(d.subtotal || 0) || (Number(d.precioUnitario || 0) * Number(d.cantidad || 1))), 0);
+          }
+        }
+
+        if (calcSubtotal > 0) {
+          const desc = parseFloat(v.descuentoAplicado || 0);
+          const calcTotal = Math.max(0, calcSubtotal - desc);
+          await sequelize.query(
+            "UPDATE `venta` SET `subtotal` = :subtotal, `total` = :total WHERE `idVenta` = :idVenta",
+            { replacements: { subtotal: calcSubtotal, total: calcTotal, idVenta: v.idVenta } }
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Error syncing ventas totals:", err.message);
+  }
+}
+
+/**
+ * Ensures table `categoriaproducto` contains the `icon` column
+ */
+async function ensureCategoriaProductoIconSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `categoriaproducto` LIKE 'icon'");
+    if (cols.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `categoriaproducto` ADD COLUMN `icon` VARCHAR(255) NULL AFTER `descripcion`"
+      );
+    }
+  } catch (err) {
+    console.warn("Error ensuring categoriaproducto icon schema:", err.message);
+  }
+}
+
+async function ensureConfiguracionComboSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `producto` LIKE 'configuracionCombo'");
+    if (cols.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `producto` ADD COLUMN `configuracionCombo` TEXT NULL AFTER `adiciones`"
+      );
+    }
+  } catch (err) {
+    console.warn("Error ensuring producto configuracionCombo schema:", err.message);
+  }
+}
+
+/**
+ * Ensures table `venta` contains the `estadoAprobacion` column.
+ * Also backfills existing rows: orders already in PREPARANDO/LISTO/ENTREGADO get APROBADO,
+ * orders in CANCELADO get RECHAZADO, and PENDIENTE stays PENDIENTE.
+ */
+async function ensureVentaAprobacionSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+
+    // Check and add estadoAprobacion column
+    const [colsAprobacion] = await sequelize.query("SHOW COLUMNS FROM `venta` LIKE 'estadoAprobacion'");
+    if (colsAprobacion.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `venta` ADD COLUMN `estadoAprobacion` ENUM('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'PENDIENTE' AFTER `observaciones`"
+      );
+      console.log('[DB Migration] Columna estadoAprobacion agregada a tabla venta');
+
+      // Backfill: orders already in progress or completed should be marked APROBADO
+      await sequelize.query(
+        "UPDATE `venta` SET `estadoAprobacion` = 'APROBADO' WHERE `estadoEntrega` IN ('PREPARANDO','LISTO','EN_CAMINO','ENTREGADO')"
+      );
+      // Backfill: cancelled orders should be marked RECHAZADO
+      await sequelize.query(
+        "UPDATE `venta` SET `estadoAprobacion` = 'RECHAZADO' WHERE `estadoEntrega` = 'CANCELADO'"
+      );
+      console.log('[DB Migration] Backfill de estadoAprobacion completado');
+    }
+
+    // Ensure deprecated column `aprobado` is dropped if still present
+    const [colsAprobado] = await sequelize.query("SHOW COLUMNS FROM `venta` LIKE 'aprobado'");
+    if (colsAprobado.length > 0) {
+      await sequelize.query("ALTER TABLE `venta` DROP COLUMN `aprobado`");
+      console.log('[DB Migration] Columna obsoleta aprobado eliminada de tabla venta');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] Error asegurando esquema de estadoAprobacion en venta:', err.message);
+  }
+}
+
+/**
+ * Ensures table `usuario` contains `numeroDocumento` column and backfills existing users
+ */
+async function ensureUsuarioDocumentoSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `usuario` LIKE 'numeroDocumento'");
+    if (!cols || cols.length === 0) {
+      await sequelize.query("ALTER TABLE `usuario` ADD COLUMN `numeroDocumento` VARCHAR(50) NULL AFTER `tipoDocumento`");
+      console.log('[DB Migration] Columna numeroDocumento agregada a tabla usuario');
+    }
+    // Backfill any empty numeroDocumento with idUsuario if applicable
+    await sequelize.query("UPDATE `usuario` SET `numeroDocumento` = CAST(`idUsuario` AS CHAR) WHERE `numeroDocumento` IS NULL OR `numeroDocumento` = ''");
+    console.log('[DB Migration] Esquema numeroDocumento en usuario verificado.');
+  } catch (err) {
+    console.warn('[DB Migration] Error asegurando columna numeroDocumento en usuario:', err.message);
+  }
+}
+
+async function ensureResenaSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`resena\` (
+        \`idResena\` INT NOT NULL AUTO_INCREMENT,
+        \`idProducto\` INT NOT NULL,
+        \`idUsuario\` INT NOT NULL,
+        \`puntuacion\` TINYINT NOT NULL DEFAULT 5,
+        \`comentario\` TEXT,
+        \`fechaResena\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        \`estado\` TINYINT DEFAULT 1,
+        PRIMARY KEY (\`idResena\`),
+        KEY \`idx_resena_producto\` (\`idProducto\`),
+        KEY \`idx_resena_usuario\` (\`idUsuario\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log('[DB] Tabla resena verificada/creada correctamente.');
+  } catch (err) {
+    console.warn('[DB] Error asegurando tabla resena:', err.message);
+  }
+}
+
+async function ensureNoNegativeStock() {
+  const sequelize = connectDB.sequelize;
+  try {
+    await sequelize.query('UPDATE `insumo` SET `stock` = 0 WHERE `stock` < 0');
+    await sequelize.query('UPDATE `insumo` SET `stockMinimo` = 0 WHERE `stockMinimo` < 0');
+    console.log('[DB] Stock negativo verificado y saneado a 0.');
+  } catch (err) {
+    console.warn('[DB] Error saneando stock negativo:', err.message);
+  }
+}
+
+/**
+ * Ensures 'eliminado' column exists in 'insumo' and 'insumopreparado' tables
+ * to support logical deletion / recycle bin.
+ */
+async function ensureInsumoEliminadoSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [insumoCols] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'eliminado'");
+    if (insumoCols.length === 0) {
+      await sequelize.query('ALTER TABLE `insumo` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`');
+      console.log('[DB] ✅ Columna insumo.eliminado agregada exitosamente.');
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando columna insumo.eliminado:', err.message);
+  }
+
+  try {
+    const [prepCols] = await sequelize.query("SHOW COLUMNS FROM `insumopreparado` LIKE 'eliminado'");
+    if (prepCols.length === 0) {
+      await sequelize.query('ALTER TABLE `insumopreparado` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`');
+      console.log('[DB] ✅ Columna insumopreparado.eliminado agregada exitosamente.');
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando columna insumopreparado.eliminado:', err.message);
+  }
+}
+
+/**
+ * Ensures 'idCategoriaInsumo' column in 'insumo' allows NULL
+ * so that deleting categories or assigning unclassified items does not violate FK constraints.
+ */
+async function ensureInsumoCategoriaNullableSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'idCategoriaInsumo'");
+    if (cols.length > 0 && cols[0].Null === 'NO') {
+      await sequelize.query('ALTER TABLE `insumo` MODIFY `idCategoriaInsumo` INT NULL');
+      console.log('[DB] ✅ Columna insumo.idCategoriaInsumo modificada a NULL exitosamente.');
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando columna idCategoriaInsumo nullable:', err.message);
+  }
+}
+
+/**
+ * Ensures food products (Hamburguesas, Perros, Salchipapas, Combos, etc.)
+ * have their appropriate additions configured in `producto.adiciones`
+ * if they are currently null or empty '[]'.
+ */
+async function ensureProductoAdicionesDefaultSchema() {
+  const { Product, Insumo } = require('../../persistence/models');
+  try {
+    const activeAdiciones = await Insumo.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
+    if (!activeAdiciones || activeAdiciones.length === 0) return;
+
+    const adicMap = {};
+    activeAdiciones.forEach(a => {
+      adicMap[a.idInsumo] = {
+        idAdicion: a.idInsumo,
+        idInsumo: a.idInsumo,
+        nombre: a.nombre,
+        precio: parseFloat(a.precioAdicion || 0),
+        imagen: a.imagen || ''
+      };
+    });
+
+    const products = await Product.findAll();
+    let updatedCount = 0;
+
+    for (const prod of products) {
+      if (prod.idProducto === 0 || prod.nombre?.startsWith('__SISTEMA')) continue;
+
+      let currentAdiciones = [];
+      try {
+        currentAdiciones = typeof prod.adiciones === 'string' ? JSON.parse(prod.adiciones) : (prod.adiciones || []);
+      } catch (e) {
+        currentAdiciones = [];
+      }
+
+      // Si no tiene adiciones configuradas y pertenece a categorías de comida rápida
+      if (!Array.isArray(currentAdiciones) || currentAdiciones.length === 0) {
+        const catId = prod.idCategoriaProducto;
+        let adicIds = [];
+
+        if (catId === 3) {
+          // Hamburguesas
+          adicIds = [3, 4, 5, 6, 7, 8, 9, 10, 12, 13];
+        } else if (catId === 1) {
+          // Perros Calientes
+          adicIds = [3, 4, 5, 7, 8, 10, 12];
+        } else if (catId === 5) {
+          // Salchipapas Gourmet
+          adicIds = [3, 4, 11, 12, 13, 7, 8, 9, 10];
+        } else if (catId === 2) {
+          // Combos
+          adicIds = [3, 4, 5, 8, 9, 10, 12, 13];
+        } else if (catId === 6) {
+          // Acompañamientos / Papas con toppings
+          const pNameLower = (prod.nombre || '').toLowerCase();
+          if (!pNameLower.includes('gaseosa') && !pNameLower.includes('agua')) {
+            adicIds = [3, 4, 12, 11, 7, 8, 9, 10];
+          }
+        }
+
+        if (adicIds.length > 0) {
+          const formatted = adicIds.map(id => adicMap[id]).filter(Boolean);
+          if (formatted.length > 0) {
+            prod.adiciones = JSON.stringify(formatted);
+            await prod.save();
+            updatedCount++;
+          }
+        }
+      }
+    }
+
+    if (updatedCount > 0) {
+      console.log(`[DB] ✅ Adiciones predeterminadas configuradas exitosamente en ${updatedCount} productos de comida.`);
+    }
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando adiciones por defecto:', err.message);
+  }
+}
+
+async function ensureInsumoAdicionSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [cols] = await sequelize.query("DESCRIBE insumo");
+    const colNames = cols.map(c => c.Field);
+    if (!colNames.includes('esAdicion')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `esAdicion` TINYINT(1) NOT NULL DEFAULT 0 AFTER `estado`");
+    }
+    if (!colNames.includes('precioAdicion')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `precioAdicion` DECIMAL(10, 2) NOT NULL DEFAULT 0.00 AFTER `esAdicion`");
+    }
+    if (!colNames.includes('imagen')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `imagen` VARCHAR(255) NULL AFTER `precioAdicion`");
+    }
+    await sequelize.query("DROP TABLE IF EXISTS `adicion`");
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error verificando schema de adiciones en insumo:', err.message);
+  }
+}
+
+async function ensureVarianteImagenSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `variante` LIKE 'imagen'");
+    if (cols.length === 0) {
+      await sequelize.query("ALTER TABLE `variante` ADD COLUMN `imagen` VARCHAR(255) NULL AFTER `precio`");
+      console.log('[DB Migration] Columna imagen agregada a tabla variante');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] Error asegurando columna imagen en variante:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
   resequenceAllCoreTables,
   ensureFichaTecnicaTrashSchema,
   ensureFichaTecnicaInsumoVariantZero,
-  ensureFichaTecnicaColombiaTimezone
+  ensureFichaTecnicaColombiaTimezone,
+  ensureEventoColumnsSchema,
+  syncVentasTotals,
+  ensureCategoriaProductoIconSchema,
+  ensureConfiguracionComboSchema,
+  ensureVarianteImagenSchema,
+  ensureVentaAprobacionSchema,
+  ensureUsuarioDocumentoSchema,
+  ensureResenaSchema,
+  ensureNoNegativeStock,
+  ensureInsumoEliminadoSchema,
+  ensureInsumoCategoriaNullableSchema,
+  ensureInsumoAdicionSchema,
+  ensureProductoAdicionesDefaultSchema
 };

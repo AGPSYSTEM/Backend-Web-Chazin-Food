@@ -1,321 +1,564 @@
-const { Venta, DetalleVentaProducto } = require('../../persistence/models');
+const { Venta, DetalleVentaProducto, DetalleVentaAdicion, Adicion, Variante, Product, FichaTecnica, DetalleFichaInsumo, Insumo, Cliente, User } = require('../../persistence/models');
 
-// In-memory store for production orders initialized with sample data matching the reference mockup
-let ordenesProduccion = [
-  {
-    id: 1,
-    codigo: "OP-001",
-    platilloNombre: "Hamburguesa Especial",
-    imagen: "🍔",
-    cantidad: 2,
-    responsable: "Carlos R.",
-    cocinero: "Carlos R.",
-    tiempo: "15 min",
-    fecha: "2026-06-23",
-    horaInicio: "10:15",
-    prioridad: "Alta",
-    estado: "En Preparación",
-    alerta: true,
-    observaciones: "Sin cebolla, queso extra",
-    ingredientes: [
-      { nombre: "Pan de hamburguesa artesanal", cantidad: "2 unidades" },
-      { nombre: "Carne de res 150g", cantidad: "2 unidades" },
-      { nombre: "Queso cheddar", cantidad: "4 lonchas" },
-      { nombre: "Salsa especial de la casa", cantidad: "2 porciones" }
-    ]
-  },
-  {
-    id: 2,
-    codigo: "OP-002",
-    platilloNombre: "Pollo Broaster",
-    imagen: "🍗",
-    cantidad: 1,
-    responsable: "María G.",
-    cocinero: "María G.",
-    tiempo: "20 min",
-    fecha: "2026-06-23",
-    horaInicio: "10:00",
-    prioridad: "Media",
-    estado: "En Preparación",
-    alerta: false,
-    observaciones: "Papas crujientes",
-    ingredientes: [
-      { nombre: "Presas de pollo apanado", cantidad: "4 piezas" },
-      { nombre: "Papas a la francesa", cantidad: "1 porción (250g)" },
-      { nombre: "Ensalada coleslaw", cantidad: "1 porción" }
-    ]
-  },
-  {
-    id: 3,
-    codigo: "OP-003",
-    platilloNombre: "Salchipapa Grande",
-    imagen: "🍟",
-    cantidad: 3,
-    responsable: "Carlos R.",
-    cocinero: "Carlos R.",
-    tiempo: "10 min",
-    fecha: "2026-06-23",
-    horaInicio: "09:45",
-    prioridad: "Normal",
-    estado: "Listo",
-    alerta: false,
-    observaciones: "Salsa tártara aparte",
-    ingredientes: [
-      { nombre: "Papas amarillas fritas", cantidad: "3 porciones" },
-      { nombre: "Salchicha manguera premium", cantidad: "6 unidades" },
-      { nombre: "Queso costeño rallado", cantidad: "3 porciones" },
-      { nombre: "Salsa tártara y rosada", cantidad: "3 porciones" }
-    ]
-  },
-  {
-    id: 4,
-    codigo: "OP-004",
-    platilloNombre: "Combo Familiar",
-    imagen: "🍱",
-    cantidad: 1,
-    responsable: "Juan P.",
-    cocinero: "Juan P.",
-    tiempo: "25 min",
-    fecha: "2026-06-23",
-    horaInicio: "09:30",
-    prioridad: "Alta",
-    estado: "Despachado",
-    alerta: true,
-    observaciones: "Para llevar con cubiertos",
-    ingredientes: [
-      { nombre: "Hamburguesas sencillas", cantidad: "2 unidades" },
-      { nombre: "Perros calientes", cantidad: "2 unidades" },
-      { nombre: "Papas familiares", cantidad: "1 porción grande" },
-      { nombre: "Gaseosa 1.5L", cantidad: "1 botella" }
-    ]
-  },
-  {
-    id: 5,
-    codigo: "OP-005",
-    platilloNombre: "Perro Caliente",
-    imagen: "🌭",
-    cantidad: 2,
-    responsable: "María G.",
-    cocinero: "María G.",
-    tiempo: "12 min",
-    fecha: "2026-06-23",
-    horaInicio: "09:50",
-    prioridad: "Normal",
-    estado: "Entregado",
-    alerta: false,
-    observaciones: "Con tocineta extra",
-    ingredientes: [
-      { nombre: "Pan de hot dog", cantidad: "2 unidades" },
-      { nombre: "Salchicha", cantidad: "2 unidades" },
-      { nombre: "Aderezos", cantidad: "2 porciones" }
-    ]
-  },
-  {
-    id: 6,
-    codigo: "OP-006",
-    platilloNombre: "Pizza Familiar Combo",
-    imagen: "🍕",
-    cantidad: 1,
-    responsable: "Ana M.",
-    cocinero: "Ana M.",
-    tiempo: "35 min",
-    fecha: "2026-06-23",
-    horaInicio: "09:10",
-    prioridad: "Normal",
-    estado: "Entregado",
-    alerta: false,
-    observaciones: "Mesa 4",
-    ingredientes: [
-      { nombre: "Masa de pizza familiar", cantidad: "1 unidad" },
-      { nombre: "Queso mozzarella", cantidad: "300g" },
-      { nombre: "Jamón y pepperoni", cantidad: "200g" }
-    ]
-  },
-  {
-    id: 7,
-    codigo: "OP-007",
-    platilloNombre: "Gaseosa Coca Cola 1.5L",
-    imagen: "🥤",
-    cantidad: 4,
-    responsable: "Pedro S.",
-    cocinero: "Pedro S.",
-    tiempo: "2 min",
-    fecha: "2026-06-23",
-    horaInicio: "10:30",
-    prioridad: "Normal",
-    estado: "En Cola",
-    alerta: false,
-    observaciones: "Bien fría",
-    ingredientes: [
-      { nombre: "Botella Coca Cola 1.5L", cantidad: "4 unidades" }
-    ]
-  },
-  {
-    id: 8,
-    codigo: "OP-008",
-    platilloNombre: "Hamburguesa Doble Carne",
-    imagen: "🍔",
-    cantidad: 1,
-    responsable: "Carlos R.",
-    cocinero: "Carlos R.",
-    tiempo: "15 min",
-    fecha: "2026-06-23",
-    horaInicio: "10:32",
-    prioridad: "Alta",
-    estado: "En Cola",
-    alerta: true,
-    observaciones: "Término medio",
-    ingredientes: [
-      { nombre: "Pan brioche", cantidad: "1 unidad" },
-      { nombre: "Carne de res 150g", cantidad: "2 unidades" },
-      { nombre: "Queso cheddar", cantidad: "2 lonchas" }
-    ]
-  }
-];
+const getProductEmoji = (nombre = "") => {
+  const n = (nombre || "").toLowerCase();
+  if (n.includes("hambur")) return "🍔";
+  if (n.includes("perro") || n.includes("hot dog")) return "🌭";
+  if (n.includes("pollo") || n.includes("broaster") || n.includes("alita")) return "🍗";
+  if (n.includes("salchipapa") || n.includes("papa")) return "🍟";
+  if (n.includes("pizza")) return "🍕";
+  if (n.includes("combo")) return "🍱";
+  if (n.includes("gaseosa") || n.includes("bebida") || n.includes("jugo") || n.includes("coca")) return "🥤";
+  if (n.includes("postre") || n.includes("torta")) return "🍰";
+  return "🍽️";
+};
 
 class ProduccionService {
   static async getAll() {
-    let salesOrders = [];
     try {
       const ventas = await Venta.findAll({
-        include: [{ model: DetalleVentaProducto, as: 'detalles' }],
+        include: [
+          {
+            model: Cliente,
+            as: 'cliente',
+            include: [{ model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos', 'telefono'] }]
+          },
+          { model: User, as: 'usuario', attributes: ['idUsuario', 'nombre', 'apellidos'] },
+          {
+            model: DetalleVentaProducto,
+            as: 'detalles',
+            include: [
+              {
+                model: Variante,
+                as: 'variante',
+                include: [
+                  {
+                    model: Product,
+                    as: 'producto',
+                    include: [
+                      {
+                        model: FichaTecnica,
+                        as: 'fichaTecnica',
+                        include: [
+                          {
+                            model: DetalleFichaInsumo,
+                            as: 'detalles',
+                            include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                model: DetalleVentaAdicion,
+                as: 'adiciones',
+                include: [{ model: Adicion, as: 'adicion' }]
+              }
+            ]
+          }
+        ],
         order: [['idVenta', 'DESC']]
       });
 
-      salesOrders = ventas.map(v => {
+      return ventas.map((v) => {
         let obsObj = {};
-        try {
-          obsObj = typeof v.observaciones === 'string' ? JSON.parse(v.observaciones) : (v.observaciones || {});
-        } catch (e) {
-          obsObj = {};
+        if (v.observaciones) {
+          try {
+            obsObj = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+              ? JSON.parse(v.observaciones)
+              : { nota: v.observaciones };
+          } catch (e) {
+            obsObj = { nota: v.observaciones };
+          }
         }
 
-        const codigo = v.codigoPedido || obsObj.codigoPedido || `VEN-${v.idVenta}`;
-        const clienteNombre = v.clienteNombre || obsObj.clienteNombre || 'Cliente General';
+        const clienteObj = v.cliente || {};
+        const clienteUser = clienteObj.usuario || v.usuario || {};
+        const clienteNombre = obsObj.clienteNombre ||
+          (clienteUser.nombre ? `${clienteUser.nombre} ${clienteUser.apellidos || ''}`.trim() : null) ||
+          (v.idCliente ? `Cliente #${v.idCliente}` : "Cliente Mostrador");
 
-        let platilloNombre = "Pedido General";
-        let cantidadTotal = 0;
-        let prodsList = [];
+        const codigo = obsObj.codigoPedido || obsObj.numeroVenta || `VEN-${String(v.idVenta).padStart(4, '0')}`;
 
-        if (obsObj.productos && Array.isArray(obsObj.productos) && obsObj.productos.length > 0) {
-          prodsList = obsObj.productos;
-          platilloNombre = obsObj.productos.map(p => `${p.nombre || 'Producto'} (x${p.cantidad || 1})`).join(', ');
-          cantidadTotal = obsObj.productos.reduce((sum, p) => sum + (Number(p.cantidad) || 1), 0);
-        } else if (v.detalles && v.detalles.length > 0) {
-          platilloNombre = v.detalles.map(d => `${d.observaciones || 'Producto'} (x${d.cantidad || 1})`).join(', ');
-          cantidadTotal = v.detalles.reduce((sum, d) => sum + (Number(d.cantidad) || 1), 0);
-        } else {
-          cantidadTotal = 1;
-        }
-
-        let estadoStr = "En Cola";
-        const est = (v.estadoEntrega || 'PENDIENTE').toUpperCase();
-        if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') estadoStr = "En Preparación";
-        else if (est === 'LISTO') estadoStr = "Listo";
-        else if (est === 'ENTREGADO' || est === 'DESPACHADO') estadoStr = "Despachado";
-        else if (est === 'CANCELADO' || est === 'ANULADA') estadoStr = "Anulada";
-        else estadoStr = "En Cola";
-
+        // Format dates
         let fechaStr = new Date().toISOString().split("T")[0];
-        let horaStr = "10:00";
-        if (v.fechaCreacion || v.createdAt) {
-          const d = new Date(v.fechaCreacion || v.createdAt);
+        let horaStr = "12:00 PM";
+        if (v.fechaVenta) {
+          const d = new Date(v.fechaVenta);
           fechaStr = d.toISOString().split("T")[0];
-          horaStr = d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+          let h = d.getHours();
+          const m = String(d.getMinutes()).padStart(2, '0');
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12 || 12;
+          horaStr = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+        }
+
+        // Format items and technical sheet (recipe) data
+        const productosList = [];
+        let totalItemsCount = 0;
+
+        if (v.detalles && v.detalles.length > 0) {
+          for (const d of v.detalles) {
+            const prod = d.variante?.producto;
+            const ft = prod?.fichaTecnica;
+            const qty = Number(d.cantidad) || 1;
+            totalItemsCount += qty;
+
+            let itemNombre = d.observaciones || d.variante?.nombre || prod?.nombre || `Producto #${d.idVariante || d.idDetalleVenta}`;
+            const pName = prod?.nombre || "";
+            const vName = d.variante?.nombre || "";
+
+            if (pName && vName) {
+              const pLower = pName.toLowerCase().trim();
+              const vLower = vName.toLowerCase().trim();
+              if (vLower === pLower || vLower === `${pLower} - base` || vLower === 'base' || vLower === 'estándar' || vLower === 'estandar') {
+                itemNombre = pName;
+              } else if (vLower.startsWith(`${pLower} - `)) {
+                itemNombre = `${pName} (${vName.slice(pName.length + 3).trim()})`;
+              } else if (vLower !== pLower) {
+                itemNombre = `${pName} (${vName})`;
+              } else {
+                itemNombre = pName;
+              }
+            } else if (pName) {
+              itemNombre = pName;
+            }
+
+            // Parse any custom JSON in d.observaciones
+            let itemObs = "";
+            let itemAdiciones = [];
+            if (d.observaciones) {
+              try {
+                if (typeof d.observaciones === 'string' && d.observaciones.startsWith('{')) {
+                  const parsed = JSON.parse(d.observaciones);
+                  itemObs = parsed.nota || parsed.observaciones || parsed.especificaciones || "";
+                  if (parsed.nombre && !prod?.nombre) itemNombre = parsed.nombre;
+                  if (Array.isArray(parsed.adiciones)) itemAdiciones = parsed.adiciones;
+                } else {
+                  itemObs = d.observaciones;
+                }
+              } catch (e) {
+                itemObs = d.observaciones;
+              }
+            }
+
+            // Include real db adiciones
+            if (d.adiciones && d.adiciones.length > 0) {
+              itemAdiciones = d.adiciones.map(a => ({
+                idAdicion: a.idAdicion,
+                nombre: a.adicion?.nombre || `Adición #${a.idAdicion}`,
+                cantidad: Number(a.cantidad) || 1,
+                precio: parseFloat(a.precio !== undefined && a.precio !== null ? a.precio : (a.precioUnitario || a.adicion?.precioAdicion || a.adicion?.precio || 0))
+              }));
+            }
+
+            // Match with obsObj.productos if available to retrieve full observations and additions
+            const matchedObsProd = Array.isArray(obsObj.productos)
+              ? obsObj.productos.find(op => op.idVariante === d.idVariante || op.id === d.idVariante || (op.nombre && op.nombre.toLowerCase().trim() === itemNombre.toLowerCase().trim())) || obsObj.productos[productosList.length]
+              : null;
+
+            if (matchedObsProd) {
+              const opObs = matchedObsProd.observaciones || matchedObsProd.observacion || matchedObsProd.especificaciones || matchedObsProd.nota;
+              if (opObs && typeof opObs === 'string' && opObs.trim() && opObs.trim().toLowerCase() !== itemNombre.toLowerCase().trim()) {
+                itemObs = opObs.trim();
+              }
+              if (Array.isArray(matchedObsProd.adiciones) && matchedObsProd.adiciones.length > 0) {
+                const opAdds = matchedObsProd.adiciones.map(a => {
+                  if (typeof a === 'object' && a !== null) {
+                    return {
+                      idAdicion: a.idAdicion || a.id,
+                      nombre: a.nombre || a.nombreAdicion || 'Adición',
+                      cantidad: Number(a.cantidad) || 1,
+                      precio: parseFloat(a.precio || 0)
+                    };
+                  }
+                  return { nombre: String(a), cantidad: 1 };
+                });
+
+                if (itemAdiciones.length === 0) {
+                  itemAdiciones = opAdds;
+                } else {
+                  for (const oa of opAdds) {
+                    const existing = itemAdiciones.find(ia => (ia.nombre || '').toLowerCase().trim() === (oa.nombre || '').toLowerCase().trim());
+                    if (existing) {
+                      existing.cantidad = Math.max(existing.cantidad, oa.cantidad);
+                    } else {
+                      itemAdiciones.push(oa);
+                    }
+                  }
+                }
+              }
+            }
+
+            // Clean itemObs: do not repeat product name or dump raw addition list or summary parenthesis
+            if (itemObs) {
+              const normObs = itemObs.toLowerCase().trim();
+              const normName = itemNombre.toLowerCase().trim();
+              const normProdName = (prod?.nombre || "").toLowerCase().trim();
+              const normVarName = (d.variante?.nombre || "").toLowerCase().trim();
+
+              if (normObs === normName || normObs === normProdName || normObs === normVarName) {
+                itemObs = "";
+              } else if (normObs.startsWith(normName) || normObs.startsWith(normProdName) || normObs.startsWith(normVarName)) {
+                if (itemObs.includes("(+") || itemObs.includes("( +")) {
+                  const match = itemObs.match(/\(\s*\+([^)]+)\)/);
+                  if (match && match[1]) {
+                    const extracted = match[1].split(',').map(s => s.trim()).filter(Boolean);
+                    if (extracted.length > 0 && itemAdiciones.length === 0) {
+                      itemAdiciones = extracted;
+                    }
+                  }
+                }
+                itemObs = "";
+              } else if (itemObs.includes("(+") || itemObs.includes("( +")) {
+                // If the entire note is just a product title with additions in parentheses
+                itemObs = "";
+              }
+            }
+
+            // Build recipe / ficha técnica if exists
+            let receta = null;
+            if (ft) {
+              const ingredientes = (ft.detalles || []).map(det => ({
+                idInsumo: det.idInsumo,
+                nombre: det.insumo?.nombre || `Insumo #${det.idInsumo}`,
+                cantidad: `${det.cantidad || 1} ${det.unidadMedida || det.insumo?.unidadMedida || 'und'}`
+              }));
+
+              const rawPasos = ft.procedimiento || ft.descripcion || "";
+              const pasos = rawPasos
+                ? rawPasos.split("\n").map(p => p.trim()).filter(Boolean)
+                : ["Preparar los ingredientes según porciones", "Cocinar y montar según estándares de la casa"];
+
+              receta = {
+                idFichaTecnica: ft.idFichaTecnica,
+                idProducto: ft.idProducto,
+                tiempoPreparacion: ft.tiempoPreparacion ? `${ft.tiempoPreparacion} min` : "12 min",
+                rendimiento: ft.rendimiento || "1 porción",
+                especificaciones: ft.especificaciones || "",
+                caracteristicas: ft.caracteristicas || "",
+                informacionNutricional: ft.informacionNutricional || "",
+                condicionesAlmacenamiento: ft.condicionesAlmacenamiento || "",
+                vidaUtil: ft.vidaUtil || "",
+                ingredientes,
+                pasos
+              };
+            }
+
+            productosList.push({
+              id: d.idDetalleVenta,
+              idProducto: prod?.idProducto || null,
+              idVariante: d.idVariante,
+              nombre: itemNombre,
+              cantidad: qty,
+              precioUnitario: parseFloat(d.precioUnitario || 0),
+              total: parseFloat(d.subtotal || 0),
+              observaciones: itemObs,
+              adiciones: itemAdiciones,
+              receta
+            });
+          }
+        } else if (Array.isArray(obsObj.productos) && obsObj.productos.length > 0) {
+          for (const p of obsObj.productos) {
+            const qty = Number(p.cantidad) || 1;
+            totalItemsCount += qty;
+            let pObs = p.observaciones || p.nota || "";
+            if (pObs.toLowerCase().trim() === (p.nombre || "").toLowerCase().trim()) {
+              pObs = "";
+            }
+
+            productosList.push({
+              id: p.id || p.idVariante || Math.random(),
+              idProducto: p.idProducto || null,
+              idVariante: p.idVariante || null,
+              nombre: p.nombre || "Producto",
+              cantidad: qty,
+              precioUnitario: parseFloat(p.precio || p.precioUnitario || 0),
+              total: parseFloat(p.total || 0),
+              observaciones: pObs,
+              adiciones: p.adiciones || [],
+              receta: p.receta || null
+            });
+          }
+        }
+
+        // Map approval and delivery/production status
+        // Primary source: real DB column `estadoAprobacion`
+        const est = (v.estadoEntrega || 'PENDIENTE').toUpperCase();
+        let estadoAprobacion = v.estadoAprobacion;
+        if (!estadoAprobacion) {
+          if (est === 'PREPARANDO' || est === 'LISTO' || est === 'ENTREGADO' || est === 'DESPACHADO') {
+            estadoAprobacion = 'APROBADO';
+          } else if (est === 'CANCELADO' || est === 'ANULADA') {
+            estadoAprobacion = 'RECHAZADO';
+          } else {
+            estadoAprobacion = 'PENDIENTE';
+          }
+        }
+
+        let estadoStr = "Por Aprobar";
+        if (estadoAprobacion === 'RECHAZADO' || est === 'CANCELADO' || est === 'ANULADA') {
+          estadoStr = "Rechazado";
+        } else if (estadoAprobacion === 'PENDIENTE') {
+          estadoStr = "Por Aprobar";
+        } else if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') {
+          estadoStr = "En Preparación";
+        } else if (est === 'LISTO') {
+          estadoStr = "Listo";
+        } else if (est === 'ENTREGADO' || est === 'DESPACHADO' || est === 'COMPLETADA') {
+          estadoStr = "Entregado";
+        } else {
+          estadoStr = "En Cola";
+        }
+
+        const platilloNombre = productosList.length > 0
+          ? productosList.map(p => `${p.nombre} (x${p.cantidad})`).join(', ')
+          : "Pedido General";
+
+        const primaryProd = productosList[0];
+        const mainEmoji = getProductEmoji(primaryProd?.nombre || platilloNombre);
+
+        // General human observation ONLY (no raw JSON dump)
+        let cleanGeneralObs = "";
+        const rawGeneralObs =
+          obsObj.especificaciones ||
+          obsObj.nota ||
+          (typeof v.observaciones === 'string' && !v.observaciones.startsWith('{') ? v.observaciones : "");
+        if (typeof rawGeneralObs === 'string') {
+          cleanGeneralObs = rawGeneralObs.trim();
+        } else if (rawGeneralObs && typeof rawGeneralObs === 'object') {
+          cleanGeneralObs = "";
+        }
+
+        // Determine delivery type and table label accurately
+        const rawTipo = obsObj.tipoEntrega || (v.tipoVenta === 'DOMICILIO' ? 'Domicilio' : (obsObj.mesa ? 'En Mesa' : 'En Local'));
+        let finalTipo = 'En Local';
+        let finalMesa = obsObj.mesa || '';
+
+        const normTipo = String(rawTipo).toLowerCase();
+        if (normTipo.includes('domicilio') || (v.tipoVenta && v.tipoVenta.toUpperCase() === 'DOMICILIO')) {
+          finalTipo = 'Domicilio';
+          finalMesa = 'Domicilio';
+        } else if (normTipo.includes('recoger') || normTipo.includes('llevar')) {
+          finalTipo = 'Para Llevar';
+          finalMesa = 'Para Llevar';
+        } else if (obsObj.mesa) {
+          finalTipo = 'En Mesa';
+          finalMesa = String(obsObj.mesa).toLowerCase().startsWith('mesa') ? obsObj.mesa : `Mesa ${obsObj.mesa}`;
+        } else {
+          finalTipo = 'En Local';
+          finalMesa = 'En Local';
         }
 
         return {
-          id: `VEN-${v.idVenta}`,
+          id: v.idVenta,
           idVenta: v.idVenta,
-          codigo: codigo,
-          platilloNombre: platilloNombre,
-          imagen: "🍔",
-          cantidad: cantidadTotal,
+          codigo,
+          platilloNombre,
+          imagen: mainEmoji,
+          cantidad: totalItemsCount || 1,
+          cliente: clienteNombre,
           responsable: clienteNombre,
-          cocinero: "Cocina Central",
-          tiempo: "15 min",
+          cocinero: "Cocina Principal",
+          tiempo: primaryProd?.receta?.tiempoPreparacion || "15 min",
           fecha: fechaStr,
           horaInicio: horaStr,
-          prioridad: est === 'PENDIENTE' ? "Alta" : "Normal",
+          fechaVenta: v.fechaVenta,
+          prioridad: (est === 'PENDIENTE' || estadoAprobacion === 'PENDIENTE') ? "Alta" : "Normal",
           estado: estadoStr,
-          alerta: est === 'PENDIENTE',
-          observaciones: obsObj.especificaciones || v.observaciones || "",
-          ingredientes: prodsList.map(p => ({ nombre: p.nombre || 'Producto', cantidad: `${p.cantidad || 1} unidad(es)` }))
+          estadoAprobacion,
+          estadoEntrega: v.estadoEntrega || 'PENDIENTE',
+          alerta: estadoAprobacion === 'PENDIENTE' || est === 'PENDIENTE',
+          observaciones: cleanGeneralObs,
+          tipo: finalTipo,
+          mesa: finalMesa,
+          tipoVenta: v.tipoVenta || (finalTipo === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
+          productos: productosList
         };
       });
     } catch (err) {
-      console.warn('Error al cargar ventas en ProduccionService:', err.message);
+      console.error('Error al cargar órdenes en ProduccionService.getAll:', err);
+      return [];
     }
-
-    return [...salesOrders, ...ordenesProduccion];
   }
 
   static async create(data) {
-    const nextId = ordenesProduccion.length > 0 ? Math.max(...ordenesProduccion.map((o) => Number(o.id) || 0)) + 1 : 1;
-    const newOrden = {
-      id: nextId,
-      codigo: data.codigo || `OP-00${nextId}`,
-      platilloNombre: data.platilloNombre || data.nombre || "Nuevo Platillo",
-      imagen: data.imagen || "🍔",
-      cantidad: Number(data.cantidad) || 1,
-      responsable: data.responsable || "Carlos R.",
-      cocinero: data.responsable || "Carlos R.",
-      tiempo: data.tiempo || "15 min",
-      fecha: new Date().toISOString().split("T")[0],
-      horaInicio: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-      prioridad: data.prioridad || "Normal",
-      estado: data.estado || "En Cola",
-      alerta: Boolean(data.alerta),
-      observaciones: data.observaciones || "",
-      ingredientes: [
-        { nombre: "Ingrediente principal", cantidad: `${Number(data.cantidad) || 1} unidades` },
-        { nombre: "Acompañamiento", cantidad: "1 porción" }
-      ]
-    };
-    ordenesProduccion.push(newOrden);
-    return newOrden;
+    const VentaService = require('./ventaService');
+    const venta = await VentaService.create(data);
+    return venta;
   }
 
   static async updateEstado(id, nuevoEstado) {
-    let idVentaNum = null;
-    if (typeof id === 'string' && id.startsWith('VEN-')) {
-      idVentaNum = Number(id.replace('VEN-', ''));
-    } else if (typeof id === 'number' || !isNaN(Number(id))) {
-      const matchV = await Venta.findByPk(Number(id));
-      if (matchV) idVentaNum = Number(id);
+    const { Op } = require('sequelize');
+    let v = null;
+    let idVentaNum = Number(id);
+
+    if (!isNaN(idVentaNum) && idVentaNum > 0) {
+      v = await Venta.findByPk(idVentaNum);
     }
 
-    if (idVentaNum) {
-      try {
-        const v = await Venta.findByPk(idVentaNum);
-        if (v) {
-          let estadoEnum = 'PENDIENTE';
-          if (nuevoEstado === 'En Preparación') estadoEnum = 'PREPARANDO';
-          else if (nuevoEstado === 'Listo') estadoEnum = 'LISTO';
-          else if (nuevoEstado === 'Despachado' || nuevoEstado === 'Entregado') estadoEnum = 'ENTREGADO';
-          else if (nuevoEstado === 'Anulada' || nuevoEstado === 'CANCELADO') estadoEnum = 'CANCELADO';
-
-          v.estadoEntrega = estadoEnum;
-          await v.save();
-          return { id, estado: nuevoEstado, message: "Estado actualizado en MySQL" };
+    if (!v && typeof id === 'string') {
+      v = await Venta.findOne({
+        where: {
+          observaciones: {
+            [Op.like]: `%"codigoPedido":"${id}"%`
+          }
         }
-      } catch (e) {
-        console.warn('Error actualizando estado de venta en produccion:', e.message);
+      });
+    }
+
+    if (!v) {
+      const numMatch = String(id).match(/\d+/);
+      if (numMatch) {
+        v = await Venta.findByPk(Number(numMatch[0]));
       }
     }
 
-    const numericId = Number(id);
-    const index = ordenesProduccion.findIndex((o) => String(o.id) === String(id) || o.id === numericId);
-    if (index !== -1) {
-      ordenesProduccion[index].estado = nuevoEstado;
-      return ordenesProduccion[index];
+    if (!v) {
+      const error = new Error(`Orden "${id}" no encontrada en la base de datos`);
+      error.statusCode = 404;
+      throw error;
     }
-    return { id, estado: nuevoEstado, message: "Estado actualizado" };
+
+    let obsObj = {};
+    if (v.observaciones) {
+      try {
+        obsObj = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+          ? JSON.parse(v.observaciones)
+          : { nota: v.observaciones };
+      } catch (e) {
+        obsObj = { nota: v.observaciones };
+      }
+    }
+
+    let estadoEnum = v.estadoEntrega || 'PENDIENTE';
+    let newAprobacion = v.estadoAprobacion || 'PENDIENTE';
+    const norm = String(nuevoEstado || '').toUpperCase();
+
+    if (norm === 'APROBAR' || norm === 'APROBADO') {
+      newAprobacion = 'APROBADO';
+      if (estadoEnum === 'PENDIENTE') {
+        estadoEnum = 'PREPARANDO';
+      }
+    } else if (norm === 'RECHAZAR' || norm === 'RECHAZADO') {
+      newAprobacion = 'RECHAZADO';
+      estadoEnum = 'CANCELADO';
+    } else if (norm === 'EN PREPARACIÓN' || norm === 'EN PREPARACION' || norm === 'PREPARANDO') {
+      newAprobacion = 'APROBADO';
+      estadoEnum = 'PREPARANDO';
+    } else if (norm === 'LISTO' || norm === 'LISTOS') {
+      newAprobacion = 'APROBADO';
+      estadoEnum = 'LISTO';
+    } else if (norm === 'DESPACHADO' || norm === 'ENTREGADO' || norm === 'COMPLETADA') {
+      newAprobacion = 'APROBADO';
+      estadoEnum = 'ENTREGADO';
+    } else if (norm === 'ANULADA' || norm === 'CANCELADO' || norm === 'CANCELADA') {
+      newAprobacion = 'RECHAZADO';
+      estadoEnum = 'CANCELADO';
+    } else {
+      estadoEnum = 'PENDIENTE';
+    }
+
+    // Write to real DB columns (source of truth)
+    v.estadoEntrega = estadoEnum;
+    v.estadoAprobacion = newAprobacion;
+
+    // Also keep obsObj JSON in sync for backward compatibility
+    obsObj.estadoAprobacion = newAprobacion;
+    v.observaciones = JSON.stringify(obsObj);
+
+    await v.save();
+
+    return {
+      id: v.idVenta,
+      idVenta: v.idVenta,
+      estado: nuevoEstado,
+      estadoEntrega: estadoEnum,
+      estadoAprobacion: newAprobacion,
+      message: `Estado de la orden #${v.idVenta} actualizado a "${nuevoEstado}" con éxito`
+    };
   }
 
   static async delete(id) {
-    ordenesProduccion = ordenesProduccion.filter((o) => String(o.id) !== String(id));
-    return { message: "Orden de producción eliminada" };
+    const { Op } = require('sequelize');
+    let v = null;
+    let idVentaNum = Number(id);
+
+    if (!isNaN(idVentaNum) && idVentaNum > 0) {
+      v = await Venta.findByPk(idVentaNum);
+    }
+
+    if (!v && typeof id === 'string') {
+      v = await Venta.findOne({
+        where: {
+          observaciones: {
+            [Op.like]: `%"codigoPedido":"${id}"%`
+          }
+        }
+      });
+    }
+
+    if (!v) {
+      const numMatch = String(id).match(/\d+/);
+      if (numMatch) {
+        v = await Venta.findByPk(Number(numMatch[0]));
+      }
+    }
+
+    if (v) {
+      const targetId = v.idVenta;
+      const { sequelize, DetalleVentaProducto, DetalleVentaAdicion, Pago, Devolucion } = require('../../persistence/models');
+
+      // Execute physical deletion in a managed transaction
+      await sequelize.transaction(async (t) => {
+        // 1. Get all DetalleVentaProducto IDs for this venta
+        const detalles = await DetalleVentaProducto.findAll({
+          where: { idVenta: targetId },
+          attributes: ['idDetalleVenta'],
+          transaction: t
+        });
+        const detalleIds = detalles.map(d => d.idDetalleVenta);
+
+        // 2. Delete all DetalleVentaAdicion associated with those detalles
+        if (detalleIds.length > 0) {
+          await DetalleVentaAdicion.destroy({
+            where: { idDetalleVenta: { [Op.in]: detalleIds } },
+            transaction: t
+          });
+        }
+
+        // 3. Delete all DetalleVentaProducto
+        await DetalleVentaProducto.destroy({
+          where: { idVenta: targetId },
+          transaction: t
+        });
+
+        // 4. Delete associated Pagos if table exists
+        if (Pago) {
+          await Pago.destroy({
+            where: { idVenta: targetId },
+            transaction: t
+          });
+        }
+
+        // 5. Delete associated Devoluciones if table exists
+        if (Devolucion) {
+          await Devolucion.destroy({
+            where: { idVenta: targetId },
+            transaction: t
+          });
+        }
+
+        // 6. Physically delete the Venta row
+        await v.destroy({ transaction: t });
+      });
+
+      return { message: `Orden #${targetId} eliminada de la base de datos con éxito` };
+    }
+
+    return { message: "Orden procesada o no encontrada" };
   }
 }
 

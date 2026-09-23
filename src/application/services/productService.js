@@ -1,25 +1,332 @@
-const { Product, CategoriaProducto, Evento, Variante } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante, FichaTecnica, DetalleFichaInsumo, Insumo, Adicion } = require('../../persistence/models');
+
+function convertUnits(amount, fromUnit, toUnit) {
+  if (!amount || isNaN(amount)) return 0;
+  if (!fromUnit || !toUnit) return Number(amount);
+
+  const from = String(fromUnit).toLowerCase().trim();
+  const to = String(toUnit).toLowerCase().trim();
+
+  if (from === to) return Number(amount);
+
+  // Normalizar masa / peso
+  const isKg = (u) => u.includes('kg') || u.includes('kilo');
+  const isGr = (u) => u.includes('gr') || u.includes('gram');
+  const isMg = (u) => u.includes('mg') || u.includes('miligram');
+
+  // Normalizar volumen / liquidos
+  const isLt = (u) => u.includes('lt') || u.includes('litro');
+  const isMl = (u) => u.includes('ml') || u.includes('mililitro') || u.includes('cc');
+
+  // Conversiones peso
+  if (isKg(from) && isGr(to)) return Number(amount) * 1000;
+  if (isGr(from) && isKg(to)) return Number(amount) / 1000;
+  if (isKg(from) && isMg(to)) return Number(amount) * 1000000;
+  if (isMg(from) && isKg(to)) return Number(amount) / 1000000;
+  if (isGr(from) && isMg(to)) return Number(amount) * 1000;
+  if (isMg(from) && isGr(to)) return Number(amount) / 1000;
+
+  // Conversiones volumen
+  if (isLt(from) && isMl(to)) return Number(amount) * 1000;
+  if (isMl(from) && isLt(to)) return Number(amount) / 1000;
+
+  return Number(amount);
+}
+
+function calculateProductStock(ficha) {
+  if (!ficha || !Array.isArray(ficha.detalles) || ficha.detalles.length === 0) {
+    return {
+      stock: 50,
+      stockDisponible: 50,
+      hasFicha: false,
+      insumosCriticos: []
+    };
+  }
+
+  let minPortions = Infinity;
+  const insumosCriticos = [];
+
+  for (const d of ficha.detalles) {
+    const rawCantRequerida = Number(d.cantidad || 0);
+    const recipeUnit = d.unidadMedida || d.insumo?.unidadMedida || 'und';
+    const insumoUnit = d.insumo?.unidadMedida || recipeUnit;
+    const insumoStock = Number(d.insumo?.stock || 0);
+
+    // Convertir la cantidad requerida de la receta a la unidad de medida del inventario
+    const cantRequeridaEnInsumoUnit = convertUnits(rawCantRequerida, recipeUnit, insumoUnit);
+
+    if (cantRequeridaEnInsumoUnit > 0) {
+      const portionsFloat = Number((insumoStock / cantRequeridaEnInsumoUnit).toFixed(6));
+      const portionsFromThisInsumo = Math.floor(portionsFloat);
+      if (portionsFromThisInsumo < minPortions) {
+        minPortions = portionsFromThisInsumo;
+      }
+      if (portionsFromThisInsumo <= 5) {
+        insumosCriticos.push({
+          idInsumo: d.idInsumo,
+          nombre: d.insumo?.nombre || `Insumo #${d.idInsumo}`,
+          stockActual: insumoStock,
+          unidadMedida: insumoUnit,
+          cantidadRequerida: rawCantRequerida,
+          unidadReceta: recipeUnit,
+          porcionesPosibles: portionsFromThisInsumo
+        });
+      }
+    }
+  }
+
+  const finalStock = minPortions === Infinity ? 50 : Math.max(0, minPortions);
+  return {
+    stock: finalStock,
+    stockDisponible: finalStock,
+    hasFicha: true,
+    insumosCriticos
+  };
+}
+
+function formatActiveEventos(rawEventos, now = new Date(), targetProduct = null) {
+  if (!Array.isArray(rawEventos)) return [];
+  return rawEventos
+    .filter((e) => {
+      if (e.estado !== 1 && e.estado !== 'Activo') return false;
+      if (e.fechaFin) {
+        const finDate = new Date(`${e.fechaFin}T23:59:59`);
+        if (now > finDate) return false; // Expirado
+      }
+      if (e.fechaInicio) {
+        const inicioDate = new Date(`${e.fechaInicio}T00:00:00`);
+        if (now < inicioDate) return false; // Programado / Aún no inicia
+      }
+      return true;
+    })
+    .map((e) => {
+      let diasRestantes = null;
+      let horasRestantes = null;
+      if (e.fechaFin) {
+        const finDate = new Date(`${e.fechaFin}T23:59:59`);
+        const ms = finDate.getTime() - now.getTime();
+        diasRestantes = Math.ceil(ms / (1000 * 60 * 60 * 24));
+        horasRestantes = Math.max(0, Math.floor(ms / (1000 * 60 * 60)));
+      }
+      const label =
+        diasRestantes === null
+          ? 'Permanente'
+          : diasRestantes === 1
+          ? `¡Último día! (${horasRestantes}h)`
+          : diasRestantes === 0
+          ? '¡Termina hoy!'
+          : `Quedan ${diasRestantes} días`;
+
+      let parsedProdsAssoc = [];
+      try {
+        parsedProdsAssoc = typeof e.productosAsociados === 'string'
+          ? JSON.parse(e.productosAsociados)
+          : (e.productosAsociados || []);
+      } catch (err) {
+        parsedProdsAssoc = [];
+      }
+
+      let parsedInsumosAssoc = [];
+      try {
+        parsedInsumosAssoc = typeof e.insumosAsociados === 'string'
+          ? JSON.parse(e.insumosAsociados)
+          : (e.insumosAsociados || []);
+      } catch (err) {
+        parsedInsumosAssoc = [];
+      }
+
+      let effectiveDescuento = e.descuento;
+      let effectiveNuevoPrecio = e.nuevoPrecio;
+
+      if (targetProduct) {
+        const pId = Number(targetProduct.idProducto || targetProduct.id);
+        const pName = String(targetProduct.nombre || '').toLowerCase().trim();
+
+        const matchedAssoc = Array.isArray(parsedProdsAssoc)
+          ? parsedProdsAssoc.find(pa =>
+              (pa.idProducto && Number(pa.idProducto) === pId) ||
+              (pa.nombre && String(pa.nombre).toLowerCase().trim() === pName)
+            )
+          : null;
+
+        if (matchedAssoc) {
+          if (matchedAssoc.descuento !== undefined && matchedAssoc.descuento !== null) {
+            effectiveDescuento = matchedAssoc.descuento;
+          }
+          if (matchedAssoc.nuevoPrecio !== undefined && matchedAssoc.nuevoPrecio !== null) {
+            effectiveNuevoPrecio = matchedAssoc.nuevoPrecio;
+          }
+        }
+
+        const basePrice = Number(targetProduct.precio || 0);
+        if (basePrice > 0 && effectiveDescuento && Number(effectiveDescuento) > 0 && (!effectiveNuevoPrecio || Number(effectiveNuevoPrecio) <= 0)) {
+          effectiveNuevoPrecio = Math.round(basePrice * (1 - (Number(effectiveDescuento) / 100)));
+        }
+      }
+
+      return {
+        id: e.idEvento,
+        idEvento: e.idEvento,
+        idProducto: e.idProducto,
+        tipoEvento: e.tipoEvento,
+        tipo: e.tipoEvento,
+        icono: e.icono || 'party',
+        descuento: effectiveDescuento,
+        nuevoPrecio: effectiveNuevoPrecio,
+        nombreEvento: e.nombreEvento,
+        nombre: e.nombreEvento,
+        descripcion: e.descripcion,
+        fechaInicio: e.fechaInicio,
+        fechaFin: e.fechaFin,
+        estado: e.estado,
+        accionInsumo: e.accionInsumo || null,
+        insumosAsociados: parsedInsumosAssoc,
+        productosAsociados: parsedProdsAssoc,
+        vigencia: {
+          diasRestantes,
+          horasRestantes,
+          urgente: diasRestantes !== null && diasRestantes <= 3,
+          label
+        }
+      };
+    });
+}
+
+function resolveComboConfig(rawConfig, prodName, catName, prodDesc = '') {
+  let cfg = null;
+  if (rawConfig) {
+    try {
+      cfg = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+    } catch (e) {
+      cfg = null;
+    }
+  }
+
+  if (cfg && typeof cfg === 'object' && cfg.esCombo !== undefined) {
+    return {
+      esCombo: Boolean(cfg.esCombo),
+      cantidadBebidas: Math.max(1, Number(cfg.cantidadBebidas) || 1),
+      bebidasPermitidas: Array.isArray(cfg.bebidasPermitidas) ? cfg.bebidasPermitidas : []
+    };
+  }
+
+  const pLower = String(prodName || '').toLowerCase();
+  const cLower = String(catName || '').toLowerCase();
+  const dLower = String(prodDesc || '').toLowerCase();
+
+  const isCombo =
+    cLower.includes('combo') ||
+    pLower.includes('combo') ||
+    pLower.includes('+ bebida') ||
+    pLower.includes('+bebida') ||
+    pLower.includes('con bebida') ||
+    pLower.includes('+ gaseosa') ||
+    pLower.includes('+gaseosa') ||
+    pLower.includes('con gaseosa') ||
+    dLower.includes('+ gaseosa') ||
+    dLower.includes('+ bebida') ||
+    dLower.includes('bebida a elección') ||
+    dLower.includes('gaseosa a elección');
+
+  // Fallback inteligente para combos de catálogo o productos con bebida incluida
+  if (isCombo) {
+    let cant = 1;
+    if (pLower.includes('familiar') || pLower.includes('4 personas') || pLower.includes('4 pers')) {
+      cant = 4;
+    } else if (pLower.includes('pareja') || pLower.includes('amigos') || pLower.includes('2 personas') || pLower.includes('duo') || pLower.includes('dúo')) {
+      cant = 2;
+    }
+    return {
+      esCombo: true,
+      cantidadBebidas: cant,
+      bebidasPermitidas: []
+    };
+  }
+
+  return {
+    esCombo: false,
+    cantidadBebidas: 0,
+    bebidasPermitidas: []
+  };
+}
 
 class ProductService {
   static async getProducts() {
+    const { sequelize } = require('../../persistence/config/db');
+    const [salesRows] = await sequelize.query(`
+      SELECT v.idProducto, COALESCE(SUM(dvp.cantidad), 0) as totalVendidos
+      FROM detalleventaproducto dvp
+      JOIN variante v ON dvp.idVariante = v.idVariante
+      GROUP BY v.idProducto
+    `);
+    const salesMap = {};
+    for (const r of salesRows) {
+      salesMap[r.idProducto] = Number(r.totalVendidos || 0);
+    }
+
     const products = await Product.findAll({
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
-        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio', 'imagen'] },
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
+        {
+          model: FichaTecnica,
+          as: 'fichaTecnica',
+          required: false,
+          where: { estado: 1 },
+          include: [
+            {
+              model: DetalleFichaInsumo,
+              as: 'detalles',
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'precioUnitario', 'estado'] }]
+            }
+          ]
+        }
       ]
     });
 
+    const activeAdiciones = await Adicion.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
+    const allActiveEvents = await Evento.findAll({ where: { estado: 1 } }).catch(() => []);
+    const adicMap = {};
+    activeAdiciones.forEach(a => {
+      adicMap[a.idAdicion] = {
+        idAdicion: a.idAdicion,
+        id: a.idAdicion,
+        nombre: a.nombre,
+        precio: parseFloat(a.precioAdicion || 0),
+        imagen: a.imagen || ''
+      };
+    });
+
+    const now = new Date();
     return products
       .filter(p => p.idProducto !== 0 && !p.nombre?.startsWith('__SISTEMA'))
       .map(p => {
-        let adiciones = [];
+        let rawAdiciones = [];
         try {
-          adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
+          rawAdiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
         } catch (e) {
-          adiciones = [];
+          rawAdiciones = [];
         }
+
+        let adiciones = Array.isArray(rawAdiciones) ? rawAdiciones.map(a => {
+          if (typeof a === 'number' || typeof a === 'string') {
+            return adicMap[a] || null;
+          }
+          if (a && typeof a === 'object') {
+            const idAd = a.idAdicion || a.id;
+            const fromMap = idAd ? adicMap[idAd] : null;
+            return {
+              idAdicion: idAd,
+              id: idAd,
+              nombre: a.nombre || fromMap?.nombre || `Adición #${idAd}`,
+              precio: a.precio !== undefined ? Number(a.precio) : (fromMap?.precio || 0),
+              imagen: a.imagen || fromMap?.imagen || ''
+            };
+          }
+          return null;
+        }).filter(Boolean) : [];
 
         const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
         const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
@@ -27,8 +334,37 @@ class ProductService {
           : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
 
         const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
-          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
-          : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0), imagen: v.imagen || '' }))
+          : [];
+
+        const stockInfo = calculateProductStock(p.fichaTecnica);
+        const realVentas = Number(salesMap[p.idProducto] || 0);
+
+        const pId = Number(p.idProducto);
+        const pName = String(p.nombre || '').toLowerCase().trim();
+
+        const matchingEvents = allActiveEvents.filter(e => {
+          if (e.idProducto && Number(e.idProducto) === pId) return true;
+          let prodsAssoc = [];
+          try {
+            prodsAssoc = typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : (e.productosAsociados || []);
+          } catch(err) {}
+          if (Array.isArray(prodsAssoc) && prodsAssoc.length > 0) {
+            return prodsAssoc.some(pa =>
+              (pa.idProducto && Number(pa.idProducto) === pId) ||
+              (pa.nombre && String(pa.nombre).toLowerCase().trim() === pName)
+            );
+          }
+          if (!e.idProducto && (!prodsAssoc || prodsAssoc.length === 0)) {
+            return true;
+          }
+          return false;
+        });
+
+        const combinedEventsMap = new Map();
+        (p.eventos || []).forEach(e => combinedEventsMap.set(e.idEvento, e));
+        matchingEvents.forEach(e => combinedEventsMap.set(e.idEvento, e));
+        const combinedEvents = Array.from(combinedEventsMap.values());
 
         return {
           _id: p.idProducto,
@@ -38,25 +374,54 @@ class ProductService {
           precio: realPrecio,
           descripcion: p.descripcion || '',
           imagen: p.imagen || '',
-          stock: p.stock || 0,
           idCategoriaProducto: p.idCategoriaProducto,
           categoriaId: p.idCategoriaProducto,
           categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
           estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+          stock: stockInfo.stock,
+          stockDisponible: stockInfo.stockDisponible,
+          hasFicha: stockInfo.hasFicha,
+          insumosCriticos: stockInfo.insumosCriticos,
           variantes,
           adiciones,
-          eventos: p.eventos || []
+          configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
+          eventos: formatActiveEventos(combinedEvents, now, { idProducto: p.idProducto, nombre: p.nombre, precio: realPrecio }),
+          fichaTecnica: p.fichaTecnica ? (typeof p.fichaTecnica.toJSON === 'function' ? p.fichaTecnica.toJSON() : p.fichaTecnica) : null,
+          ventas: realVentas,
+          totalVendidos: realVentas
         };
       });
   }
 
   static async getProductById(id) {
+    const { sequelize } = require('../../persistence/config/db');
+    const [salesRows] = await sequelize.query(`
+      SELECT COALESCE(SUM(dvp.cantidad), 0) as totalVendidos
+      FROM detalleventaproducto dvp
+      JOIN variante v ON dvp.idVariante = v.idVariante
+      WHERE v.idProducto = ?
+    `, { replacements: [id] });
+    const realVentas = salesRows.length > 0 ? Number(salesRows[0].totalVendidos || 0) : 0;
+
     const p = await Product.findByPk(id, {
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
-        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } }
+        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio', 'imagen'] },
+        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
+        {
+          model: FichaTecnica,
+          as: 'fichaTecnica',
+          required: false,
+          where: { estado: 1 },
+          include: [
+            {
+              model: DetalleFichaInsumo,
+              as: 'detalles',
+              include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'stockMinimo', 'unidadMedida', 'precioUnitario', 'estado'] }]
+            }
+          ]
+        }
       ]
     });
     if (!p) {
@@ -65,12 +430,42 @@ class ProductService {
       throw error;
     }
 
-    let adiciones = [];
+    const activeAdiciones = await Adicion.findAll({ where: { esAdicion: 1, estado: 1, eliminado: 0 } });
+    const adicMap = {};
+    activeAdiciones.forEach(a => {
+      adicMap[a.idAdicion] = {
+        idAdicion: a.idAdicion,
+        id: a.idAdicion,
+        nombre: a.nombre,
+        precio: parseFloat(a.precioAdicion || 0),
+        imagen: a.imagen || ''
+      };
+    });
+
+    let rawAdiciones = [];
     try {
-      adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
+      rawAdiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
     } catch (e) {
-      adiciones = [];
+      rawAdiciones = [];
     }
+
+    let adiciones = Array.isArray(rawAdiciones) ? rawAdiciones.map(a => {
+      if (typeof a === 'number' || typeof a === 'string') {
+        return adicMap[a] || null;
+      }
+      if (a && typeof a === 'object') {
+        const idAd = a.idAdicion || a.id;
+        const fromMap = idAd ? adicMap[idAd] : null;
+        return {
+          idAdicion: idAd,
+          id: idAd,
+          nombre: a.nombre || fromMap?.nombre || `Adición #${idAd}`,
+          precio: a.precio !== undefined ? Number(a.precio) : (fromMap?.precio || 0),
+          imagen: a.imagen || fromMap?.imagen || ''
+        };
+      }
+      return null;
+    }).filter(Boolean) : [];
 
     const primeraVariante = Array.isArray(p.variantes) && p.variantes.length > 0 ? p.variantes[0] : null;
     const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
@@ -78,8 +473,37 @@ class ProductService {
       : (primeraVariante ? parseFloat(primeraVariante.precio || 0) : 0);
 
     const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
-      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0) }))
-      : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: parseFloat(v.precio || 0), imagen: v.imagen || '' }))
+      : [];
+
+    const stockInfo = calculateProductStock(p.fichaTecnica);
+
+    const allActiveEvents = await Evento.findAll({ where: { estado: 1 } }).catch(() => []);
+    const pId = Number(p.idProducto);
+    const pName = String(p.nombre || '').toLowerCase().trim();
+
+    const matchingEvents = allActiveEvents.filter(e => {
+      if (e.idProducto && Number(e.idProducto) === pId) return true;
+      let prodsAssoc = [];
+      try {
+        prodsAssoc = typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : (e.productosAsociados || []);
+      } catch(err) {}
+      if (Array.isArray(prodsAssoc) && prodsAssoc.length > 0) {
+        return prodsAssoc.some(pa =>
+          (pa.idProducto && Number(pa.idProducto) === pId) ||
+          (pa.nombre && String(pa.nombre).toLowerCase().trim() === pName)
+        );
+      }
+      if (!e.idProducto && (!prodsAssoc || prodsAssoc.length === 0)) {
+        return true;
+      }
+      return false;
+    });
+
+    const combinedEventsMap = new Map();
+    (p.eventos || []).forEach(e => combinedEventsMap.set(e.idEvento, e));
+    matchingEvents.forEach(e => combinedEventsMap.set(e.idEvento, e));
+    const combinedEvents = Array.from(combinedEventsMap.values());
 
     return {
       _id: p.idProducto,
@@ -89,19 +513,26 @@ class ProductService {
       precio: realPrecio,
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
-      stock: p.stock || 0,
       idCategoriaProducto: p.idCategoriaProducto,
       categoriaId: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
       estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+      stock: stockInfo.stock,
+      stockDisponible: stockInfo.stockDisponible,
+      hasFicha: stockInfo.hasFicha,
+      insumosCriticos: stockInfo.insumosCriticos,
       variantes,
       adiciones,
-      eventos: p.eventos || []
+      configuracionCombo: resolveComboConfig(p.configuracionCombo, p.nombre, p.categoriaProducto?.nombre || p.categoria, p.descripcion),
+      eventos: formatActiveEventos(combinedEvents, new Date(), { idProducto: p.idProducto, nombre: p.nombre, precio: realPrecio }),
+      fichaTecnica: p.fichaTecnica ? (typeof p.fichaTecnica.toJSON === 'function' ? p.fichaTecnica.toJSON() : p.fichaTecnica) : null,
+      ventas: realVentas,
+      totalVendidos: realVentas
     };
   }
 
   static async createProduct(data) {
-    const { nombre, precio, descripcion, imagen, stock, categoria, adiciones, idCategoriaProducto, estado } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, idCategoriaProducto, estado, configuracionCombo, variantes, fichaTecnica } = data;
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre del producto es obligatorio');
       error.statusCode = 400;
@@ -111,6 +542,31 @@ class ProductService {
     const existing = await Product.findOne({ where: { nombre: nombre.trim() } });
     if (existing) {
       const error = new Error('Ya existe un producto registrado con ese nombre');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Validar que la ficha técnica sea obligatoria al crear un producto
+    if (!fichaTecnica) {
+      const error = new Error('La ficha técnica es obligatoria para crear un producto. Por favor completa todos los campos de la ficha técnica antes de guardar.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const ftIngredientes = fichaTecnica.detalles || fichaTecnica.insumos || fichaTecnica.ingredientes || [];
+    const camposFaltantes = [];
+    if (!ftIngredientes || ftIngredientes.length === 0) camposFaltantes.push('Ingredientes');
+    if (!fichaTecnica.procedimiento || !String(fichaTecnica.procedimiento).trim()) camposFaltantes.push('Procedimiento');
+    if (!fichaTecnica.tiempoPreparacion || Number(fichaTecnica.tiempoPreparacion) < 1) camposFaltantes.push('Tiempo de Preparación');
+    if (!fichaTecnica.rendimiento || !String(fichaTecnica.rendimiento).trim()) camposFaltantes.push('Rendimiento');
+    if (!fichaTecnica.condicionesAlmacenamiento || !String(fichaTecnica.condicionesAlmacenamiento).trim()) camposFaltantes.push('Condiciones de Almacenamiento');
+    if (!fichaTecnica.vidaUtil || !String(fichaTecnica.vidaUtil).trim()) camposFaltantes.push('Vida Útil');
+    if (!fichaTecnica.especificaciones || !String(fichaTecnica.especificaciones).trim()) camposFaltantes.push('Especificaciones');
+    if (!fichaTecnica.caracteristicas || !String(fichaTecnica.caracteristicas).trim()) camposFaltantes.push('Características Organolépticas');
+    if (!fichaTecnica.informacionNutricional || !String(fichaTecnica.informacionNutricional).trim()) camposFaltantes.push('Información Nutricional');
+
+    if (camposFaltantes.length > 0) {
+      const error = new Error(`Ficha técnica incompleta. Campos faltantes: ${camposFaltantes.join(', ')}`);
       error.statusCode = 400;
       throw error;
     }
@@ -130,24 +586,35 @@ class ProductService {
 
     const normalizedEstado = estado === 'Inactivo' || estado === 0 || estado === '0' ? 0 : 1;
 
+    let initialPrice = Number(precio) || 0;
+    if (Array.isArray(variantes) && variantes.length > 0 && Number(variantes[0].precio) > 0) {
+      initialPrice = Number(variantes[0].precio);
+    }
+
     const product = await Product.create({
       idCategoriaProducto: resolvedCatId,
       nombre: nombre.trim(),
+      precio: initialPrice,
       descripcion: descripcion || '',
       imagen: imagen || '',
       categoria: categoria || '',
-      stock: stock || 0,
       estado: normalizedEstado,
-      adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
+      adiciones: adiciones ? JSON.stringify(adiciones) : '[]',
+      configuracionCombo: configuracionCombo ? (typeof configuracionCombo === 'object' ? JSON.stringify(configuracionCombo) : configuracionCombo) : null
     });
 
-    if (precio !== undefined && precio !== null && precio !== '') {
-      await Variante.create({
-        idProducto: product.idProducto,
-        nombre: `${nombre.trim()} - base`,
-        precio: Number(precio) || 0,
-        estado: normalizedEstado
-      });
+    if (Array.isArray(variantes) && variantes.length > 0) {
+      for (const v of variantes) {
+        if (v.nombre && v.nombre.trim()) {
+          await Variante.create({
+            idProducto: product.idProducto,
+            nombre: v.nombre.trim(),
+            precio: Number(v.precio) >= 0 ? Number(v.precio) : initialPrice,
+            imagen: v.imagen || null,
+            estado: normalizedEstado
+          });
+        }
+      }
     }
 
     return this.getProductById(product.idProducto);
@@ -161,7 +628,14 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo, variantes } = data;
+
+    // Si la imagen se actualiza o se quita, y existía una imagen previa en Cloudinary, eliminarla
+    if (imagen !== undefined && p.imagen && p.imagen !== imagen) {
+      const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+      deleteImage(p.imagen).catch((err) => console.warn('⚠️ Error al eliminar imagen anterior de producto:', err.message));
+    }
+
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
@@ -177,10 +651,56 @@ class ProductService {
     }
 
     if (adiciones !== undefined) p.adiciones = JSON.stringify(adiciones);
+    if (configuracionCombo !== undefined) {
+      p.configuracionCombo = typeof configuracionCombo === 'object' ? JSON.stringify(configuracionCombo) : configuracionCombo;
+    }
 
-    await p.save();
+    if (Array.isArray(variantes)) {
+      const currentVars = await Variante.findAll({ where: { idProducto: id } });
+      const incomingIds = variantes.map(v => v.idVariante || v.id).filter(Boolean);
 
-    if (precio !== undefined && precio !== null && precio !== '') {
+      // Eliminar variantes removidas
+      for (const cur of currentVars) {
+        if (!incomingIds.includes(cur.idVariante)) {
+          try {
+            await cur.destroy();
+          } catch (err) {
+            cur.estado = 0;
+            await cur.save();
+          }
+        }
+      }
+
+      // Actualizar existentes o crear nuevas
+      for (const v of variantes) {
+        if (!v.nombre || !v.nombre.trim()) continue;
+        const varId = v.idVariante || v.id;
+        const found = currentVars.find(c => c.idVariante === varId);
+        const vPrice = Number(v.precio) >= 0 ? Number(v.precio) : (Number(precio) || 0);
+        if (found) {
+          found.nombre = v.nombre.trim();
+          found.precio = vPrice;
+          if (v.imagen !== undefined) {
+            found.imagen = v.imagen || null;
+          }
+          found.estado = 1;
+          await found.save();
+        } else {
+          await Variante.create({
+            idProducto: id,
+            nombre: v.nombre.trim(),
+            precio: vPrice,
+            imagen: v.imagen || null,
+            estado: 1
+          });
+        }
+      }
+
+      if (variantes.length > 0 && Number(variantes[0].precio) >= 0) {
+        p.precio = Number(variantes[0].precio);
+      }
+    } else if (precio !== undefined && precio !== null && precio !== '') {
+      p.precio = Number(precio);
       let variante = await Variante.findOne({ where: { idProducto: id } });
       if (!variante) {
         variante = await Variante.create({
@@ -195,6 +715,7 @@ class ProductService {
       }
     }
 
+    await p.save();
     return this.getProductById(id);
   }
 
@@ -206,18 +727,76 @@ class ProductService {
       throw error;
     }
 
-    // Delete associated ficha técnica and its details
-    const { FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
-    const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
-    if (ficha) {
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
-      await ficha.destroy();
-    }
+    const imagenAEliminar = p.imagen;
 
-    await p.destroy();
-    const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
-    await resetAutoIncrement('producto', 'idProducto');
-    return { message: 'Producto eliminado correctamente' };
+    const { sequelize } = require('../../persistence/config/db');
+    const t = await sequelize.transaction();
+
+    try {
+      // 1. Eliminar reseñas asociadas
+      await sequelize.query('DELETE FROM resena WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 2. Eliminar descuentos vinculados a eventos de este producto
+      await sequelize.query(
+        'DELETE FROM descuento WHERE idEvento IN (SELECT idEvento FROM evento WHERE idProducto = ?)',
+        { replacements: [id], transaction: t }
+      );
+
+      // 3. Eliminar eventos asociados al producto
+      await sequelize.query('DELETE FROM evento WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 4. Eliminar detalles de fichas técnicas y fichas técnicas del producto
+      await sequelize.query(
+        'DELETE FROM detallefichainsumo WHERE idFichaTecnica IN (SELECT idFichaTecnica FROM fichatecnica WHERE idProducto = ?)',
+        { replacements: [id], transaction: t }
+      );
+      await sequelize.query('DELETE FROM fichatecnica WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 5. Eliminar registros de detalle de venta asociados a las variantes de este producto
+      await sequelize.query(
+        'DELETE FROM detalleventaproducto WHERE idVariante IN (SELECT idVariante FROM variante WHERE idProducto = ?)',
+        { replacements: [id], transaction: t }
+      );
+
+      // 6. Eliminar variantes del producto (resuelve la restricción variante_ibfk_1)
+      await sequelize.query('DELETE FROM variante WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      // 7. Eliminar el producto de forma definitiva
+      await sequelize.query('DELETE FROM producto WHERE idProducto = ?', {
+        replacements: [id],
+        transaction: t
+      });
+
+      await t.commit();
+
+      // Eliminar imagen de Cloudinary si existía
+      if (imagenAEliminar) {
+        const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+        deleteImage(imagenAEliminar).catch((err) => console.warn('⚠️ Error al eliminar imagen de Cloudinary del producto borrado:', err.message));
+      }
+
+      const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
+      await resetAutoIncrement('producto', 'idProducto');
+      await resetAutoIncrement('variante', 'idVariante');
+
+      return { success: true, message: 'Producto eliminado correctamente' };
+    } catch (err) {
+      await t.rollback();
+      console.error('Error al eliminar producto en cascada:', err);
+      throw err;
+    }
   }
 }
 

@@ -144,6 +144,14 @@ class ProveedorService {
       estado: estadoInt
     });
 
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Creado',
+      entidadNombre: proveedor.nombre,
+      detalle: `Se registró el proveedor en el sistema: ${proveedor.nombre}`,
+      motivo: 'Registro inicial de proveedor'
+    }).catch(() => {});
+
     return this.getById(proveedor.idProveedor);
   }
 
@@ -217,6 +225,15 @@ class ProveedorService {
     if (estado !== undefined) p.estado = (estado === 'Activo' || estado === 1) ? 1 : 0;
 
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Editado',
+      entidadNombre: p.nombre,
+      detalle: `Se actualizaron los datos del proveedor: ${p.nombre}`,
+      motivo: 'Actualización de datos'
+    }).catch(() => {});
+
     return this.getById(idProveedor);
   }
 
@@ -237,6 +254,15 @@ class ProveedorService {
 
     p.estado = nuevoEstado;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Estado Cambiado',
+      entidadNombre: p.nombre,
+      detalle: `El proveedor ${p.nombre} cambió su estado a ${nuevoEstado === 1 ? 'Activo' : 'Inactivo'}`,
+      motivo: 'Cambio de estado'
+    }).catch(() => {});
+
     return this.getById(idProveedor);
   }
 
@@ -250,6 +276,15 @@ class ProveedorService {
 
     p.estado = 0;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado',
+      entidadNombre: p.nombre,
+      detalle: `Se envió a la papelera el proveedor: ${p.nombre}`,
+      motivo: 'Inactivación / Papelera'
+    }).catch(() => {});
+
     return { message: 'Proveedor inactivado exitosamente' };
   }
 
@@ -262,6 +297,15 @@ class ProveedorService {
     }
     p.estado = 1;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Restaurado',
+      entidadNombre: p.nombre,
+      detalle: `Se restauró el proveedor: ${p.nombre}`,
+      motivo: 'Restauración desde papelera'
+    }).catch(() => {});
+
     return this.getById(idProveedor);
   }
 
@@ -282,7 +326,16 @@ class ProveedorService {
       throw error;
     }
 
+    const nombreProv = p.nombre;
     await p.destroy();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado permanente',
+      entidadNombre: nombreProv,
+      detalle: `Se eliminó permanentemente el proveedor: ${nombreProv}`,
+      motivo: 'Eliminación física definitiva'
+    }).catch(() => {});
 
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
     await resequenceTableIds('proveedor', 'idProveedor', ['insumo', 'compra']);

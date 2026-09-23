@@ -1,8 +1,25 @@
 const { Trazabilidad, Insumo, User } = require('../../persistence/models');
 
+function formatFecha(d) {
+  if (!d) return '';
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return String(d);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(dateObj.getDate())}/${pad(dateObj.getMonth() + 1)}/${dateObj.getFullYear()} ${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+}
+
 class TrazabilidadService {
-  static async getAll() {
+  static async getAll(filter = {}) {
+    const where = {};
+    if (filter.idInsumo) {
+      where.idInsumo = filter.idInsumo;
+    }
+    if (filter.tipo) {
+      where.tipo = filter.tipo;
+    }
+
     const registros = await Trazabilidad.findAll({
+      where,
       include: [
         { model: Insumo, as: 'insumo', required: false },
         { model: User, as: 'usuario', required: false }
@@ -10,24 +27,53 @@ class TrazabilidadService {
       order: [['fecha', 'DESC']]
     });
 
-    return registros.map(r => ({
-      idTrazabilidad: r.idTrazabilidad || r.id,
-      id: r.idTrazabilidad || r.id,
-      tipo: r.tipo || (r.tipoMovimiento ? r.tipoMovimiento.toLowerCase() : 'crear'),
-      entidadNombre: r.entidadNombre || (r.insumo ? r.insumo.nombre : 'General'),
-      detalle: r.detalle || (r.motivo ? `${r.tipoMovimiento || 'Movimiento'}: ${r.motivo}` : 'Registro de trazabilidad'),
-      leido: Number(r.leido || 0),
-      fecha: r.fecha || new Date(),
-      idInsumo: r.idInsumo || null,
-      tipoMovimiento: r.tipoMovimiento || null,
-      cantidad: r.cantidad ? parseFloat(r.cantidad) : null,
-      motivo: r.motivo || '',
-      usuarioId: r.usuarioId || null,
-      usuarioNombre: r.usuario ? r.usuario.nombre : 'Sistema'
-    }));
+    return registros.map(r => {
+      let tipoLabel = 'Creado';
+      const t = (r.tipo || '').toLowerCase();
+      const mov = (r.tipoMovimiento || '').toLowerCase();
+
+      if (t.includes('crea') || t === 'nuevo' || t === 'registro') {
+        tipoLabel = 'Creado';
+      } else if (t.includes('edit') || t.includes('modif') || t === 'actualizado') {
+        tipoLabel = 'Editado';
+      } else if (t.includes('eliminado permanente') || t.includes('harddelete') || t.includes('definitivo')) {
+        tipoLabel = 'Eliminado permanente';
+      } else if (t.includes('elimin') || t.includes('papelera') || t === 'inactivar') {
+        tipoLabel = 'Eliminado';
+      } else if (t.includes('restaur')) {
+        tipoLabel = 'Restaurado';
+      } else if (t.includes('compra') || t.includes('reabastec') || mov === 'entrada' || mov === 'salida' || mov === 'compra') {
+        tipoLabel = 'Reabastecimiento';
+      } else if (t.includes('estado') || t.includes('cambio')) {
+        tipoLabel = 'Estado Cambiado';
+      }
+
+      return {
+        idTrazabilidad: r.idTrazabilidad || r.id,
+        id: `tz-${r.idTrazabilidad || r.id}`,
+        tipo: tipoLabel,
+        tipoRaw: r.tipo || '',
+        nombre: r.entidadNombre || (r.insumo ? r.insumo.nombre : 'Registro'),
+        descripcion: r.detalle || (r.motivo ? `${r.tipoMovimiento || 'Movimiento'}: ${r.motivo}` : 'Registro de trazabilidad'),
+        fecha: formatFecha(r.fecha),
+        fechaRaw: r.fecha || new Date(),
+        leido: Number(r.leido || 0),
+        idInsumo: r.idInsumo || null,
+        tipoMovimiento: r.tipoMovimiento || null,
+        cantidad: r.cantidad ? parseFloat(r.cantidad) : null,
+        motivo: r.motivo || '',
+        usuarioId: r.usuarioId || null,
+        usuarioNombre: r.usuario ? r.usuario.nombre : 'Sistema'
+      };
+    });
   }
 
-  static async create(data) {
+  static async getUnreadCount() {
+    const count = await Trazabilidad.count({ where: { leido: 0 } });
+    return { unreadCount: count };
+  }
+
+  static async create(data, options = {}) {
     const {
       tipo, entidadNombre, detalle,
       idInsumo, tipoMovimiento, cantidad, motivo, usuarioId,
@@ -39,10 +85,9 @@ class TrazabilidadService {
     const finalDetalle = detalle || motivo || `${finalTipo} en trazabilidad`;
 
     // Solo actualizar stock si NO se indica skipStockUpdate
-    // (compraService ya maneja su propio ajuste de stock y pasa skipStockUpdate: true)
     if (!skipStockUpdate && idInsumo && cantidad !== undefined && tipoMovimiento) {
       try {
-        const insumo = await Insumo.findByPk(idInsumo);
+        const insumo = await Insumo.findByPk(idInsumo, { transaction: options.transaction });
         if (insumo) {
           const cantNum = parseFloat(cantidad);
           if (tipoMovimiento === 'Entrada') {
@@ -50,27 +95,32 @@ class TrazabilidadService {
           } else if (tipoMovimiento === 'Salida') {
             insumo.stock = Math.max(0, parseFloat(insumo.stock || 0) - cantNum);
           }
-          await insumo.save();
+          await insumo.save({ transaction: options.transaction });
         }
       } catch (err) {
         console.warn('Advertencia al actualizar stock en trazabilidad:', err.message);
       }
     }
 
-    const registro = await Trazabilidad.create({
-      tipo: finalTipo,
-      entidadNombre: finalEntidadNombre,
-      detalle: finalDetalle,
-      leido: 0,
-      idInsumo: idInsumo || null,
-      tipoMovimiento: tipoMovimiento || null,
-      cantidad: cantidad !== undefined && cantidad !== null ? parseFloat(cantidad) : null,
-      motivo: motivo || null,
-      usuarioId: usuarioId || null,
-      fecha: new Date()
-    });
+    try {
+      const registro = await Trazabilidad.create({
+        tipo: finalTipo,
+        entidadNombre: finalEntidadNombre,
+        detalle: finalDetalle,
+        leido: 0,
+        idInsumo: idInsumo || null,
+        tipoMovimiento: tipoMovimiento || null,
+        cantidad: cantidad !== undefined && cantidad !== null ? parseFloat(cantidad) : null,
+        motivo: motivo || null,
+        usuarioId: usuarioId || null,
+        fecha: new Date()
+      }, { transaction: options.transaction });
 
-    return registro;
+      return registro;
+    } catch (tzErr) {
+      console.warn('Advertencia al crear registro de trazabilidad:', tzErr.message);
+      return null;
+    }
   }
 
   static async markAllAsRead() {

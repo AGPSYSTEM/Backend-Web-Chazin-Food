@@ -25,6 +25,8 @@ class DashboardService {
       let ventasVariacion = 0;
       if (totalVentasAnterior > 0) {
         ventasVariacion = parseFloat((((totalVentasActual - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1));
+      } else if (totalVentasActual > 0) {
+        ventasVariacion = 100;
       }
 
       // Orders count
@@ -35,11 +37,42 @@ class DashboardService {
       let pedidosVariacion = 0;
       if (pedidosTotalAnterior > 0) {
         pedidosVariacion = parseFloat((((pedidosTotalActual - pedidosTotalAnterior) / pedidosTotalAnterior) * 100).toFixed(1));
+      } else if (pedidosTotalActual > 0) {
+        pedidosVariacion = 100;
+      }
+
+      // Frecuencia de ventas (pedidos por dia en el mes actual)
+      const currentDay = now.getDate();
+      let frecuenciaVentas = 0;
+      if (currentDay > 0) {
+        frecuenciaVentas = parseFloat((pedidosTotalActual / currentDay).toFixed(1));
       }
 
       // Active clients count
       const clientesTotal = await Cliente.count().catch(() => 0);
       const clientesActivos = await Cliente.count({ where: { estado: 1 } }).catch(() => clientesTotal);
+
+      // Clientes variation
+      let clientesVariacion = 0;
+      try {
+        const allUsers = await sequelize.query("SELECT idUsuario, createdAt, fechaCreacion FROM usuario", { type: sequelize.QueryTypes.SELECT }).catch(() => []);
+        const usersThisMonth = allUsers.filter(u => {
+          const date = u.createdAt || u.fechaCreacion;
+          return date && new Date(date) >= firstDayCurrentMonth;
+        }).length;
+        const usersLastMonth = allUsers.filter(u => {
+          const date = u.createdAt || u.fechaCreacion;
+          return date && new Date(date) >= firstDayLastMonth && new Date(date) <= lastDayLastMonth;
+        }).length;
+
+        if (usersLastMonth > 0) {
+          clientesVariacion = parseFloat((((usersThisMonth - usersLastMonth) / usersLastMonth) * 100).toFixed(1));
+        } else if (usersThisMonth > 0) {
+          clientesVariacion = 100;
+        }
+      } catch (err) {
+        clientesVariacion = 0;
+      }
 
       // Products count & Low Stock
       const productosTotal = await Product.count({ where: { estado: 1 } }).catch(() => 0);
@@ -59,9 +92,10 @@ class DashboardService {
         ventasVariacion,
         pedidosTotal,
         pedidosVariacion,
+        frecuenciaVentas,
         clientesTotal,
         clientesActivos,
-        clientesVariacion: 0,
+        clientesVariacion,
         productosTotal,
         insumosBajoStock
       };
@@ -72,6 +106,7 @@ class DashboardService {
         ventasVariacion: 0,
         pedidosTotal: 0,
         pedidosVariacion: 0,
+        frecuenciaVentas: 0,
         clientesTotal: 0,
         clientesActivos: 0,
         clientesVariacion: 0,
@@ -144,9 +179,9 @@ class DashboardService {
 
   static async getProductosPopulares() {
     try {
-      // Consultar los detalles de venta reales
+      // Consultar los detalles de venta reales uniendo con producto y variante
       const [rows] = await sequelize.query(`
-        SELECT dv.observaciones, dv.cantidad, p.nombre as productoNombre
+        SELECT dv.idVariante, dv.observaciones, dv.cantidad, p.nombre as productoNombre, var.nombre as varNombre
         FROM detalleventaproducto dv
         LEFT JOIN variante var ON dv.idVariante = var.idVariante
         LEFT JOIN producto p ON var.idProducto = p.idProducto
@@ -158,26 +193,33 @@ class DashboardService {
 
       const productCounts = {};
       rows.forEach(r => {
-        let pName = null;
-        if (r.observaciones) {
+        // Priorizar el nombre real del producto en base de datos
+        let pName = r.productoNombre || r.varNombre || null;
+
+        // Si no tiene nombre por join, verificar si observaciones es un JSON estructurado con nombre
+        if (!pName && r.observaciones) {
           try {
-            const parsed = typeof r.observaciones === 'string' && r.observaciones.startsWith('{')
-              ? JSON.parse(r.observaciones)
-              : { nombre: r.observaciones };
-            pName = parsed.nombre || parsed.nombreProducto || (typeof r.observaciones === 'string' ? r.observaciones : null);
+            if (typeof r.observaciones === 'string' && r.observaciones.startsWith('{')) {
+              const parsed = JSON.parse(r.observaciones);
+              pName = parsed.nombre || parsed.nombreProducto || null;
+            }
           } catch (e) {
-            pName = typeof r.observaciones === 'string' ? r.observaciones : null;
+            pName = null;
           }
         }
-        if (!pName && r.productoNombre) {
-          pName = r.productoNombre;
-        }
 
-        if (!pName || pName === "Pedido de Venta" || pName === "Producto General" || pName.startsWith("Producto #")) return;
+        // Descartar si es un placeholder genérico o inválido
+        if (
+          !pName ||
+          pName === "Producto" ||
+          pName === "Pedido de Venta" ||
+          pName === "Producto General" ||
+          pName.startsWith("Producto #")
+        ) return;
 
-        // Limpiar adiciones entre paréntesis (ej: "Pollo Broaster (+Salsa...)" -> "Pollo Broaster")
-        const nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").trim();
-        if (!nombreLimpio || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
+        // Limpiar adiciones entre paréntesis (ej: "Hamburguesa chazin monster - base" o "(+Salsa...)")
+        let nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").replace(/\s*-\s*base/i, "").trim();
+        if (!nombreLimpio || nombreLimpio === "Producto" || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
 
         const key = nombreLimpio.toLowerCase();
         if (!productCounts[key]) {
