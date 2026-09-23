@@ -1084,7 +1084,38 @@ class VentaService {
       }
     }
 
-    // 3. Demás casos generales
+    // 3. Caso Postobón y Bebidas Específicas por Sabor
+    const isUva = rawText.includes('uva') || (targetProductId === 38) || (d.idProducto === 38);
+    const isNaranja = rawText.includes('naranja') || (targetProductId === 39) || (d.idProducto === 39);
+    const isColombiana = (rawText.includes('colombiana') || (targetProductId === 12) || (d.idProducto === 12)) && !isUva && !isNaranja && !rawText.includes('manzana');
+    const isManzana = (rawText.includes('manzana') || (targetProductId === 9) || (d.idProducto === 9)) && !isUva && !isNaranja && !isColombiana;
+    const isSprite = rawText.includes('sprite') || (targetProductId === 13) || (d.idProducto === 13);
+    const isQuatro = rawText.includes('cuatro') || rawText.includes('quatro') || (targetProductId === 14) || (d.idProducto === 14);
+    const isAgua = rawText.includes('agua') || rawText.includes('cristal') || (targetProductId === 10) || (d.idProducto === 10);
+
+    if (isUva) {
+      return { directInsumoId: 47, targetProductId: 38, resolvedName: 'Gaseosa Uva Postobón 400ml' };
+    }
+    if (isNaranja) {
+      return { directInsumoId: 48, targetProductId: 39, resolvedName: 'Gaseosa Naranja Postobón 400ml' };
+    }
+    if (isColombiana) {
+      return { directInsumoId: 35, targetProductId: 12, resolvedName: 'Gaseosa Colombiana Postobón 400ml' };
+    }
+    if (isManzana) {
+      return { directInsumoId: 30, targetProductId: 9, resolvedName: 'Manzana Postobón 400ml' };
+    }
+    if (isSprite) {
+      return { directInsumoId: 36, targetProductId: 13, resolvedName: 'Gaseosa Sprite 400ml' };
+    }
+    if (isQuatro) {
+      return { directInsumoId: 37, targetProductId: 14, resolvedName: 'Gaseosa Cuatro Toronja 400ml' };
+    }
+    if (isAgua) {
+      return { directInsumoId: 31, targetProductId: 10, resolvedName: 'Agua Cristal sin Gas 500ml' };
+    }
+
+    // 4. Demás casos generales (Platos, combos, etc.)
     const varId = chosenVarianteId || d.idVariante;
     let varRow = null;
     if (varId) {
