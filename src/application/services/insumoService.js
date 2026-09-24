@@ -1,9 +1,20 @@
-const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo, Trazabilidad, DetalleInsumoPreparadoInsumo } = require('../../persistence/models');
+const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo, Trazabilidad, DetalleInsumoPreparadoInsumo, LoteInsumo } = require('../../persistence/models');
 const database = require('../../persistence/config/db');
 
 function formatInsumo(i) {
   const catNombre = i.categoria ? i.categoria.nombre : 'Sin categoría';
   const provNombre = i.proveedor ? i.proveedor.nombre : 'Sin Proveedor';
+  const lotesList = (i.lotes || []).map(l => ({
+    idLote: l.idLote,
+    idInsumo: l.idInsumo,
+    idCompra: l.idCompra,
+    numeroLote: l.numeroLote,
+    cantidad: parseFloat(l.cantidad || 0),
+    cantidadDisponible: parseFloat(l.cantidadDisponible !== undefined ? l.cantidadDisponible : l.cantidad || 0),
+    fechaVencimiento: l.fechaVencimiento || null,
+    estado: l.estado || 'ACTIVO'
+  }));
+
   return {
     idInsumo: i.idInsumo,
     id: i.idInsumo,
@@ -24,7 +35,8 @@ function formatInsumo(i) {
     categoria: catNombre,
     categoriaNombre: catNombre,
     proveedor: provNombre,
-    proveedorNombre: provNombre
+    proveedorNombre: provNombre,
+    lotes: lotesList
   };
 }
 
@@ -33,8 +45,9 @@ class InsumoService {
     const insumos = await Insumo.findAll({
       where: { eliminado: 0 },
       include: [
-        { model: CategoriaInsumo, as: 'categoria' },
-        { model: Proveedor, as: 'proveedor' }
+        { model: CategoriaInsumo, as: 'categoria', required: false },
+        { model: Proveedor, as: 'proveedor', required: false },
+        { model: LoteInsumo, as: 'lotes', required: false }
       ]
     });
 
@@ -45,8 +58,9 @@ class InsumoService {
     const insumos = await Insumo.findAll({
       where: { eliminado: 1 },
       include: [
-        { model: CategoriaInsumo, as: 'categoria' },
-        { model: Proveedor, as: 'proveedor' }
+        { model: CategoriaInsumo, as: 'categoria', required: false },
+        { model: Proveedor, as: 'proveedor', required: false },
+        { model: LoteInsumo, as: 'lotes', required: false }
       ]
     });
 
@@ -56,8 +70,9 @@ class InsumoService {
   static async getById(idInsumo) {
     const i = await Insumo.findByPk(idInsumo, {
       include: [
-        { model: CategoriaInsumo, as: 'categoria' },
-        { model: Proveedor, as: 'proveedor' }
+        { model: CategoriaInsumo, as: 'categoria', required: false },
+        { model: Proveedor, as: 'proveedor', required: false },
+        { model: LoteInsumo, as: 'lotes', required: false }
       ]
     });
 
@@ -137,6 +152,7 @@ class InsumoService {
         tipoMovimiento: 'Entrada',
         cantidad: insumo.stock,
         motivo: 'Registro inicial de insumo',
+        usuarioId: data.usuarioId || (options && options.usuarioId) || null,
         skipStockUpdate: true
       }, { transaction });
 
@@ -209,6 +225,7 @@ class InsumoService {
         detalle: `Se actualizaron los datos del insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
         motivo: 'Actualización de datos',
+        usuarioId: data.usuarioId || (options && options.usuarioId) || null,
         skipStockUpdate: true
       }, { transaction });
 
@@ -220,7 +237,7 @@ class InsumoService {
     }
   }
 
-  static async softDelete(idInsumo) {
+  static async softDelete(idInsumo, options = {}) {
     const transaction = await database.sequelize.transaction();
 
     try {
@@ -244,6 +261,7 @@ class InsumoService {
         detalle: `Se movió a la papelera el insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
         motivo: 'Envío a papelera',
+        usuarioId: options.usuarioId || null,
         skipStockUpdate: true
       }, { transaction });
 
@@ -255,7 +273,7 @@ class InsumoService {
     }
   }
 
-  static async restore(idInsumo) {
+  static async restore(idInsumo, options = {}) {
     const transaction = await database.sequelize.transaction();
 
     try {
@@ -279,6 +297,7 @@ class InsumoService {
         detalle: `Se restauró el insumo en el inventario: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
         motivo: 'Restauración desde papelera',
+        usuarioId: options.usuarioId || null,
         skipStockUpdate: true
       }, { transaction });
 

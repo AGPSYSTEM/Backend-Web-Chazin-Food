@@ -26,7 +26,7 @@ const getUnreadCount = async (req, res, next) => {
 
 const createMovimiento = async (req, res, next) => {
   try {
-    const usuarioId = req.user ? (req.user._id || req.user.id) : null;
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id || req.user._id) : (req.body?.usuarioId || null);
     const movimiento = await TrazabilidadService.create({
       ...req.body,
       usuarioId

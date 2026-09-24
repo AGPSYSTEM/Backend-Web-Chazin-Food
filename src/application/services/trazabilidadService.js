@@ -63,7 +63,9 @@ class TrazabilidadService {
         cantidad: r.cantidad ? parseFloat(r.cantidad) : null,
         motivo: r.motivo || '',
         usuarioId: r.usuarioId || null,
-        usuarioNombre: r.usuario ? r.usuario.nombre : 'Sistema'
+        usuarioNombre: r.usuario
+          ? ([(r.usuario.nombre || '').trim(), (r.usuario.apellidos || '').trim()].filter(Boolean).join(' ') || r.usuario.nombre || 'Usuario')
+          : (r.usuarioId ? `Usuario #${r.usuarioId}` : 'Sistema')
       };
     });
   }

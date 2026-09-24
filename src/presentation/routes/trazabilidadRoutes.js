@@ -7,6 +7,9 @@ const {
   markAllAsRead,
   clearAll
 } = require('../controllers/trazabilidadController');
+const { optionalProtect } = require('../../infrastructure/middlewares/authMiddleware');
+
+router.use(optionalProtect);
 
 router.route('/')
   .get(getMovimientos)

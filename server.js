@@ -29,7 +29,8 @@ const {
   ensureInsumoEliminadoSchema,
   ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
-  ensureProductoAdicionesDefaultSchema
+  ensureProductoAdicionesDefaultSchema,
+  ensureCompraLotesYCancelacionSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
 // Connect to Database and run schema verifications
@@ -52,6 +53,7 @@ const {
     await ensureResenaSchema();
     await ensureNoNegativeStock();
     await ensureProductoAdicionesDefaultSchema();
+    await ensureCompraLotesYCancelacionSchema();
     try {
       const [results] = await sequelize.query(
         "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta' AND COLUMN_NAME = 'tipoVenta'"

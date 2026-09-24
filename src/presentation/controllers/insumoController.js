@@ -32,7 +32,8 @@ const getInsumoById = async (req, res, next) => {
 
 const createInsumo = async (req, res, next) => {
   try {
-    const nuevoInsumo = await InsumoService.create(req.body);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const nuevoInsumo = await InsumoService.create({ ...req.body, usuarioId });
     res.status(201).json(nuevoInsumo);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -42,7 +43,8 @@ const createInsumo = async (req, res, next) => {
 
 const updateInsumo = async (req, res, next) => {
   try {
-    const actualizado = await InsumoService.update(req.params.id, req.body);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const actualizado = await InsumoService.update(req.params.id, { ...req.body, usuarioId });
     res.json(actualizado);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -52,7 +54,8 @@ const updateInsumo = async (req, res, next) => {
 
 const deleteInsumo = async (req, res, next) => {
   try {
-    const result = await InsumoService.softDelete(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await InsumoService.softDelete(req.params.id, { usuarioId });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -62,7 +65,8 @@ const deleteInsumo = async (req, res, next) => {
 
 const restoreInsumo = async (req, res, next) => {
   try {
-    const result = await InsumoService.restore(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await InsumoService.restore(req.params.id, { usuarioId });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -72,7 +76,8 @@ const restoreInsumo = async (req, res, next) => {
 
 const hardDeleteInsumo = async (req, res, next) => {
   try {
-    const result = await InsumoService.hardDelete(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await InsumoService.hardDelete(req.params.id, { usuarioId });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);

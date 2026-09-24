@@ -15,6 +15,9 @@ const {
   validateCreateProveedor,
   validateUpdateProveedor,
 } = require('../../infrastructure/middlewares/proveedorValidation');
+const { optionalProtect } = require('../../infrastructure/middlewares/authMiddleware');
+
+router.use(optionalProtect);
 
 router.get('/tipos', getTiposProveedor);
 

@@ -658,7 +658,7 @@ const Compra = sequelize.define('compra', {
   },
   idProveedor: {
     type: DataTypes.INTEGER,
-    allowNull: false
+    allowNull: true
   },
   fechaCompra: {
     type: DataTypes.DATE,
@@ -671,6 +671,18 @@ const Compra = sequelize.define('compra', {
   estado: {
     type: DataTypes.ENUM('PENDIENTE', 'RECIBIDA', 'CANCELADA'),
     defaultValue: 'RECIBIDA'
+  },
+  motivoCancelacion: {
+    type: DataTypes.STRING(500)
+  },
+  detallesCancelacion: {
+    type: DataTypes.TEXT
+  },
+  usuarioCancelacionId: {
+    type: DataTypes.INTEGER
+  },
+  fechaCancelacion: {
+    type: DataTypes.DATE
   }
 }, { tableName: 'compra', timestamps: false });
 
@@ -699,8 +711,64 @@ const DetalleCompraInsumo = sequelize.define('detallecomprainsumo', {
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false
+  },
+  lotes: {
+    type: DataTypes.TEXT
+  },
+  numeroLote: {
+    type: DataTypes.STRING(100)
+  },
+  fechaVencimiento: {
+    type: DataTypes.DATEONLY
   }
 }, { tableName: 'detallecomprainsumo', timestamps: false });
+
+const LoteInsumo = sequelize.define('loteinsumo', {
+  idLote: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idLote'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idLote;
+    }
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idCompra: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  numeroLote: {
+    type: DataTypes.STRING(100),
+    allowNull: false
+  },
+  cantidad: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
+  cantidadDisponible: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
+  fechaVencimiento: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
+  fechaCreacion: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  estado: {
+    type: DataTypes.STRING(30),
+    defaultValue: 'ACTIVO'
+  }
+}, { tableName: 'loteinsumo', timestamps: false });
 
 
 // Relationships / Associations
@@ -753,6 +821,12 @@ Proveedor.hasMany(Compra, { foreignKey: 'idProveedor' });
 Compra.hasMany(DetalleCompraInsumo, { foreignKey: 'idCompra', as: 'detalles' });
 DetalleCompraInsumo.belongsTo(Compra, { foreignKey: 'idCompra' });
 DetalleCompraInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+
+Compra.belongsTo(User, { foreignKey: 'usuarioCancelacionId', as: 'usuarioCancelacion' });
+Compra.hasMany(LoteInsumo, { foreignKey: 'idCompra', as: 'lotes' });
+LoteInsumo.belongsTo(Compra, { foreignKey: 'idCompra', as: 'compra' });
+Insumo.hasMany(LoteInsumo, { foreignKey: 'idInsumo', as: 'lotes' });
+LoteInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
 
 
 const Evento = sequelize.define('evento', {
@@ -1119,6 +1193,7 @@ module.exports = {
   DetalleFichaInsumo,
   Compra,
   DetalleCompraInsumo,
+  LoteInsumo,
   Evento,
   Adicion,
   Variante,

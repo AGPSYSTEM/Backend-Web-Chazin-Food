@@ -585,6 +585,67 @@ async function ensureVarianteImagenSchema() {
   }
 }
 
+async function ensureCompraLotesYCancelacionSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    // 1. Crear tabla loteinsumo si no existe
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`loteinsumo\` (
+        \`idLote\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`idInsumo\` INT NOT NULL,
+        \`idCompra\` INT NULL,
+        \`numeroLote\` VARCHAR(100) NOT NULL,
+        \`cantidad\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`cantidadDisponible\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`fechaVencimiento\` DATE NULL,
+        \`fechaCreacion\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        \`estado\` VARCHAR(30) DEFAULT 'ACTIVO',
+        KEY \`idx_lote_insumo\` (\`idInsumo\`),
+        KEY \`idx_lote_compra\` (\`idCompra\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('[DB] ✅ Tabla loteinsumo verificada/creada correctamente.');
+
+    // 2. Columnas en compra para cancelación
+    const [colsCompra] = await sequelize.query("DESCRIBE `compra`");
+    const compraColNames = colsCompra.map(c => c.Field);
+    if (!compraColNames.includes('motivoCancelacion')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `motivoCancelacion` VARCHAR(500) NULL");
+      console.log('[DB Migration] Columna motivoCancelacion agregada a tabla compra');
+    }
+    if (!compraColNames.includes('detallesCancelacion')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `detallesCancelacion` TEXT NULL");
+      console.log('[DB Migration] Columna detallesCancelacion agregada a tabla compra');
+    }
+    if (!compraColNames.includes('usuarioCancelacionId')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `usuarioCancelacionId` INT NULL");
+      console.log('[DB Migration] Columna usuarioCancelacionId agregada a tabla compra');
+    }
+    if (!compraColNames.includes('fechaCancelacion')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `fechaCancelacion` DATETIME NULL");
+      console.log('[DB Migration] Columna fechaCancelacion agregada a tabla compra');
+    }
+
+    // 3. Columnas en detallecomprainsumo para lotes
+    const [colsDetalle] = await sequelize.query("DESCRIBE `detallecomprainsumo`");
+    const detalleColNames = colsDetalle.map(c => c.Field);
+    if (!detalleColNames.includes('lotes')) {
+      await sequelize.query("ALTER TABLE `detallecomprainsumo` ADD COLUMN `lotes` TEXT NULL");
+      console.log('[DB Migration] Columna lotes agregada a tabla detallecomprainsumo');
+    }
+    if (!detalleColNames.includes('numeroLote')) {
+      await sequelize.query("ALTER TABLE `detallecomprainsumo` ADD COLUMN `numeroLote` VARCHAR(100) NULL");
+      console.log('[DB Migration] Columna numeroLote agregada a tabla detallecomprainsumo');
+    }
+    if (!detalleColNames.includes('fechaVencimiento')) {
+      await sequelize.query("ALTER TABLE `detallecomprainsumo` ADD COLUMN `fechaVencimiento` DATE NULL");
+      console.log('[DB Migration] Columna fechaVencimiento agregada a tabla detallecomprainsumo');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando esquema de lotes y cancelación de compras:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -604,5 +665,6 @@ module.exports = {
   ensureInsumoEliminadoSchema,
   ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
-  ensureProductoAdicionesDefaultSchema
+  ensureProductoAdicionesDefaultSchema,
+  ensureCompraLotesYCancelacionSchema
 };

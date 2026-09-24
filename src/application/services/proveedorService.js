@@ -149,7 +149,8 @@ class ProveedorService {
       tipo: 'Creado',
       entidadNombre: proveedor.nombre,
       detalle: `Se registró el proveedor en el sistema: ${proveedor.nombre}`,
-      motivo: 'Registro inicial de proveedor'
+      motivo: 'Registro inicial de proveedor',
+      usuarioId: data.usuarioId || null
     }).catch(() => {});
 
     return this.getById(proveedor.idProveedor);
@@ -231,13 +232,14 @@ class ProveedorService {
       tipo: 'Editado',
       entidadNombre: p.nombre,
       detalle: `Se actualizaron los datos del proveedor: ${p.nombre}`,
-      motivo: 'Actualización de datos'
+      motivo: 'Actualización de datos',
+      usuarioId: data.usuarioId || null
     }).catch(() => {});
 
     return this.getById(idProveedor);
   }
 
-  static async toggleEstado(idProveedor, estado) {
+  static async toggleEstado(idProveedor, estado, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -260,13 +262,14 @@ class ProveedorService {
       tipo: 'Estado Cambiado',
       entidadNombre: p.nombre,
       detalle: `El proveedor ${p.nombre} cambió su estado a ${nuevoEstado === 1 ? 'Activo' : 'Inactivo'}`,
-      motivo: 'Cambio de estado'
+      motivo: 'Cambio de estado',
+      usuarioId: options.usuarioId || null
     }).catch(() => {});
 
     return this.getById(idProveedor);
   }
 
-  static async delete(idProveedor) {
+  static async delete(idProveedor, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -282,13 +285,14 @@ class ProveedorService {
       tipo: 'Eliminado',
       entidadNombre: p.nombre,
       detalle: `Se envió a la papelera el proveedor: ${p.nombre}`,
-      motivo: 'Inactivación / Papelera'
+      motivo: 'Inactivación / Papelera',
+      usuarioId: options.usuarioId || null
     }).catch(() => {});
 
     return { message: 'Proveedor inactivado exitosamente' };
   }
 
-  static async restore(idProveedor) {
+  static async restore(idProveedor, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -303,13 +307,14 @@ class ProveedorService {
       tipo: 'Restaurado',
       entidadNombre: p.nombre,
       detalle: `Se restauró el proveedor: ${p.nombre}`,
-      motivo: 'Restauración desde papelera'
+      motivo: 'Restauración desde papelera',
+      usuarioId: options.usuarioId || null
     }).catch(() => {});
 
     return this.getById(idProveedor);
   }
 
-  static async deletePermanente(idProveedor) {
+  static async deletePermanente(idProveedor, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -334,7 +339,8 @@ class ProveedorService {
       tipo: 'Eliminado permanente',
       entidadNombre: nombreProv,
       detalle: `Se eliminó permanentemente el proveedor: ${nombreProv}`,
-      motivo: 'Eliminación física definitiva'
+      motivo: 'Eliminación física definitiva',
+      usuarioId: options.usuarioId || null
     }).catch(() => {});
 
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
