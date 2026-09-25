@@ -80,6 +80,7 @@ class DashboardService {
       const insumosBajoStockList = await Insumo.findAll({
         where: {
           estado: 1,
+          eliminado: 0,
           stock: { [Op.lte]: sequelize.col('stockMinimo') }
         },
         raw: true
@@ -249,6 +250,7 @@ class DashboardService {
       const insumosBajoStock = await Insumo.findAll({
         where: {
           estado: 1,
+          eliminado: 0,
           stock: { [Op.lte]: sequelize.col('stockMinimo') }
         },
         limit: 5,
@@ -257,9 +259,14 @@ class DashboardService {
 
       return insumosBajoStock.map(i => ({
         id: i.idInsumo,
+        idInsumo: i.idInsumo,
         nombre: i.nombre,
-        stock: i.stock,
-        minimo: i.stockMinimo
+        stock: parseFloat(i.stock || 0),
+        minimo: parseFloat(i.stockMinimo || 0),
+        stockMinimo: parseFloat(i.stockMinimo || 0),
+        unidadMedida: i.unidadMedida || 'unidades',
+        precioUnitario: parseFloat(i.precioUnitario || 0),
+        idProveedor: i.idProveedor || null
       }));
     } catch (error) {
       console.error('Error in getAlertasStock:', error);
