@@ -202,10 +202,11 @@ class CompraService {
     console.log(`[COMPRA CREATE]   - Usuario ID responsable: ${data.usuarioId || 'No especificado'}`);
     console.log(`==========================================================================`);
 
+    const idProv = data.idProveedor ? parseInt(data.idProveedor) : null;
     const compra = await Compra.create({
-      idProveedor: data.idProveedor || null,   // null = compra genérica sin proveedor
+      idProveedor: idProv,   // null = compra genérica sin proveedor
       fechaCompra: data.fechaCompra || new Date(),
-      total: data.total,
+      total: parseFloat(data.total) || 0,
       estado: estadoNormalizado
     });
 
@@ -215,15 +216,28 @@ class CompraService {
           ? d.lotes
           : (d.numeroLote ? [{ numeroLote: d.numeroLote, fechaVencimiento: d.fechaVencimiento, cantidad: d.cantidad }] : []);
 
+        const primerLote = lotesArr[0];
+        const numLote = (d.numeroLote && String(d.numeroLote).trim()) 
+          || (primerLote && primerLote.numeroLote && String(primerLote.numeroLote).trim()) 
+          || null;
+        const rawVenc = (d.fechaVencimiento && String(d.fechaVencimiento).trim()) 
+          || (primerLote && primerLote.fechaVencimiento && String(primerLote.fechaVencimiento).trim()) 
+          || null;
+        const fVenc = (rawVenc && rawVenc !== '') ? rawVenc : null;
+
+        const cant = parseFloat(d.cantidad) || 0;
+        const pUnit = parseFloat(d.precioUnitario) || 0;
+        const sub = d.subtotal !== undefined ? parseFloat(d.subtotal) : (cant * pUnit);
+
         return {
           idCompra: compra.idCompra,
-          idInsumo: d.idInsumo,
-          cantidad: d.cantidad,
-          precioUnitario: d.precioUnitario,
-          subtotal: d.subtotal || (d.cantidad * d.precioUnitario),
+          idInsumo: parseInt(d.idInsumo),
+          cantidad: cant,
+          precioUnitario: pUnit,
+          subtotal: sub,
           lotes: lotesArr.length > 0 ? JSON.stringify(lotesArr) : null,
-          numeroLote: d.numeroLote || (lotesArr[0] ? lotesArr[0].numeroLote : null),
-          fechaVencimiento: d.fechaVencimiento || (lotesArr[0] ? lotesArr[0].fechaVencimiento : null)
+          numeroLote: numLote,
+          fechaVencimiento: fVenc
         };
       });
 
@@ -237,15 +251,16 @@ class CompraService {
           : (d.numeroLote ? [{ numeroLote: d.numeroLote, fechaVencimiento: d.fechaVencimiento, cantidad: d.cantidad }] : []);
 
         for (const l of lotesArr) {
-          if (l && l.numeroLote) {
+          if (l && l.numeroLote && String(l.numeroLote).trim()) {
             const cantLot = parseFloat(l.cantidad || d.cantidad) || 0;
+            const lVenc = (l.fechaVencimiento && String(l.fechaVencimiento).trim()) || null;
             lotesToCreate.push({
-              idInsumo: d.idInsumo,
+              idInsumo: parseInt(d.idInsumo),
               idCompra: compra.idCompra,
               numeroLote: String(l.numeroLote).trim(),
               cantidad: cantLot,
               cantidadDisponible: cantLot,
-              fechaVencimiento: l.fechaVencimiento || null,
+              fechaVencimiento: (lVenc && lVenc !== '') ? lVenc : null,
               estado: 'ACTIVO'
             });
           }
@@ -353,7 +368,7 @@ class CompraService {
 
         try {
           await TrazabilidadService.create({
-            tipo: 'compra',
+            tipo: signo > 0 ? 'compra' : 'Cancelación de Compra',
             entidadNombre: insumo.nombre,
             detalle: `${signo > 0 ? "Reabastecimiento" : "Reversa"} por compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Precio unitario: $${parseFloat(entry.precioUnitario).toLocaleString('es-CO')} | Subtotal: $${parseFloat(entry.subtotalTotal).toLocaleString('es-CO')} | Estado: ${estadoNormalizado}${opts.motivo ? ` | Motivo: ${opts.motivo}` : ''}`,
             idInsumo: idIns,
@@ -486,7 +501,7 @@ class CompraService {
           await Insumo.update({ stock: nuevoStock }, { where: { idInsumo } });
           try {
             await TrazabilidadService.create({
-              tipo: 'compra',
+              tipo: 'Cancelación de Compra',
               entidadNombre: insumo.nombre,
               detalle: `Cancelación parcial de compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Cantidad cancelada: ${cantidadCancelada} ${insumo.unidadMedida || ''} | Motivo: ${motivo || 'Sin motivo'}`,
               idInsumo,
@@ -605,22 +620,33 @@ class CompraService {
       const detallesViejos = (compra.detalles || []).map(d => d.toJSON());
       const mapaViejo = await this._agruparCantidadesPorInsumo(detallesViejos);
 
-      compra.idProveedor = data.idProveedor !== undefined ? (data.idProveedor || null) : compra.idProveedor;
+      const idProvUpdate = data.idProveedor !== undefined ? (data.idProveedor ? parseInt(data.idProveedor) : null) : compra.idProveedor;
+      compra.idProveedor = idProvUpdate;
       compra.fechaCompra = data.fechaCompra !== undefined ? data.fechaCompra : compra.fechaCompra;
-      compra.total = data.total !== undefined ? data.total : compra.total;
+      compra.total = data.total !== undefined ? (parseFloat(data.total) || 0) : compra.total;
       compra.estado = estadoNuevo;
       await compra.save({ transaction: t });
 
       if (data.detalles !== undefined && Array.isArray(data.detalles)) {
         await DetalleCompraInsumo.destroy({ where: { idCompra: id }, transaction: t });
         if (data.detalles.length > 0) {
-          const nuevosDetalles = data.detalles.map(d => ({
-            idCompra: id,
-            idInsumo: d.idInsumo,
-            cantidad: d.cantidad,
-            precioUnitario: d.precioUnitario,
-            subtotal: d.subtotal !== undefined ? d.subtotal : ((parseFloat(d.cantidad) || 0) * (parseFloat(d.precioUnitario) || 0))
-          }));
+          const nuevosDetalles = data.detalles.map(d => {
+            const cant = parseFloat(d.cantidad) || 0;
+            const pUnit = parseFloat(d.precioUnitario) || 0;
+            const sub = d.subtotal !== undefined ? parseFloat(d.subtotal) : (cant * pUnit);
+            const numLote = (d.numeroLote && String(d.numeroLote).trim()) || null;
+            const rawVenc = (d.fechaVencimiento && String(d.fechaVencimiento).trim()) || null;
+            const fVenc = (rawVenc && rawVenc !== '') ? rawVenc : null;
+            return {
+              idCompra: id,
+              idInsumo: parseInt(d.idInsumo),
+              cantidad: cant,
+              precioUnitario: pUnit,
+              subtotal: sub,
+              numeroLote: numLote,
+              fechaVencimiento: fVenc
+            };
+          });
           await DetalleCompraInsumo.bulkCreate(nuevosDetalles, { transaction: t });
         }
       }

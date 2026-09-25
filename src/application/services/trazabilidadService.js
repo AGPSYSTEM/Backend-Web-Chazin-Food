@@ -31,8 +31,19 @@ class TrazabilidadService {
       let tipoLabel = 'Creado';
       const t = (r.tipo || '').toLowerCase();
       const mov = (r.tipoMovimiento || '').toLowerCase();
+      const dLower = (r.detalle || '').toLowerCase();
+      const mLower = (r.motivo || '').toLowerCase();
 
-      if (t.includes('crea') || t === 'nuevo' || t === 'registro') {
+      const isCancelCompra = t.includes('cancel') || t.includes('anula') || t.includes('reversa')
+        || (mov === 'salida' && (t.includes('compra') || dLower.includes('compra') || mLower.includes('compra')))
+        || dLower.includes('cancelaci') || dLower.includes('anulaci') || dLower.includes('reversa')
+        || mLower.includes('cancelaci') || mLower.includes('anulaci') || mLower.includes('reversa');
+
+      if (isCancelCompra) {
+        tipoLabel = 'Cancelación de Compra';
+      } else if (t.includes('consumo') || dLower.includes('consumo')) {
+        tipoLabel = 'Consumo por Venta';
+      } else if (t.includes('crea') || t === 'nuevo' || t === 'registro') {
         tipoLabel = 'Creado';
       } else if (t.includes('edit') || t.includes('modif') || t === 'actualizado') {
         tipoLabel = 'Editado';
@@ -42,8 +53,10 @@ class TrazabilidadService {
         tipoLabel = 'Eliminado';
       } else if (t.includes('restaur')) {
         tipoLabel = 'Restaurado';
-      } else if (t.includes('compra') || t.includes('reabastec') || mov === 'entrada' || mov === 'salida' || mov === 'compra') {
+      } else if (t.includes('compra') || t.includes('reabastec') || mov === 'entrada') {
         tipoLabel = 'Reabastecimiento';
+      } else if (mov === 'salida') {
+        tipoLabel = 'Salida de Stock';
       } else if (t.includes('estado') || t.includes('cambio')) {
         tipoLabel = 'Estado Cambiado';
       }
@@ -53,13 +66,14 @@ class TrazabilidadService {
         id: `tz-${r.idTrazabilidad || r.id}`,
         tipo: tipoLabel,
         tipoRaw: r.tipo || '',
+        esCancelacion: isCancelCompra || mov === 'salida',
         nombre: r.entidadNombre || (r.insumo ? r.insumo.nombre : 'Registro'),
         descripcion: r.detalle || (r.motivo ? `${r.tipoMovimiento || 'Movimiento'}: ${r.motivo}` : 'Registro de trazabilidad'),
         fecha: formatFecha(r.fecha),
         fechaRaw: r.fecha || new Date(),
         leido: Number(r.leido || 0),
         idInsumo: r.idInsumo || null,
-        tipoMovimiento: r.tipoMovimiento || null,
+        tipoMovimiento: r.tipoMovimiento || (isCancelCompra ? 'Salida' : 'Entrada'),
         cantidad: r.cantidad ? parseFloat(r.cantidad) : null,
         motivo: r.motivo || '',
         usuarioId: r.usuarioId || null,

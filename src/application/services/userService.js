@@ -65,6 +65,15 @@ class UserService {
     const cleanTel = sanitizeTelefono(user.telefono);
     const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
 
+    let metaFoto = null;
+    if (user.clienteInfo?.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
+      try {
+        const meta = JSON.parse(user.clienteInfo.direccion);
+        metaFoto = meta.foto || meta.avatar || null;
+      } catch (e) {}
+    }
+    const finalFoto = user.foto || metaFoto || null;
+
     return {
       _id: user.idUsuario,
       id: user.idUsuario,
@@ -82,6 +91,8 @@ class UserService {
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
       estado: user.estado,
       direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
+      foto: finalFoto,
+      avatar: finalFoto,
       fechaRegistro: user.fechaRegistro
     };
   }
@@ -184,7 +195,7 @@ class UserService {
       throw error;
     }
 
-    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, documento, numeroDocumento, telefono, direccion, estado } = userData;
+    const { nombre, apellidos, apellido, email, correo, contrasena, contraseña, password, idRol, rol_id, tipoDocumento, documento, numeroDocumento, telefono, direccion, estado, foto, avatar } = userData;
     const isPasswordOnly = Boolean((contrasena || contraseña || password) && !nombre && !email && !correo && !telefono && !idRol && !estado);
     
     // 1. Name & Uniqueness Check (ignoring current user)
@@ -257,6 +268,9 @@ class UserService {
     if (telefono !== undefined) user.telefono = sanitizeTelefono(telefono);
     if (idRol || rol_id) user.idRol = idRol || rol_id;
     if (estado) user.estado = estado;
+    if (foto !== undefined || avatar !== undefined) {
+      user.foto = foto !== undefined ? foto : (avatar !== undefined ? avatar : null);
+    }
 
     if (contrasena || contraseña || password) {
       const salt = await bcrypt.genSalt(10);
@@ -265,30 +279,32 @@ class UserService {
 
     await user.save();
 
-    if (direccion !== undefined) {
-      const cleanDir = getCleanDireccion(direccion);
+    if (direccion !== undefined || foto !== undefined || avatar !== undefined) {
+      const cleanDir = direccion !== undefined ? getCleanDireccion(direccion) : undefined;
       let cliente = await Cliente.findOne({ where: { idUsuario: id } });
       if (cliente) {
         let meta = {};
         if (cliente.direccion && cliente.direccion.trim().startsWith('{')) {
           try { meta = JSON.parse(cliente.direccion); } catch (e) { meta = {}; }
         }
-        meta.direccion = cleanDir;
+        if (cleanDir !== undefined) meta.direccion = cleanDir;
         meta.nombre = user.nombre;
         meta.apellidos = user.apellidos;
         meta.email = user.email;
         meta.telefono = user.telefono;
+        if (user.foto !== undefined) meta.foto = user.foto;
         cliente.direccion = JSON.stringify(meta);
         await cliente.save();
       } else {
         const metaStr = JSON.stringify({
-          direccion: cleanDir,
+          direccion: cleanDir || '',
           tipo: 'Nuevo',
           descuentoPorcentaje: 0,
           nombre: user.nombre,
           apellidos: user.apellidos,
           email: user.email,
-          telefono: user.telefono
+          telefono: user.telefono,
+          foto: user.foto || null
         });
         await Cliente.create({ idUsuario: id, direccion: metaStr });
       }

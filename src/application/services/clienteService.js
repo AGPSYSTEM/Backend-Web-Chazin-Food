@@ -52,7 +52,10 @@ class ClienteService {
       const { Op } = require('sequelize');
       const ventasDB = await Venta.findAll({
         where: {
-          idCliente: c.idCliente,
+          [Op.or]: [
+            { idCliente: c.idCliente },
+            ...(c.idUsuario ? [{ idUsuario: c.idUsuario }] : [])
+          ],
           estadoEntrega: { [Op.ne]: 'CANCELADO' },
           estadoAprobacion: { [Op.ne]: 'RECHAZADO' }
         },
@@ -87,7 +90,7 @@ class ClienteService {
       (cleanDireccion && cleanDireccion.toLowerCase().includes('mostrador')) ||
       (meta.tipo && String(meta.tipo).toLowerCase().includes('mostrador'));
 
-    const hasAccount = !!c.idUsuario && !!c.usuario;
+    const hasAccount = Boolean(c.idUsuario || c.usuario);
 
     let tipo = 'Nuevo';
     let descuentoPorcentaje = 0;
@@ -154,17 +157,16 @@ class ClienteService {
       }
     }
 
-    // Determine state: if no user account linked or user account is not active, client state is Inactivo
-    const isUserActive = Boolean(
-      c.usuario &&
-      (String(c.usuario.estado).toUpperCase() === 'ACTIVO' || c.usuario.estado === 1 || c.usuario.estado === true)
-    );
+    // Determine state: if user account linked and not active, client state is Inactivo
+    const isUserActive = c.usuario
+      ? Boolean(String(c.usuario.estado).toUpperCase() === 'ACTIVO' || c.usuario.estado === 1 || c.usuario.estado === true)
+      : (c.estado !== 0 && c.estado !== false && meta.estado !== 'Inactivo' && meta.estado !== 0);
 
     let estadoStr = 'Activo';
-    if (!c.idUsuario || !c.usuario || !isUserActive || c.estado === 0 || c.estado === false || meta.estado === 'Inactivo' || meta.estado === 0) {
+    if ((c.usuario && !isUserActive) || c.estado === 0 || c.estado === false || meta.estado === 'Inactivo' || meta.estado === 0) {
       estadoStr = 'Inactivo';
     }
-    const rawNombre = c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente sin cuenta');
+    const rawNombre = c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente');
     const rawApellidos = c.usuario ? c.usuario.apellidos : (meta.apellidos || '');
     const { nombre: cleanNombre, apellidos: cleanApellidos } = cleanNameAndLastName(rawNombre, rawApellidos);
     const cleanTelefono = sanitizeTelefono(c.usuario ? c.usuario.telefono : (meta.telefono || ''));
@@ -173,8 +175,8 @@ class ClienteService {
       id: c.idCliente,
       idCliente: c.idCliente,
       idUsuario: c.idUsuario || null,
-      tieneCuenta: !!c.idUsuario && !!c.usuario,
-      cuentaActiva: Boolean(c.idUsuario && c.usuario && isUserActive),
+      tieneCuenta: hasAccount,
+      cuentaActiva: Boolean(hasAccount && isUserActive),
       direccion: cleanDireccion,
       tipo,
       descuentoPorcentaje,
@@ -482,6 +484,16 @@ class ClienteService {
     if (!c) {
       const error = new Error('Cliente no encontrado');
       error.statusCode = 404;
+      throw error;
+    }
+
+    // Proteger registros contables: no eliminar clientes con ventas asociadas
+    const ventasAsociadas = await Venta.count({ where: { idCliente: id } });
+    if (ventasAsociadas > 0) {
+      const error = new Error(
+        `No es posible eliminar el cliente porque cuenta con ${ventasAsociadas} ${ventasAsociadas === 1 ? 'venta asociada' : 'ventas asociadas'}. Solo se puede cambiar su estado a Inactivo para preservar el histórico de ventas.`
+      );
+      error.statusCode = 400;
       throw error;
     }
 

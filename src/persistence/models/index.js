@@ -92,6 +92,10 @@ const User = sequelize.define('usuario', {
   fechaRegistro: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
+  },
+  foto: {
+    type: DataTypes.TEXT,
+    allowNull: true
   }
 }, { tableName: 'usuario', timestamps: false });
 

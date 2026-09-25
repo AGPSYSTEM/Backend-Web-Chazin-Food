@@ -626,6 +626,17 @@ async function ensureCompraLotesYCancelacionSchema() {
       console.log('[DB Migration] Columna fechaCancelacion agregada a tabla compra');
     }
 
+    // 2.1 Asegurar que idProveedor en compra permita NULL (compra genérica sin proveedor)
+    try {
+      const idProvCol = colsCompra.find(c => c.Field === 'idProveedor');
+      if (idProvCol && idProvCol.Null === 'NO') {
+        await sequelize.query("ALTER TABLE `compra` MODIFY COLUMN `idProveedor` INT(11) NULL");
+        console.log('[DB Migration] ✅ Columna compra.idProveedor ahora es NULLABLE para compras genéricas.');
+      }
+    } catch (altErr) {
+      console.warn('[DB Migration] ⚠️ Error modificando compra.idProveedor a NULL:', altErr.message);
+    }
+
     // 3. Columnas en detallecomprainsumo para lotes
     const [colsDetalle] = await sequelize.query("DESCRIBE `detallecomprainsumo`");
     const detalleColNames = colsDetalle.map(c => c.Field);

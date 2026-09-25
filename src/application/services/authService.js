@@ -100,13 +100,23 @@ class AuthService {
 
     const user = await User.create(userPayload);
 
-    if (direccion) {
+    let createdCliente = null;
+    if (finalRolId === 4) {
       try {
-        const cleanDir = getCleanDireccion(direccion);
-        const metaStr = JSON.stringify({ direccion: cleanDir, tipo: 'Nuevo', descuentoPorcentaje: 0, nombre: cleanNom, apellidos: cleanApe, telefono: cleanTel });
-        await Cliente.create({
+        const cleanDir = getCleanDireccion(direccion || '');
+        const metaStr = JSON.stringify({
+          direccion: cleanDir,
+          tipo: 'Nuevo',
+          descuentoPorcentaje: 0,
+          nombre: cleanNom,
+          apellidos: cleanApe,
+          telefono: cleanTel,
+          ciclo: 0
+        });
+        createdCliente = await Cliente.create({
           idUsuario: user.idUsuario,
-          direccion: metaStr
+          direccion: metaStr,
+          estado: 1
         });
       } catch (err) {
         console.warn('Advertencia al crear registro de cliente:', err.message);
@@ -127,12 +137,30 @@ class AuthService {
       _id: user.idUsuario,
       id: user.idUsuario,
       idUsuario: user.idUsuario,
+      idCliente: createdCliente ? createdCliente.idCliente : null,
       nombre: user.nombre,
       apellidos: user.apellidos,
       email: user.email,
       correo: user.email,
       rol: role ? role.nombre : 'Cliente',
       idRol: user.idRol,
+      direccion: getCleanDireccion(direccion || ''),
+      tipo: 'Nuevo',
+      descuentoPorcentaje: 0,
+      fidelidad: {
+        tipo: 'Nuevo',
+        descuentoPorcentaje: 0,
+        comprasCiclo: 0,
+        comprasTotales: 0,
+        comprasFaltantes: 3,
+        comprasMeta: 3,
+        progresoPorcentaje: 0,
+        siguienteNivel: 'Regular',
+        diasRestantes: null,
+        enGracia: false,
+        diasGraciaRestantes: 0,
+        estadoCiclo: 'ACTIVO'
+      },
       token: this.generateToken(user.idUsuario)
     };
   }
@@ -190,9 +218,34 @@ class AuthService {
     let tipoCliente = 'Nuevo';
     let descuentoPorcentaje = 0;
 
+    if (!user.clienteInfo && (user.idRol === 4 || user.rolInfo?.nombre?.toLowerCase() === 'cliente')) {
+      try {
+        const [clientRecord] = await Cliente.findOrCreate({
+          where: { idUsuario: user.idUsuario },
+          defaults: {
+            idUsuario: user.idUsuario,
+            direccion: JSON.stringify({
+              direccion: '',
+              tipo: 'Nuevo',
+              ciclo: 0,
+              nombre: user.nombre,
+              apellidos: user.apellidos,
+              telefono: user.telefono,
+              estado: 'Activo'
+            }),
+            estado: 1
+          }
+        });
+        user.clienteInfo = clientRecord;
+      } catch (err) {
+        console.warn('Error asegurando clienteInfo en login:', err.message);
+      }
+    }
+
     if (user.clienteInfo) {
       try {
         const ClienteService = require('./clienteService');
+        user.clienteInfo.usuario = user;
         const formattedCliente = await ClienteService.formatCliente(user.clienteInfo);
         idCliente = formattedCliente.id;
         fidelidadObj = formattedCliente.fidelidad;
@@ -202,6 +255,15 @@ class AuthService {
         idCliente = user.clienteInfo.idCliente;
       }
     }
+
+    let metaFoto = null;
+    if (user.clienteInfo?.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
+      try {
+        const meta = JSON.parse(user.clienteInfo.direccion);
+        metaFoto = meta.foto || meta.avatar || null;
+      } catch (e) {}
+    }
+    const finalFoto = user.foto || metaFoto || null;
 
     return {
       _id: user.idUsuario,
@@ -224,6 +286,8 @@ class AuthService {
       tipo: tipoCliente,
       descuentoPorcentaje,
       fidelidad: fidelidadObj,
+      foto: finalFoto,
+      avatar: finalFoto,
       token: this.generateToken(user.idUsuario)
     };
   }
@@ -244,9 +308,34 @@ class AuthService {
     let tipoCliente = 'Nuevo';
     let descuentoPorcentaje = 0;
 
+    if (!user.clienteInfo && (user.idRol === 4 || user.rolInfo?.nombre?.toLowerCase() === 'cliente')) {
+      try {
+        const [clientRecord] = await Cliente.findOrCreate({
+          where: { idUsuario: user.idUsuario },
+          defaults: {
+            idUsuario: user.idUsuario,
+            direccion: JSON.stringify({
+              direccion: '',
+              tipo: 'Nuevo',
+              ciclo: 0,
+              nombre: user.nombre,
+              apellidos: user.apellidos,
+              telefono: user.telefono,
+              estado: 'Activo'
+            }),
+            estado: 1
+          }
+        });
+        user.clienteInfo = clientRecord;
+      } catch (err) {
+        console.warn('Error asegurando clienteInfo en getUserProfile:', err.message);
+      }
+    }
+
     if (user.clienteInfo) {
       try {
         const ClienteService = require('./clienteService');
+        user.clienteInfo.usuario = user;
         const formattedCliente = await ClienteService.formatCliente(user.clienteInfo);
         idCliente = formattedCliente.id;
         fidelidadObj = formattedCliente.fidelidad;
@@ -258,6 +347,15 @@ class AuthService {
     }
 
     const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+
+    let metaFoto = null;
+    if (user.clienteInfo?.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
+      try {
+        const meta = JSON.parse(user.clienteInfo.direccion);
+        metaFoto = meta.foto || meta.avatar || null;
+      } catch (e) {}
+    }
+    const finalFoto = user.foto || metaFoto || null;
 
     return {
       _id: user.idUsuario,
@@ -279,7 +377,9 @@ class AuthService {
       direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       tipo: tipoCliente,
       descuentoPorcentaje,
-      fidelidad: fidelidadObj
+      fidelidad: fidelidadObj,
+      foto: finalFoto,
+      avatar: finalFoto
     };
   }
 
