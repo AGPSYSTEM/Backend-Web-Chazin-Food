@@ -173,12 +173,16 @@ class AuthService {
       throw error;
     }
 
+    const normalizedEmail = finalEmail.replace(/@chanzinfood\.com$/i, '@chazinfood.com');
+
     const { Sequelize, Op } = require('sequelize');
     const user = await User.findOne({
       where: {
         [Op.or]: [
           Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), finalEmail),
-          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), `${finalEmail}.com`)
+          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), normalizedEmail),
+          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), `${finalEmail}.com`),
+          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), `${normalizedEmail}.com`)
         ]
       },
       include: [
