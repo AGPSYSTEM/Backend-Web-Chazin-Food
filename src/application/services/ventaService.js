@@ -666,9 +666,20 @@ class VentaService {
       vueltoEfectivo: parsedObs.vueltoEfectivo || (data.datosPago ? data.datosPago.vueltoEfectivo : null) || 0,
       transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",
       transferBanco: parsedObs.transferBanco || (data.datosPago ? data.datosPago.transferBanco : null) || "",
-      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || "",
-      estadoAprobacion: data.estadoAprobacion || parsedObs.estadoAprobacion || 'PENDIENTE'
+      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || ""
     };
+
+    // Auto-aprobación: si es venta en PUNTO_DE_VENTA con pago en Efectivo,
+    // la orden se aprueba automáticamente sin pasar por gestión de producción
+    const finalMetodoPago = obsObj.metodoPago;
+    const esEfectivoPOS = resolvedTipoVenta === 'PUNTO_DE_VENTA' && 
+      String(finalMetodoPago).toLowerCase() === 'efectivo';
+    
+    const finalEstadoAprobacion = esEfectivoPOS 
+      ? 'APROBADO' 
+      : (data.estadoAprobacion || parsedObs.estadoAprobacion || 'PENDIENTE');
+
+    obsObj.estadoAprobacion = finalEstadoAprobacion;
 
     const obsStr = JSON.stringify(obsObj);
 
@@ -682,7 +693,7 @@ class VentaService {
       total: finalTotal,
       estadoEntrega: data.estadoEntrega || data.estado || 'ENTREGADO',
       observaciones: obsStr,
-      estadoAprobacion: data.estadoAprobacion || 'PENDIENTE'
+      estadoAprobacion: finalEstadoAprobacion
     });
 
     if (rawDetails.length > 0) {
