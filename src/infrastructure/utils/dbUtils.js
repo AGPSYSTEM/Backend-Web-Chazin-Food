@@ -390,8 +390,15 @@ async function ensureUsuarioDocumentoSchema() {
     // Backfill any empty numeroDocumento with idUsuario if applicable
     await sequelize.query("UPDATE `usuario` SET `numeroDocumento` = CAST(`idUsuario` AS CHAR) WHERE `numeroDocumento` IS NULL OR `numeroDocumento` = ''");
     console.log('[DB Migration] Esquema numeroDocumento en usuario verificado.');
+
+    // Ensure foto column exists in usuario
+    const [fotoCols] = await sequelize.query("SHOW COLUMNS FROM `usuario` LIKE 'foto'");
+    if (!fotoCols || fotoCols.length === 0) {
+      await sequelize.query("ALTER TABLE `usuario` ADD COLUMN `foto` TEXT NULL AFTER `fechaRegistro`");
+      console.log('[DB Migration] Columna foto agregada a tabla usuario');
+    }
   } catch (err) {
-    console.warn('[DB Migration] Error asegurando columna numeroDocumento en usuario:', err.message);
+    console.warn('[DB Migration] Error asegurando columna numeroDocumento/foto en usuario:', err.message);
   }
 }
 
