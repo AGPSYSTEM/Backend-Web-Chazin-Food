@@ -5,8 +5,10 @@ const {
   getFichaById,
   getFichaByProducto,
   getFichaByInsumo,
+  getFichaByInsumoPreparado,
   saveFichaByProducto,
   saveFichaByInsumo,
+  saveFichaByInsumoPreparado,
   createFicha,
   updateFicha,
   deleteFicha
@@ -21,6 +23,11 @@ router.route('/producto/:idProducto')
   .put(saveFichaByProducto)
   .post(saveFichaByProducto);
 
+router.route('/insumo-preparado/:idInsumoPreparado')
+  .get(getFichaByInsumoPreparado)
+  .put(saveFichaByInsumoPreparado)
+  .post(saveFichaByInsumoPreparado);
+
 router.route('/insumo/:idInsumo')
   .get(getFichaByInsumo)
   .put(saveFichaByInsumo)
@@ -32,3 +39,4 @@ router.route('/:id')
   .delete(deleteFicha);
 
 module.exports = router;
+

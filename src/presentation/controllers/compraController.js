@@ -20,7 +20,11 @@ const getCompraById = async (req, res, next) => {
 
 const createCompra = async (req, res, next) => {
   try {
-    const compra = await CompraService.create(req.body);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id || req.user._id) : (req.body.usuarioId || null);
+    const compra = await CompraService.create({
+      ...req.body,
+      usuarioId
+    });
     res.status(201).json(compra);
   } catch (error) {
     next(error);
@@ -29,7 +33,11 @@ const createCompra = async (req, res, next) => {
 
 const updateCompra = async (req, res, next) => {
   try {
-    const compra = await CompraService.update(req.params.id, req.body);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id || req.user._id) : (req.body.usuarioId || null);
+    const compra = await CompraService.update(req.params.id, {
+      ...req.body,
+      usuarioId
+    });
     res.json(compra);
   } catch (error) {
     next(error);
@@ -38,7 +46,8 @@ const updateCompra = async (req, res, next) => {
 
 const updateEstadoCompra = async (req, res, next) => {
   try {
-    const compra = await CompraService.updateEstado(req.params.id, req.body.estado);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id || req.user._id) : (req.body.usuarioId || null);
+    const compra = await CompraService.updateEstado(req.params.id, req.body.estado, { usuarioId });
     res.json(compra);
   } catch (error) {
     next(error);
@@ -47,7 +56,17 @@ const updateEstadoCompra = async (req, res, next) => {
 
 const cancelarCompra = async (req, res, next) => {
   try {
-    const compra = await CompraService.cancelar(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id || req.user._id) : (req.body.usuarioId || null);
+    const motivo = req.body.motivo || req.body.motivoCancelacion || 'Cancelada por el usuario';
+    const detallesCancelacion = req.body.detallesCancelacion || null;
+    // cantidadesAjuste: array de { idInsumo, cantidadCancelada } para ajuste parcial de stock
+    const cantidadesAjuste = req.body.cantidadesAjuste || null;
+    const compra = await CompraService.cancelar(req.params.id, {
+      motivo,
+      detallesCancelacion,
+      cantidadesAjuste,
+      usuarioId
+    });
     res.json(compra);
   } catch (error) {
     next(error);

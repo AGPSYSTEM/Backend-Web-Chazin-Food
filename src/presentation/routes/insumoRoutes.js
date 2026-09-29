@@ -10,6 +10,9 @@ const {
   restoreInsumo,
   hardDeleteInsumo,
 } = require('../controllers/insumoController');
+const { optionalProtect } = require('../../infrastructure/middlewares/authMiddleware');
+
+router.use(optionalProtect);
 
 router.get('/papelera', getInsumosPapelera);
 router.get('/deleted', getInsumosPapelera);

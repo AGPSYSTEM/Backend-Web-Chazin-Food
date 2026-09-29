@@ -49,4 +49,20 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+const optionalProtect = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      const user = await UserService.getUserById(decoded.id);
+      if (user && user.estado !== 'INACTIVO' && user.estado !== 0 && user.estado !== '0') {
+        req.user = user;
+      }
+    } catch (e) {
+      // Token inválido o expirado, continuar sin req.user
+    }
+  }
+  return next();
+};
+
+module.exports = { protect, optionalProtect, authorize };

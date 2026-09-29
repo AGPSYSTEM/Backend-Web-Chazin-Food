@@ -9,6 +9,15 @@ const getClientes = async (req, res, next) => {
   }
 };
 
+const getClientesStats = async (req, res, next) => {
+  try {
+    const stats = await ClienteService.getClientesStats();
+    res.json(stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getClienteById = async (req, res, next) => {
   try {
     const cliente = await ClienteService.getById(req.params.id);
@@ -45,4 +54,14 @@ const deleteCliente = async (req, res, next) => {
   }
 };
 
-module.exports = { getClientes, getClienteById, createCliente, updateCliente, deleteCliente };
+const getFidelidadCatalogo = async (req, res, next) => {
+  try {
+    const catalogo = ClienteService.getCatalogoFidelidad();
+    res.json(catalogo);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getClientes, getClientesStats, getClienteById, createCliente, updateCliente, deleteCliente, getFidelidadCatalogo };
+
