@@ -2,8 +2,22 @@ const TrazabilidadService = require('../../application/services/trazabilidadServ
 
 const getMovimientos = async (req, res, next) => {
   try {
-    const movimientos = await TrazabilidadService.getAll();
+    const filter = {
+      idInsumo: req.query.idInsumo,
+      tipo: req.query.tipo
+    };
+    const movimientos = await TrazabilidadService.getAll(filter);
     res.json(movimientos);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+const getUnreadCount = async (req, res, next) => {
+  try {
+    const result = await TrazabilidadService.getUnreadCount();
+    res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
     next(error);
@@ -12,7 +26,7 @@ const getMovimientos = async (req, res, next) => {
 
 const createMovimiento = async (req, res, next) => {
   try {
-    const usuarioId = req.user ? (req.user._id || req.user.id) : null;
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id || req.user._id) : (req.body?.usuarioId || null);
     const movimiento = await TrazabilidadService.create({
       ...req.body,
       usuarioId
@@ -46,6 +60,7 @@ const clearAll = async (req, res, next) => {
 
 module.exports = {
   getMovimientos,
+  getUnreadCount,
   createMovimiento,
   markAllAsRead,
   clearAll

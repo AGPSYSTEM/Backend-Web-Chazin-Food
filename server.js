@@ -1,4 +1,4 @@
-// Environment Configuration
+// Environment Configuration - Wompi Enabled
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -16,19 +16,65 @@ const { swaggerUi, swaggerSpec } = require('./src/infrastructure/swagger/swagger
 const {
   resequenceAllCoreTables,
   ensureFichaTecnicaTrashSchema,
-  ensureFichaTecnicaInsumoVariantZero
+  ensureFichaTecnicaInsumoVariantZero,
+  ensureEventoColumnsSchema,
+  syncVentasTotals,
+  ensureCategoriaProductoIconSchema,
+  ensureConfiguracionComboSchema,
+  ensureVarianteImagenSchema,
+  ensureVentaAprobacionSchema,
+  ensureUsuarioDocumentoSchema,
+  ensureResenaSchema,
+  ensureNoNegativeStock,
+  ensureInsumoEliminadoSchema,
+  ensureInsumoCategoriaNullableSchema,
+  ensureInsumoAdicionSchema,
+  ensureProductoAdicionesDefaultSchema,
+  ensureCompraLotesYCancelacionSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
-// Connect to Database via Sequelize
-connectDB();
-sequelize.sync({ alter: true }).then(async () => {
-  await ensureFichaTecnicaTrashSchema();
-  await ensureFichaTecnicaInsumoVariantZero();
-  console.log('Modelos de Sequelize sincronizados correctamente.');
-  await resequenceAllCoreTables();
-}).catch((err) => {
-  console.error('Sincronización opcional de Sequelize diferida:', err.message);
-});
+// Connect to Database and run schema verifications
+(async () => {
+  try {
+    await connectDB();
+    await ensureInsumoEliminadoSchema();
+    await ensureInsumoCategoriaNullableSchema();
+    await ensureInsumoAdicionSchema();
+    await ensureVarianteImagenSchema();
+    await ensureUsuarioDocumentoSchema();
+    await ensureFichaTecnicaTrashSchema();
+    await ensureFichaTecnicaInsumoVariantZero();
+    await ensureEventoColumnsSchema();
+    await ensureCategoriaProductoIconSchema();
+    await ensureConfiguracionComboSchema();
+    await ensureVentaAprobacionSchema();
+    await syncVentasTotals();
+    await resequenceAllCoreTables();
+    await ensureResenaSchema();
+    await ensureNoNegativeStock();
+    await ensureProductoAdicionesDefaultSchema();
+    await ensureCompraLotesYCancelacionSchema();
+    try {
+      const [results] = await sequelize.query(
+        "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta' AND COLUMN_NAME = 'tipoVenta'"
+      );
+      const columnExists = results[0].cnt > 0;
+      if (!columnExists) {
+        await sequelize.query(
+          "ALTER TABLE venta ADD COLUMN tipoVenta VARCHAR(50) NOT NULL DEFAULT 'PUNTO_DE_VENTA'"
+        );
+        console.log('✅ Added venta.tipoVenta column');
+      } else {
+        console.log('✅ venta.tipoVenta column already exists');
+      }
+    } catch (err) {
+      console.warn('⚠️ could not ensure venta.tipoVenta column:', err.message);
+    }
+    console.log('Esquema y modelos de base de datos verificados correctamente.');
+  } catch (err) {
+    console.error('Error al verificar esquemas de base de datos:', err.message);
+  }
+})();
 
 const app = express();
 
@@ -36,7 +82,9 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  process.env.FRONTEND_URL // Por si luego configuras la URL en el .env
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+  process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
@@ -56,6 +104,30 @@ app.use(cors({
 
 // Middlewares
 app.use(express.json());
+
+// Compresión gzip nativa para optimización de transferencia de datos y rendimiento Lighthouse
+const zlib = require('zlib');
+app.use((req, res, next) => {
+  const acceptEncoding = req.headers['accept-encoding'] || '';
+  if (!acceptEncoding.includes('gzip')) return next();
+
+  const originalJson = res.json;
+  res.json = function (obj) {
+    try {
+      const jsonString = JSON.stringify(obj);
+      if (jsonString.length > 1024) {
+        const compressed = zlib.gzipSync(Buffer.from(jsonString, 'utf-8'));
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Length', compressed.length);
+        return res.send(compressed);
+      }
+    } catch (e) {}
+    return originalJson.call(this, obj);
+  };
+  next();
+});
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -102,6 +174,8 @@ app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes')
 app.use('/api/dashboard', require('./src/presentation/routes/dashboardRoutes'));
 app.use('/api/eventos', require('./src/presentation/routes/eventoRoutes'));
 app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
+app.use('/api/resenas', require('./src/presentation/routes/resenaRoutes'));
+app.use('/api/wompi', require('./src/presentation/routes/wompiRoutes'));
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
