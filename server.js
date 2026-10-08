@@ -104,6 +104,30 @@ app.use(cors({
 
 // Middlewares
 app.use(express.json());
+
+// Compresión gzip nativa para optimización de transferencia de datos y rendimiento Lighthouse
+const zlib = require('zlib');
+app.use((req, res, next) => {
+  const acceptEncoding = req.headers['accept-encoding'] || '';
+  if (!acceptEncoding.includes('gzip')) return next();
+
+  const originalJson = res.json;
+  res.json = function (obj) {
+    try {
+      const jsonString = JSON.stringify(obj);
+      if (jsonString.length > 1024) {
+        const compressed = zlib.gzipSync(Buffer.from(jsonString, 'utf-8'));
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Length', compressed.length);
+        return res.send(compressed);
+      }
+    } catch (e) {}
+    return originalJson.call(this, obj);
+  };
+  next();
+});
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
