@@ -60,8 +60,12 @@ class CompraService {
         id: c.idCompra,
         idCompra: c.idCompra,
         idProveedor: c.idProveedor,
-        numeroFactura: `COMP-${String(c.idCompra).padStart(4, '0')}`,
-        proveedorNombre: c.proveedor ? c.proveedor.nombre : 'Proveedor Genérico',
+        numeroFactura: c.numeroFactura || `COMP-${String(c.idCompra).padStart(4, '0')}`,
+        fechaFactura: c.fechaFactura || null,
+        incluyeIva: c.incluyeIva ? 1 : 0,
+        subtotal: parseFloat(c.subtotal || c.total || 0),
+        iva: parseFloat(c.iva || 0),
+        proveedorNombre: c.proveedor ? c.proveedor.nombre : 'Sin proveedor',
         fechaCompra: c.fechaCompra,
         total: c.total,
         estado: c.estado,
@@ -140,8 +144,12 @@ class CompraService {
       id: c.idCompra,
       idCompra: c.idCompra,
       idProveedor: c.idProveedor,
-      numeroFactura: `COMP-${String(c.idCompra).padStart(4, '0')}`,
-      proveedorNombre: c.proveedor ? c.proveedor.nombre : 'Proveedor Genérico',
+      numeroFactura: c.numeroFactura || `COMP-${String(c.idCompra).padStart(4, '0')}`,
+      fechaFactura: c.fechaFactura || null,
+      incluyeIva: c.incluyeIva ? 1 : 0,
+      subtotal: parseFloat(c.subtotal || c.total || 0),
+      iva: parseFloat(c.iva || 0),
+      proveedorNombre: c.proveedor ? c.proveedor.nombre : 'Sin proveedor',
       fechaCompra: c.fechaCompra,
       total: c.total,
       estado: c.estado,
@@ -204,10 +212,15 @@ class CompraService {
 
     const idProv = data.idProveedor ? parseInt(data.idProveedor) : null;
     const compra = await Compra.create({
-      idProveedor: idProv,   // null = compra genérica sin proveedor
+      idProveedor: idProv,
+      numeroFactura: data.numeroFactura ? String(data.numeroFactura).trim() : null,
+      fechaFactura: data.fechaFactura || null,
       fechaCompra: data.fechaCompra || new Date(),
+      subtotal: parseFloat(data.subtotal) || parseFloat(data.total) || 0,
+      iva: parseFloat(data.iva) || 0,
       total: parseFloat(data.total) || 0,
-      estado: estadoNormalizado
+      incluyeIva: data.incluyeIva ? 1 : 0,
+      estado: ESTADO_RECIBIDA
     });
 
     if (data.detalles && data.detalles.length > 0) {
@@ -316,7 +329,7 @@ class CompraService {
     if (!detalles.length) return;
 
     const proveedor = compraCompleta.proveedor;
-    const proveedorNombre = proveedor ? proveedor.nombre : (compraCompleta.idProveedor ? `Proveedor #${compraCompleta.idProveedor}` : 'Proveedor Genérico');
+    const proveedorNombre = proveedor ? proveedor.nombre : (compraCompleta.idProveedor ? `Proveedor #${compraCompleta.idProveedor}` : 'Sin proveedor');
     const numeroFactura = `COMP-${String(idCompra).padStart(4, '0')}`;
 
     // Agrupar cantidades por insumo para manejar correctamente detalles duplicados
@@ -444,7 +457,7 @@ class CompraService {
   }
 
   static async cancelar(id, opts = {}) {
-    const { motivo, detallesCancelacion, cantidadesAjuste, usuarioId } = opts;
+    const { motivo, detallesCancelacion, cantidadesAjuste, usuarioId, fechaCancelacion } = opts;
     const c = await Compra.findByPk(id);
     if (!c) {
       const error = new Error('Compra no encontrada');
@@ -473,13 +486,26 @@ class CompraService {
 
     c.motivoCancelacion = motivo || 'Cancelada por el usuario';
     c.detallesCancelacion = detCancStr;
-    c.usuarioCancelacionId = usuarioId || null;
-    c.fechaCancelacion = new Date();
-    await c.save();
+    if (usuarioId) {
+      c.usuarioCancelacionId = usuarioId;
+    }
+    if (fechaCancelacion) {
+      c.fechaCancelacion = new Date(fechaCancelacion);
+    } else if (!c.fechaCancelacion) {
+      c.fechaCancelacion = new Date();
+    }
+
+    const estadoActual = normalizarEstado(c.estado);
+
+    // Si la compra YA está cancelada, se trata de una EDICIÓN de los detalles/estados de la devolución
+    if (estadoActual === ESTADO_CANCELADA) {
+      console.log(`[COMPRA CANCELAR] #${id}: Actualización de detalles de cancelación/devolución existente (sin tocar inventario).`);
+      await c.save();
+      return this.getById(id);
+    }
 
     // Si el usuario envió cantidades editadas individualmente, hacer ajuste PARCIAL de stock
     // en lugar de usar _ajustarStockPorCompra que usa las cantidades originales de la BD.
-    const estadoActual = normalizarEstado(c.estado);
     if (esEstadoRecibida(estadoActual) && Array.isArray(cantidadesAjuste) && cantidadesAjuste.length > 0) {
       console.log(`[COMPRA CANCELAR] #${id}: Ajuste PARCIAL de stock con cantidades editadas por el usuario.`);
       const idCompra = Number(id);
@@ -503,11 +529,11 @@ class CompraService {
             await TrazabilidadService.create({
               tipo: 'Cancelación de Compra',
               entidadNombre: insumo.nombre,
-              detalle: `Cancelación parcial de compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Cantidad cancelada: ${cantidadCancelada} ${insumo.unidadMedida || ''} | Motivo: ${motivo || 'Sin motivo'}`,
+              detalle: `Cancelación/Devolución de compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Cantidad revertida: ${cantidadCancelada} ${insumo.unidadMedida || ''} | Motivo: ${motivo || 'Sin motivo'}`,
               idInsumo,
               tipoMovimiento: 'Salida',
               cantidad: parseFloat(cantidadCancelada),
-              motivo: `Reversa parcial por cancelación compra ${numeroFactura}`,
+              motivo: `Reversa por devolución/cancelación compra ${numeroFactura}`,
               usuarioId: usuarioId || null,
               skipStockUpdate: true
             });
@@ -587,99 +613,9 @@ class CompraService {
   }
 
   static async update(id, data) {
-    const t = await sequelize.transaction();
-    try {
-      const compra = await Compra.findByPk(id, {
-        include: [{ model: DetalleCompraInsumo, as: 'detalles' }],
-        transaction: t
-      });
-      if (!compra) {
-        const error = new Error('Compra no encontrada');
-        error.statusCode = 404;
-        throw error;
-      }
-
-      const estadoAnteriorSinNormalizar = compra.estado;
-      const estadoAnterior = normalizarEstado(estadoAnteriorSinNormalizar);
-      const estadoSinNormalizarEntrada = (data.estado !== undefined && data.estado !== null)
-        ? `[recibido del frontend: ${data.estado}]`
-        : `[omitido, default=anterior]`;
-      const estadoNuevoSinNormalizar = (data.estado !== undefined && data.estado !== null) ? data.estado : estadoAnterior;
-      const estadoNuevo = normalizarEstado(estadoNuevoSinNormalizar);
-      const anteriorRecibida = esEstadoRecibida(estadoAnterior);
-      const nuevaRecibida = esEstadoRecibida(estadoNuevo);
-      const TOCARA_STOCK = anteriorRecibida || nuevaRecibida;
-
-      console.log(`==========================================================================`);
-      console.log(`[COMPRA UPDATE] #${id} - INICIO`);
-      console.log(`[COMPRA UPDATE]   - estadoAnterior (BD sin normalizar): "${estadoAnteriorSinNormalizar}" → normalizado: ${estadoAnterior}`);
-      console.log(`[COMPRA UPDATE]   - estadoNuevo  ${estadoSinNormalizarEntrada} → normalizado: ${estadoNuevo}`);
-      console.log(`[COMPRA UPDATE]   - anteriorRecibida=${anteriorRecibida} | nuevaRecibida=${nuevaRecibida} | TOCARA_STOCK=${TOCARA_STOCK}`);
-      console.log(`==========================================================================`);
-
-      const detallesViejos = (compra.detalles || []).map(d => d.toJSON());
-      const mapaViejo = await this._agruparCantidadesPorInsumo(detallesViejos);
-
-      const idProvUpdate = data.idProveedor !== undefined ? (data.idProveedor ? parseInt(data.idProveedor) : null) : compra.idProveedor;
-      compra.idProveedor = idProvUpdate;
-      compra.fechaCompra = data.fechaCompra !== undefined ? data.fechaCompra : compra.fechaCompra;
-      compra.total = data.total !== undefined ? (parseFloat(data.total) || 0) : compra.total;
-      compra.estado = estadoNuevo;
-      await compra.save({ transaction: t });
-
-      if (data.detalles !== undefined && Array.isArray(data.detalles)) {
-        await DetalleCompraInsumo.destroy({ where: { idCompra: id }, transaction: t });
-        if (data.detalles.length > 0) {
-          const nuevosDetalles = data.detalles.map(d => {
-            const cant = parseFloat(d.cantidad) || 0;
-            const pUnit = parseFloat(d.precioUnitario) || 0;
-            const sub = d.subtotal !== undefined ? parseFloat(d.subtotal) : (cant * pUnit);
-            const numLote = (d.numeroLote && String(d.numeroLote).trim()) || null;
-            const rawVenc = (d.fechaVencimiento && String(d.fechaVencimiento).trim()) || null;
-            const fVenc = (rawVenc && rawVenc !== '') ? rawVenc : null;
-            return {
-              idCompra: id,
-              idInsumo: parseInt(d.idInsumo),
-              cantidad: cant,
-              precioUnitario: pUnit,
-              subtotal: sub,
-              numeroLote: numLote,
-              fechaVencimiento: fVenc
-            };
-          });
-          await DetalleCompraInsumo.bulkCreate(nuevosDetalles, { transaction: t });
-        }
-      }
-
-      let mapaNuevo = new Map();
-      if (TOCARA_STOCK) {
-        const detallesFinales = await DetalleCompraInsumo.findAll({ where: { idCompra: id }, transaction: t });
-        mapaNuevo = await this._agruparCantidadesPorInsumo(detallesFinales);
-      }
-
-      await t.commit();
-
-      // Ajustar stock FUERA de la transacción (ya cerrada)
-      if (anteriorRecibida && nuevaRecibida) {
-        console.log(`[COMPRA UPDATE] #${id}: ✅ ajustando diferencia (sigue RECIBIDA)`);
-        await this._aplicarDiferenciaStock(id, mapaViejo, mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
-      } else if (!anteriorRecibida && nuevaRecibida) {
-        console.log(`[COMPRA UPDATE] #${id}: ✅ sumando TODO nuevo (pasó a RECIBIDA)`);
-        await this._aplicarDiferenciaStock(id, new Map(), mapaNuevo, { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
-      } else if (anteriorRecibida && !nuevaRecibida) {
-        console.log(`[COMPRA UPDATE] #${id}: ✅ restando TODO viejo (salió de RECIBIDA)`);
-        await this._aplicarDiferenciaStock(id, mapaViejo, new Map(), { estadoFinalCompraNormalizado: estadoNuevo, estadoInicialCompraNormalizado: estadoAnterior });
-      } else {
-        console.log(`[COMPRA UPDATE] #${id}: ⛔ GUARDIA TOTAL ACTIVADA - SIN CAMBIO DE STOCK (estado anterior y nuevo NO SON RECIBIDA). Se omiten cálculos.`);
-      }
-
-      console.log(`[COMPRA UPDATE] #${id}: FIN`);
-      return this.getById(id);
-    } catch (err) {
-      try { if (!t.finished) await t.rollback(); } catch (_) {}
-      console.error(`[COMPRA UPDATE] #${id}: ERROR - rollback:`, err.message);
-      throw err;
-    }
+    const error = new Error('Las compras no se pueden editar una vez registradas. Si requieres corregir una compra, debes anularla.');
+    error.statusCode = 400;
+    throw error;
   }
 }
 

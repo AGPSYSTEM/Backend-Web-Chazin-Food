@@ -42,6 +42,12 @@ class CategoryService {
       throw error;
     }
 
+    if (/\d/.test(nombre)) {
+      const error = new Error('El nombre de la categoría no debe contener números');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const existing = await CategoriaInsumo.findOne({ where: { nombre: nombre.trim() } });
     if (existing) {
       const error = new Error('Ya existe una categoría con ese nombre');
@@ -66,7 +72,14 @@ class CategoryService {
       throw error;
     }
 
-    if (data.nombre) cat.nombre = data.nombre.trim();
+    if (data.nombre) {
+      if (/\d/.test(data.nombre)) {
+        const error = new Error('El nombre de la categoría no debe contener números');
+        error.statusCode = 400;
+        throw error;
+      }
+      cat.nombre = data.nombre.trim();
+    }
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
     if (data.estado !== undefined) {
       cat.estado = data.estado === 'Activo' || data.estado === 1 ? 1 : 0;

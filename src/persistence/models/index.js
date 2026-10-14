@@ -266,6 +266,10 @@ const Insumo = sequelize.define('insumo', {
   eliminado: {
     type: DataTypes.TINYINT,
     defaultValue: 0
+  },
+  incluyeIva: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
   }
 }, { tableName: 'insumo', timestamps: false });
 
@@ -664,13 +668,33 @@ const Compra = sequelize.define('compra', {
     type: DataTypes.INTEGER,
     allowNull: true
   },
+  numeroFactura: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  fechaFactura: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
   fechaCompra: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
   },
+  subtotal: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0
+  },
+  iva: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0
+  },
   total: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false
+  },
+  incluyeIva: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
   },
   estado: {
     type: DataTypes.ENUM('PENDIENTE', 'RECIBIDA', 'CANCELADA'),

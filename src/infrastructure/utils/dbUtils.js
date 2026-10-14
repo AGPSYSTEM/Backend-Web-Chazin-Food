@@ -573,6 +573,9 @@ async function ensureInsumoAdicionSchema() {
     if (!colNames.includes('imagen')) {
       await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `imagen` VARCHAR(255) NULL AFTER `precioAdicion`");
     }
+    if (!colNames.includes('incluyeIva')) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `incluyeIva` TINYINT(1) NOT NULL DEFAULT 0 AFTER `imagen`");
+    }
     await sequelize.query("DROP TABLE IF EXISTS `adicion`");
   } catch (err) {
     console.warn('[DB] ⚠️ Error verificando schema de adiciones en insumo:', err.message);
@@ -631,6 +634,26 @@ async function ensureCompraLotesYCancelacionSchema() {
     if (!compraColNames.includes('fechaCancelacion')) {
       await sequelize.query("ALTER TABLE `compra` ADD COLUMN `fechaCancelacion` DATETIME NULL");
       console.log('[DB Migration] Columna fechaCancelacion agregada a tabla compra');
+    }
+    if (!compraColNames.includes('numeroFactura')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `numeroFactura` VARCHAR(100) NULL AFTER `idProveedor`");
+      console.log('[DB Migration] Columna numeroFactura agregada a tabla compra');
+    }
+    if (!compraColNames.includes('fechaFactura')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `fechaFactura` DATE NULL AFTER `numeroFactura`");
+      console.log('[DB Migration] Columna fechaFactura agregada a tabla compra');
+    }
+    if (!compraColNames.includes('incluyeIva')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `incluyeIva` TINYINT(1) NOT NULL DEFAULT 0 AFTER `total`");
+      console.log('[DB Migration] Columna incluyeIva agregada a tabla compra');
+    }
+    if (!compraColNames.includes('subtotal')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `subtotal` DECIMAL(12, 2) NOT NULL DEFAULT 0.00 AFTER `total`");
+      console.log('[DB Migration] Columna subtotal agregada a tabla compra');
+    }
+    if (!compraColNames.includes('iva')) {
+      await sequelize.query("ALTER TABLE `compra` ADD COLUMN `iva` DECIMAL(12, 2) NOT NULL DEFAULT 0.00 AFTER `subtotal`");
+      console.log('[DB Migration] Columna iva agregada a tabla compra');
     }
 
     // 2.1 Asegurar que idProveedor en compra permita NULL (compra genérica sin proveedor)

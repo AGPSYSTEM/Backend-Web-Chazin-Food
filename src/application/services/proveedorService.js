@@ -108,6 +108,17 @@ class ProveedorService {
       throw error;
     }
 
+    if (finalNumeroDocumento && String(finalNumeroDocumento).trim()) {
+      const existingDoc = await Proveedor.findOne({
+        where: { numeroDocumento: String(finalNumeroDocumento).trim() }
+      });
+      if (existingDoc) {
+        const error = new Error(`Ya existe un proveedor registrado con el número de documento / NIT: ${finalNumeroDocumento}`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     // Determinar idTipoProveedor (1: Mayorista, 2: Distribuidor, 3: Fabricante)
     let parsedTipoProv = Number(idTipoProveedor);
     if (!parsedTipoProv || isNaN(parsedTipoProv)) {
@@ -177,8 +188,8 @@ class ProveedorService {
     const errores = [];
 
     if (finalNumeroDocumento !== undefined && String(finalNumeroDocumento).trim() !== '') {
-      if (!/^[\d.\-\s]+$/.test(String(finalNumeroDocumento).trim()))
-        errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento solo puede contener dígitos, puntos y guiones.' });
+      if (!/^[\d]+$/.test(String(finalNumeroDocumento).trim()))
+        errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento solo puede contener dígitos, sin puntos ni guiones.' });
     }
 
     if (telefono !== undefined && String(telefono).trim() !== '') {
@@ -196,6 +207,21 @@ class ProveedorService {
       error.statusCode = 400;
       error.errores = errores;
       throw error;
+    }
+
+    if (finalNumeroDocumento && String(finalNumeroDocumento).trim()) {
+      const { Op } = require('sequelize');
+      const existingDoc = await Proveedor.findOne({
+        where: {
+          numeroDocumento: String(finalNumeroDocumento).trim(),
+          idProveedor: { [Op.ne]: idProveedor }
+        }
+      });
+      if (existingDoc) {
+        const error = new Error(`Ya existe otro proveedor registrado con el número de documento / NIT: ${finalNumeroDocumento}`);
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
     if (nombre !== undefined) p.nombre = nombre.trim();

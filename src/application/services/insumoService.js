@@ -32,6 +32,7 @@ function formatInsumo(i) {
     esAdicion: i.esAdicion ? 1 : 0,
     precioAdicion: parseFloat(i.precioAdicion || 0),
     imagen: i.imagen || '',
+    incluyeIva: i.incluyeIva ? 1 : 0,
     categoria: catNombre,
     categoriaNombre: catNombre,
     proveedor: provNombre,
@@ -132,6 +133,7 @@ class InsumoService {
         esAdicion: insumoData.esAdicion ? 1 : 0,
         precioAdicion: insumoData.precioAdicion !== undefined && insumoData.precioAdicion !== null ? parseFloat(insumoData.precioAdicion) : 0,
         imagen: insumoData.imagen || null,
+        incluyeIva: insumoData.incluyeIva ? 1 : 0,
         estado: 1
       }, { transaction });
 
@@ -152,7 +154,7 @@ class InsumoService {
         tipoMovimiento: 'Entrada',
         cantidad: insumo.stock,
         motivo: 'Registro inicial de insumo',
-        usuarioId: data.usuarioId || (options && options.usuarioId) || null,
+        usuarioId: insumoData.usuarioId || null,
         skipStockUpdate: true
       }, { transaction });
 
@@ -204,6 +206,7 @@ class InsumoService {
       if (insumoData.esAdicion !== undefined) insumo.esAdicion = insumoData.esAdicion ? 1 : 0;
       if (insumoData.precioAdicion !== undefined) insumo.precioAdicion = parseFloat(insumoData.precioAdicion || 0);
       if (insumoData.imagen !== undefined) insumo.imagen = insumoData.imagen || null;
+      if (insumoData.incluyeIva !== undefined) insumo.incluyeIva = insumoData.incluyeIva ? 1 : 0;
       if (estado !== undefined) {
         insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
       }
@@ -225,7 +228,7 @@ class InsumoService {
         detalle: `Se actualizaron los datos del insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
         motivo: 'Actualización de datos',
-        usuarioId: data.usuarioId || (options && options.usuarioId) || null,
+        usuarioId: insumoData.usuarioId || (options && options.usuarioId) || null,
         skipStockUpdate: true
       }, { transaction });
 

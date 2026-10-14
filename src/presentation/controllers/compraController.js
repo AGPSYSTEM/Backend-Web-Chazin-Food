@@ -61,11 +61,13 @@ const cancelarCompra = async (req, res, next) => {
     const detallesCancelacion = req.body.detallesCancelacion || null;
     // cantidadesAjuste: array de { idInsumo, cantidadCancelada } para ajuste parcial de stock
     const cantidadesAjuste = req.body.cantidadesAjuste || null;
+    const fechaCancelacion = req.body.fechaCancelacion || null;
     const compra = await CompraService.cancelar(req.params.id, {
       motivo,
       detallesCancelacion,
       cantidadesAjuste,
-      usuarioId
+      usuarioId,
+      fechaCancelacion
     });
     res.json(compra);
   } catch (error) {

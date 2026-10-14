@@ -39,20 +39,20 @@ class TrazabilidadService {
         || dLower.includes('cancelaci') || dLower.includes('anulaci') || dLower.includes('reversa')
         || mLower.includes('cancelaci') || mLower.includes('anulaci') || mLower.includes('reversa');
 
-      if (isCancelCompra) {
+      if (t.includes('eliminado permanente') || t.includes('harddelete') || t.includes('definitivo')) {
+        tipoLabel = 'Eliminado permanente';
+      } else if (t.includes('elimin') || t.includes('papelera') || t === 'inactivar') {
+        tipoLabel = 'Eliminado';
+      } else if (t.includes('edit') || t.includes('modif') || t.includes('actualiz')) {
+        tipoLabel = 'Editado';
+      } else if (t.includes('restaur')) {
+        tipoLabel = 'Restaurado';
+      } else if (isCancelCompra) {
         tipoLabel = 'Cancelación de Compra';
       } else if (t.includes('consumo') || dLower.includes('consumo')) {
         tipoLabel = 'Consumo por Venta';
       } else if (t.includes('crea') || t === 'nuevo' || t === 'registro') {
         tipoLabel = 'Creado';
-      } else if (t.includes('edit') || t.includes('modif') || t === 'actualizado') {
-        tipoLabel = 'Editado';
-      } else if (t.includes('eliminado permanente') || t.includes('harddelete') || t.includes('definitivo')) {
-        tipoLabel = 'Eliminado permanente';
-      } else if (t.includes('elimin') || t.includes('papelera') || t === 'inactivar') {
-        tipoLabel = 'Eliminado';
-      } else if (t.includes('restaur')) {
-        tipoLabel = 'Restaurado';
       } else if (t.includes('compra') || t.includes('reabastec') || mov === 'entrada') {
         tipoLabel = 'Reabastecimiento';
       } else if (mov === 'salida') {
@@ -61,19 +61,26 @@ class TrazabilidadService {
         tipoLabel = 'Estado Cambiado';
       }
 
+      let finalMovimiento = r.tipoMovimiento || null;
+      if (!finalMovimiento) {
+        if (isCancelCompra) finalMovimiento = 'Salida';
+        else if (tipoLabel === 'Reabastecimiento') finalMovimiento = 'Entrada';
+        else if (tipoLabel === 'Consumo por Venta') finalMovimiento = 'Salida';
+      }
+
       return {
         idTrazabilidad: r.idTrazabilidad || r.id,
         id: `tz-${r.idTrazabilidad || r.id}`,
         tipo: tipoLabel,
         tipoRaw: r.tipo || '',
-        esCancelacion: isCancelCompra || mov === 'salida',
+        esCancelacion: isCancelCompra,
         nombre: r.entidadNombre || (r.insumo ? r.insumo.nombre : 'Registro'),
         descripcion: r.detalle || (r.motivo ? `${r.tipoMovimiento || 'Movimiento'}: ${r.motivo}` : 'Registro de trazabilidad'),
         fecha: formatFecha(r.fecha),
         fechaRaw: r.fecha || new Date(),
         leido: Number(r.leido || 0),
         idInsumo: r.idInsumo || null,
-        tipoMovimiento: r.tipoMovimiento || (isCancelCompra ? 'Salida' : 'Entrada'),
+        tipoMovimiento: finalMovimiento,
         cantidad: r.cantidad ? parseFloat(r.cantidad) : null,
         motivo: r.motivo || '',
         usuarioId: r.usuarioId || null,
