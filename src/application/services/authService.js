@@ -665,6 +665,240 @@ class AuthService {
 
     return { message: 'Contraseña restablecida exitosamente' };
   }
+
+  static async googleLogin(credential) {
+    if (!credential) {
+      const error = new Error('Token de Google no proporcionado');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    let payload = null;
+    const { OAuth2Client } = require('google-auth-library');
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID || undefined
+      });
+      payload = ticket.getPayload();
+    } catch (verifyError) {
+      // Fallback: verify with Google public tokeninfo endpoint
+      try {
+        const https = require('https');
+        const tokenInfo = await new Promise((resolve, reject) => {
+          https.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => {
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error_description || parsed.error) {
+                  reject(new Error(parsed.error_description || parsed.error));
+                } else {
+                  resolve(parsed);
+                }
+              } catch (e) {
+                reject(e);
+              }
+            });
+          }).on('error', reject);
+        });
+        payload = tokenInfo;
+      } catch (fallbackError) {
+        console.error('Error al verificar token de Google:', verifyError.message, fallbackError.message);
+        const error = new Error('Token de autenticación de Google inválido o expirado');
+        error.statusCode = 401;
+        throw error;
+      }
+    }
+
+    if (!payload || !payload.email) {
+      const error = new Error('No se pudo obtener el correo de la cuenta de Google');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const email = payload.email.trim().toLowerCase();
+    const givenName = payload.given_name || payload.name || 'Usuario';
+    const familyName = payload.family_name || '';
+    const picture = payload.picture || null;
+
+    // Check if user exists
+    let user = await User.findOne({
+      where: { email },
+      include: [
+        { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
+        { model: Cliente, as: 'clienteInfo' }
+      ]
+    });
+
+    if (user) {
+      if (user.estado === 'INACTIVO' || user.estado === '0' || user.estado === 0) {
+        const error = new Error('Tu usuario está inactivo. Comunícate con el administrador para activar tu cuenta.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      // If user doesn't have a photo but Google provides one, save it
+      if (!user.foto && picture) {
+        try {
+          await user.update({ foto: picture });
+        } catch (e) {
+          console.warn('No se pudo actualizar foto de Google:', e.message);
+        }
+      }
+    } else {
+      // Register new user via Google
+      const crypto = require('crypto');
+      const randomPassword = crypto.randomBytes(16).toString('hex') + 'A1!';
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(randomPassword, salt);
+
+      const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(givenName, familyName);
+
+      // Default role: Cliente (idRol: 4)
+      const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
+      const finalRolId = clienteRol ? clienteRol.idRol : 4;
+
+      user = await User.create({
+        nombre: cleanNom,
+        apellidos: cleanApe,
+        tipoDocumento: 'C.C.',
+        numeroDocumento: null,
+        telefono: null,
+        email,
+        contrasena: hashedPassword,
+        idRol: finalRolId,
+        estado: 'ACTIVO',
+        foto: picture,
+        fechaRegistro: new Date()
+      });
+
+      // Create Cliente record
+      try {
+        const metaStr = JSON.stringify({
+          direccion: '',
+          tipo: 'Nuevo',
+          descuentoPorcentaje: 0,
+          nombre: cleanNom,
+          apellidos: cleanApe,
+          telefono: '',
+          ciclo: 0,
+          foto: picture
+        });
+        await Cliente.create({
+          idUsuario: user.idUsuario,
+          direccion: metaStr,
+          estado: 1
+        });
+      } catch (err) {
+        console.warn('Advertencia al crear registro de cliente para Google:', err.message);
+      }
+
+      // Re-fetch user with relations
+      user = await User.findByPk(user.idUsuario, {
+        include: [
+          { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
+          { model: Cliente, as: 'clienteInfo' }
+        ]
+      });
+
+      // Send welcome email in background
+      EmailService.sendWelcomeEmail({
+        email: user.email,
+        nombre: user.nombre,
+        apellidos: user.apellidos,
+        password: '(Autenticado con Google)'
+      }).catch(err => console.error('Background welcome email error in googleLogin:', err.message));
+    }
+
+    // Format response identically to login
+    const rolNombre = user.rolInfo ? user.rolInfo.nombre : 'Cliente';
+    const direccion = getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : '');
+    const permisos = user.rolInfo && user.rolInfo.permisos
+      ? user.rolInfo.permisos.map(p => p.nombrePermiso)
+      : [];
+
+    let fidelidadObj = null;
+    let idCliente = null;
+    let tipoCliente = 'Nuevo';
+    let descuentoPorcentaje = 0;
+
+    if (!user.clienteInfo && (user.idRol === 4 || user.rolInfo?.nombre?.toLowerCase() === 'cliente')) {
+      try {
+        const [clientRecord] = await Cliente.findOrCreate({
+          where: { idUsuario: user.idUsuario },
+          defaults: {
+            idUsuario: user.idUsuario,
+            direccion: JSON.stringify({
+              direccion: '',
+              tipo: 'Nuevo',
+              ciclo: 0,
+              nombre: user.nombre,
+              apellidos: user.apellidos,
+              telefono: user.telefono,
+              estado: 'Activo'
+            }),
+            estado: 1
+          }
+        });
+        user.clienteInfo = clientRecord;
+      } catch (err) {
+        console.warn('Error asegurando clienteInfo en googleLogin:', err.message);
+      }
+    }
+
+    if (user.clienteInfo) {
+      try {
+        const ClienteService = require('./clienteService');
+        user.clienteInfo.usuario = user;
+        const formattedCliente = await ClienteService.formatCliente(user.clienteInfo);
+        idCliente = formattedCliente.id;
+        fidelidadObj = formattedCliente.fidelidad;
+        tipoCliente = formattedCliente.tipo;
+        descuentoPorcentaje = formattedCliente.descuentoPorcentaje;
+      } catch (e) {
+        idCliente = user.clienteInfo.idCliente;
+      }
+    }
+
+    let metaFoto = null;
+    if (user.clienteInfo?.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
+      try {
+        const meta = JSON.parse(user.clienteInfo.direccion);
+        metaFoto = meta.foto || meta.avatar || null;
+      } catch (e) {}
+    }
+    const finalFoto = user.foto || metaFoto || picture || null;
+
+    return {
+      _id: user.idUsuario,
+      id: user.idUsuario,
+      idUsuario: user.idUsuario,
+      idCliente,
+      nombre: user.nombre,
+      apellidos: user.apellidos,
+      apellido: user.apellidos,
+      tipoDocumento: user.tipoDocumento || 'C.C.',
+      numeroDocumento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
+      documento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
+      telefono: user.telefono || '',
+      email: user.email,
+      correo: user.email,
+      rol: rolNombre,
+      idRol: user.idRol,
+      permisos,
+      direccion,
+      tipo: tipoCliente,
+      descuentoPorcentaje,
+      fidelidad: fidelidadObj,
+      foto: finalFoto,
+      avatar: finalFoto,
+      token: this.generateToken(user.idUsuario)
+    };
+  }
 }
 
 module.exports = AuthService;
