@@ -251,6 +251,27 @@ class FichaTecnicaService {
   }
 
   static async saveForProducto(idProducto, data) {
+    if (!idProducto || !data) return null;
+
+    // Los combos no llevan ficha técnica (la ficha técnica es solo para productos e insumos preparados)
+    const { Product } = require('../../persistence/models');
+    const prod = await Product.findByPk(idProducto);
+    if (prod) {
+      let isCombo = false;
+      if (prod.configuracionCombo) {
+        try {
+          const cfg = typeof prod.configuracionCombo === 'object' ? prod.configuracionCombo : JSON.parse(prod.configuracionCombo);
+          if (cfg && cfg.esCombo) isCombo = true;
+        } catch (_) {}
+      }
+      if (!isCombo && prod.categoria && String(prod.categoria).toLowerCase().includes('combo')) {
+        isCombo = true;
+      }
+      if (isCombo) {
+        return null;
+      }
+    }
+
     let f = await FichaTecnica.findOne({ where: { idProducto: String(idProducto) } });
     const resolvedVarianteId = await this.resolveVarianteId(idProducto, null, data.idVariante);
 
