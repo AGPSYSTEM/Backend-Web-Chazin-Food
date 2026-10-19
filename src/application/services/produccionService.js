@@ -13,10 +13,28 @@ const getProductEmoji = (nombre = "") => {
   return "🍽️";
 };
 
+const { Op } = require('sequelize');
+
 class ProduccionService {
   static async getAll() {
     try {
       const ventas = await Venta.findAll({
+        where: {
+          [Op.and]: [
+            {
+              [Op.or]: [
+                { estadoAprobacion: 'APROBADO' },
+                {
+                  estadoAprobacion: null,
+                  estadoEntrega: { [Op.in]: ['PREPARANDO', 'LISTO', 'ENTREGADO', 'DESPACHADO'] }
+                }
+              ]
+            },
+            {
+              estadoEntrega: { [Op.ne]: 'CANCELADO' }
+            }
+          ]
+        },
         include: [
           {
             model: Cliente,
@@ -344,30 +362,16 @@ class ProduccionService {
           }
         }
 
-        // Map approval and delivery/production status
-        // Primary source: real DB column `estadoAprobacion`
+        // Map delivery/production status
         const est = (v.estadoEntrega || 'PENDIENTE').toUpperCase();
-        let estadoAprobacion = v.estadoAprobacion;
-        if (!estadoAprobacion) {
-          if (est === 'PREPARANDO' || est === 'LISTO' || est === 'ENTREGADO' || est === 'DESPACHADO') {
-            estadoAprobacion = 'APROBADO';
-          } else if (est === 'CANCELADO' || est === 'ANULADA') {
-            estadoAprobacion = 'RECHAZADO';
-          } else {
-            estadoAprobacion = 'PENDIENTE';
-          }
-        }
-
-        let estadoStr = "Por Aprobar";
-        if (estadoAprobacion === 'RECHAZADO' || est === 'CANCELADO' || est === 'ANULADA') {
-          estadoStr = "Rechazado";
-        } else if (estadoAprobacion === 'PENDIENTE') {
-          estadoStr = "Por Aprobar";
-        } else if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') {
+        let estadoStr = "En Cola";
+        if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') {
           estadoStr = "En Preparación";
         } else if (est === 'LISTO') {
           estadoStr = "Listo";
-        } else if (est === 'ENTREGADO' || est === 'DESPACHADO' || est === 'COMPLETADA') {
+        } else if (est === 'DESPACHADO') {
+          estadoStr = "Despachado";
+        } else if (est === 'ENTREGADO' || est === 'COMPLETADA') {
           estadoStr = "Entregado";
         } else {
           estadoStr = "En Cola";
@@ -426,16 +430,38 @@ class ProduccionService {
           fecha: fechaStr,
           horaInicio: horaStr,
           fechaVenta: v.fechaVenta,
-          prioridad: (est === 'PENDIENTE' || estadoAprobacion === 'PENDIENTE') ? "Alta" : "Normal",
           estado: estadoStr,
-          estadoAprobacion,
+          estadoAprobacion: 'APROBADO',
           estadoEntrega: v.estadoEntrega || 'PENDIENTE',
-          alerta: estadoAprobacion === 'PENDIENTE' || est === 'PENDIENTE',
+          alerta: false,
           observaciones: cleanGeneralObs,
           tipo: finalTipo,
           mesa: finalMesa,
           tipoVenta: v.tipoVenta || (finalTipo === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
           productos: productosList
+        };
+      });
+
+      // Sequential numerical priority calculation (1, 2, 3, ...) for active orders in preparation order (Item 117)
+      const activeQueue = mappedOrders
+        .filter(o => o.estado === "En Cola" || o.estado === "En Preparación")
+        .sort((a, b) => {
+          const dateA = a.fechaVenta ? new Date(a.fechaVenta).getTime() : a.id;
+          const dateB = b.fechaVenta ? new Date(b.fechaVenta).getTime() : b.id;
+          return dateA - dateB;
+        });
+
+      const priorityMap = new Map();
+      activeQueue.forEach((order, index) => {
+        priorityMap.set(order.id, index + 1);
+      });
+
+      return mappedOrders.map(o => {
+        const seqPrioridad = priorityMap.get(o.id) || null;
+        return {
+          ...o,
+          prioridad: seqPrioridad || (o.estado === "Listo" || o.estado === "Despachado" || o.estado === "Entregado" ? null : 1),
+          turno: seqPrioridad || null
         };
       });
     } catch (err) {
@@ -444,10 +470,10 @@ class ProduccionService {
     }
   }
 
-  static async create(data) {
-    const VentaService = require('./ventaService');
-    const venta = await VentaService.create(data);
-    return venta;
+  static async create() {
+    const error = new Error('Las órdenes de producción se generan automáticamente a partir de las ventas aprobadas.');
+    error.statusCode = 400;
+    throw error;
   }
 
   static async updateEstado(id, nuevoEstado) {

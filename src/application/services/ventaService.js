@@ -692,13 +692,13 @@ class VentaService {
       tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || ""
     };
 
-    // Auto-aprobación: si es venta en PUNTO_DE_VENTA con pago en Efectivo,
-    // la orden se aprueba automáticamente sin pasar por gestión de producción
-    const finalMetodoPago = obsObj.metodoPago;
-    const esEfectivoPOS = resolvedTipoVenta === 'PUNTO_DE_VENTA' && 
-      String(finalMetodoPago).toLowerCase() === 'efectivo';
-    
-    const finalEstadoAprobacion = esEfectivoPOS 
+    // Auto-aprobación en Ventas: las ventas en Punto de Venta (POS) o con pago confirmado/aprobado
+    // se aprueban directamente en el módulo de Ventas, convirtiéndose en órdenes de producción (Ítem 114 y 116)
+    const esPOS = resolvedTipoVenta === 'PUNTO_DE_VENTA';
+    const esPagado = String(obsObj.estadoPago || data.estadoPago || '').toLowerCase() === 'pagado';
+    const esAprobadoExplicito = data.estadoAprobacion === 'APROBADO' || parsedObs.estadoAprobacion === 'APROBADO';
+
+    const finalEstadoAprobacion = (esPOS || esPagado || esAprobadoExplicito)
       ? 'APROBADO' 
       : (data.estadoAprobacion || parsedObs.estadoAprobacion || 'PENDIENTE');
 
