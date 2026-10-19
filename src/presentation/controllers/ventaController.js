@@ -54,6 +54,15 @@ const updateEstadoVenta = async (req, res, next) => {
   }
 };
 
+const updateTiempoEntregaVenta = async (req, res, next) => {
+  try {
+    const venta = await VentaService.updateTiempoEntrega(req.params.id, req.body.tiempoEstimadoEntrega || req.body.tiempoEstimado);
+    res.json(venta);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const cancelarVenta = async (req, res, next) => {
   try {
     const venta = await VentaService.cancelar(req.params.id);
@@ -63,4 +72,4 @@ const cancelarVenta = async (req, res, next) => {
   }
 };
 
-module.exports = { getVentas, getVentasStats, getVentaById, createVenta, updateEstadoVenta, cancelarVenta };
+module.exports = { getVentas, getVentasStats, getVentaById, createVenta, updateEstadoVenta, updateTiempoEntregaVenta, cancelarVenta };

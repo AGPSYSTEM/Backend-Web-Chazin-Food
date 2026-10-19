@@ -246,6 +246,25 @@ class VentaService {
       estado: 'Activo'
     };
 
+    const horaEstado = obsData.horaEstado || horario || "12:30 PM";
+
+    const isOnline = (
+      String(v.tipoVenta || '').toUpperCase() === 'ONLINE' ||
+      String(v.tipoVenta || '').toUpperCase() === 'DOMICILIO' ||
+      String(obsData.origen || '').toUpperCase() === 'ONLINE' ||
+      String(obsData.tipoVenta || '').toUpperCase() === 'ONLINE' ||
+      (responsable && responsable.rol === 'Online') ||
+      (!v.idUsuario && v.idCliente) ||
+      (tipoEntrega === 'Domicilio' && (!v.usuario || v.usuario.idRol === 4))
+    );
+
+    const origen = isOnline ? 'ONLINE' : 'PUNTO_FISICO';
+    const origenNombre = isOnline ? 'Venta Online' : 'Punto Físico';
+
+    const tiempoEstimadoEntrega = obsData.tiempoEstimadoEntrega || obsData.tiempoEstimado || (
+      tipoEntrega === 'Domicilio' ? '35 - 45 min' : '15 - 20 min'
+    );
+
     return {
       id: v.idVenta,
       idVenta: v.idVenta,
@@ -269,6 +288,10 @@ class VentaService {
       fechaVenta: v.fechaVenta,
       fechaFormatted,
       horario,
+      horaEstado,
+      origen,
+      origenNombre,
+      tiempoEstimadoEntrega,
       tipoEntrega,
       metodoPago,
       estadoPago,
@@ -965,6 +988,28 @@ class VentaService {
     } else if (estadoEnum === 'PREPARANDO' || estadoEnum === 'LISTO' || estadoEnum === 'ENTREGADO') {
       v.estadoAprobacion = 'APROBADO';
     }
+
+    // Actualizar hora del estado dinámicamente en observaciones
+    let obsData = {};
+    try {
+      obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+        ? JSON.parse(v.observaciones)
+        : { nota: v.observaciones || '' };
+    } catch (e) {
+      obsData = { nota: v.observaciones || '' };
+    }
+
+    const horaActual = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    obsData.horaEstado = horaActual;
+    obsData.fechaCambioEstado = new Date().toISOString();
+    if (!Array.isArray(obsData.historialEstados)) obsData.historialEstados = [];
+    obsData.historialEstados.push({
+      estado: estadoEnum,
+      hora: horaActual,
+      fecha: new Date().toISOString()
+    });
+    v.observaciones = JSON.stringify(obsData);
+
     await v.save();
 
     // Reintegrar insumos si la venta fue anulada/cancelada y no estaba ya cancelada
@@ -1161,6 +1206,27 @@ class VentaService {
     }
 
     return { ficha: null, targetProductId: finalProdId };
+  }
+
+  static async updateTiempoEntrega(id, tiempoEstimadoEntrega) {
+    const v = await Venta.findByPk(id);
+    if (!v) {
+      const error = new Error('Venta no encontrada');
+      error.statusCode = 404;
+      throw error;
+    }
+    let obsData = {};
+    try {
+      obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+        ? JSON.parse(v.observaciones)
+        : { nota: v.observaciones || '' };
+    } catch (e) {
+      obsData = { nota: v.observaciones || '' };
+    }
+    obsData.tiempoEstimadoEntrega = tiempoEstimadoEntrega;
+    v.observaciones = JSON.stringify(obsData);
+    await v.save();
+    return this.getById(id);
   }
 
   static async cancelar(id) {

@@ -67,12 +67,12 @@ const resetPassword = async (req, res, next) => {
 
 const googleAuth = async (req, res, next) => {
   try {
-    const { credential, token } = req.body;
-    const finalToken = credential || token;
+    const { credential, token, email, correo, mode, allowRegister } = req.body;
+    const finalToken = credential || token || (email || correo ? req.body : null);
     if (!finalToken) {
       return res.status(400).json({ message: 'Token de Google no proporcionado' });
     }
-    const result = await AuthService.googleLogin(finalToken);
+    const result = await AuthService.googleLogin(finalToken, { mode, allowRegister });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);

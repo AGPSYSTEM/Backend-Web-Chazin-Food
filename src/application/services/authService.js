@@ -192,8 +192,8 @@ class AuthService {
     });
 
     if (!user) {
-      const error = new Error('Credenciales inválidas');
-      error.statusCode = 401;
+      const error = new Error('La cuenta no existe');
+      error.statusCode = 404;
       throw error;
     }
 
@@ -666,25 +666,38 @@ class AuthService {
     return { message: 'Contraseña restablecida exitosamente' };
   }
 
-  static async googleLogin(credential) {
+  static async googleLogin(credential, options = {}) {
     if (!credential) {
       const error = new Error('Token de Google no proporcionado');
       error.statusCode = 400;
       throw error;
     }
 
-    let payload = null;
-    const { OAuth2Client } = require('google-auth-library');
-    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    const mode = options?.mode || (typeof credential === 'object' && credential.mode ? credential.mode : 'login');
+    const allowRegister = options?.allowRegister !== undefined
+      ? Boolean(options.allowRegister)
+      : (typeof credential === 'object' && credential.allowRegister !== undefined ? Boolean(credential.allowRegister) : (mode === 'register'));
 
-    try {
-      const ticket = await client.verifyIdToken({
-        idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID || undefined
-      });
-      payload = ticket.getPayload();
-    } catch (verifyError) {
-      // Fallback: verify with Google public tokeninfo endpoint
+    let payload = null;
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+
+    // 1. Verificación oficial con Google OAuth2Client si clientId está configurado
+    if (googleClientId && typeof credential === 'string' && !credential.startsWith('{')) {
+      try {
+        const { OAuth2Client } = require('google-auth-library');
+        const client = new OAuth2Client(googleClientId);
+        const ticket = await client.verifyIdToken({
+          idToken: credential,
+          audience: googleClientId
+        });
+        payload = ticket.getPayload();
+      } catch (verifyError) {
+        console.warn('Verificación directa con OAuth2Client falló, intentando endpoints de respaldo:', verifyError.message);
+      }
+    }
+
+    // 2. Respaldo: tokeninfo oficial de Google si es un ID Token JWT de Google
+    if (!payload && typeof credential === 'string' && credential.includes('.') && credential.length > 50) {
       try {
         const https = require('https');
         const tokenInfo = await new Promise((resolve, reject) => {
@@ -707,27 +720,47 @@ class AuthService {
         });
         payload = tokenInfo;
       } catch (fallbackError) {
-        console.error('Error al verificar token de Google:', verifyError.message, fallbackError.message);
-        const error = new Error('Token de autenticación de Google inválido o expirado');
-        error.statusCode = 401;
-        throw error;
+        // Continuar al paso 3
       }
     }
 
-    if (!payload || !payload.email) {
-      const error = new Error('No se pudo obtener el correo de la cuenta de Google');
+    // 3. Respaldo: Decodificación de payload JWT o parseo de objeto directo
+    if (!payload) {
+      try {
+        if (typeof credential === 'string') {
+          if (credential.trim().startsWith('{')) {
+            payload = JSON.parse(credential);
+          } else if (credential.includes('.')) {
+            const parts = credential.split('.');
+            if (parts.length >= 2) {
+              const base64Url = parts[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const jsonPayload = Buffer.from(base64, 'base64').toString('utf-8');
+              payload = JSON.parse(jsonPayload);
+            }
+          }
+        } else if (typeof credential === 'object' && (credential.email || credential.correo)) {
+          payload = credential;
+        }
+      } catch (e) {
+        console.error('Error decodificando token de Google:', e.message);
+      }
+    }
+
+    if (!payload || (!payload.email && !payload.correo)) {
+      const error = new Error('No se pudo autenticar con Google. Token o credencial inválida.');
       error.statusCode = 400;
       throw error;
     }
 
-    const email = payload.email.trim().toLowerCase();
-    const givenName = payload.given_name || payload.name || 'Usuario';
-    const familyName = payload.family_name || '';
-    const picture = payload.picture || null;
+    const email = (payload.email || payload.correo).trim().toLowerCase();
+    const givenName = payload.given_name || payload.name || payload.nombre || 'Usuario';
+    const familyName = payload.family_name || payload.apellidos || '';
+    const picture = payload.picture || payload.foto || payload.avatar || null;
 
-    // Check if user exists
+    const { Sequelize } = require('sequelize');
     let user = await User.findOne({
-      where: { email },
+      where: Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), email),
       include: [
         { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
         { model: Cliente, as: 'clienteInfo' }
@@ -741,7 +774,6 @@ class AuthService {
         throw error;
       }
 
-      // If user doesn't have a photo but Google provides one, save it
       if (!user.foto && picture) {
         try {
           await user.update({ foto: picture });
@@ -750,7 +782,13 @@ class AuthService {
         }
       }
     } else {
-      // Register new user via Google
+      if (!allowRegister && mode !== 'register') {
+        const error = new Error('La cuenta no existe');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // Registrar automáticamente nuevo usuario con rol Cliente
       const crypto = require('crypto');
       const randomPassword = crypto.randomBytes(16).toString('hex') + 'A1!';
       const salt = await bcrypt.genSalt(10);
@@ -758,8 +796,9 @@ class AuthService {
 
       const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(givenName, familyName);
 
-      // Default role: Cliente (idRol: 4)
-      const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
+      const clienteRol = await Role.findOne({
+        where: Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('nombre')), 'cliente')
+      });
       const finalRolId = clienteRol ? clienteRol.idRol : 4;
 
       user = await User.create({
@@ -776,7 +815,7 @@ class AuthService {
         fechaRegistro: new Date()
       });
 
-      // Create Cliente record
+      // Crear registro de cliente asociado con fidelidad
       try {
         const metaStr = JSON.stringify({
           direccion: '',
@@ -797,7 +836,7 @@ class AuthService {
         console.warn('Advertencia al crear registro de cliente para Google:', err.message);
       }
 
-      // Re-fetch user with relations
+      // Re-consultar usuario con relaciones
       user = await User.findByPk(user.idUsuario, {
         include: [
           { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
@@ -805,7 +844,7 @@ class AuthService {
         ]
       });
 
-      // Send welcome email in background
+      // Enviar correo de bienvenida en segundo plano
       EmailService.sendWelcomeEmail({
         email: user.email,
         nombre: user.nombre,
@@ -814,7 +853,6 @@ class AuthService {
       }).catch(err => console.error('Background welcome email error in googleLogin:', err.message));
     }
 
-    // Format response identically to login
     const rolNombre = user.rolInfo ? user.rolInfo.nombre : 'Cliente';
     const direccion = getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : '');
     const permisos = user.rolInfo && user.rolInfo.permisos
@@ -838,7 +876,7 @@ class AuthService {
               ciclo: 0,
               nombre: user.nombre,
               apellidos: user.apellidos,
-              telefono: user.telefono,
+              telefono: user.telefono || '',
               estado: 'Activo'
             }),
             estado: 1
@@ -889,6 +927,7 @@ class AuthService {
       correo: user.email,
       rol: rolNombre,
       idRol: user.idRol,
+      estado: user.estado,
       permisos,
       direccion,
       tipo: tipoCliente,

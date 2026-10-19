@@ -171,12 +171,17 @@ class ClienteService {
     const { nombre: cleanNombre, apellidos: cleanApellidos } = cleanNameAndLastName(rawNombre, rawApellidos);
     const cleanTelefono = sanitizeTelefono(c.usuario ? c.usuario.telefono : (meta.telefono || ''));
 
+    const rawTipoDoc = (c.usuario && c.usuario.tipoDocumento) || meta.tipoDocumento || 'C.C.';
+    const rawDocumento = (c.usuario && c.usuario.numeroDocumento) || meta.documento || (c.idUsuario ? String(c.idUsuario) : '');
+
     return {
       id: c.idCliente,
       idCliente: c.idCliente,
       idUsuario: c.idUsuario || null,
       tieneCuenta: hasAccount,
       cuentaActiva: Boolean(hasAccount && isUserActive),
+      tipoDocumento: rawTipoDoc,
+      documento: rawDocumento,
       direccion: cleanDireccion,
       tipo,
       descuentoPorcentaje,
@@ -187,6 +192,7 @@ class ClienteService {
       telefono: cleanTelefono,
       estado: estadoStr,
       compras: comprasCount,
+      totalConsumido: `$${totalGastadoSum.toLocaleString('es-CO')}`,
       totalGastado: `$${totalGastadoSum.toLocaleString('es-CO')}`,
       ticketPromedio: comprasCount > 0 ? `$${Math.round(ticketPromedioVal / 1000)}K` : '$0',
       transacciones,
@@ -194,6 +200,8 @@ class ClienteService {
         id: c.usuario.idUsuario,
         nombre: cleanNombre,
         apellidos: cleanApellidos,
+        tipoDocumento: rawTipoDoc,
+        numeroDocumento: rawDocumento,
         email: c.usuario.email,
         telefono: cleanTelefono,
         estado: c.usuario.estado
@@ -208,7 +216,7 @@ class ClienteService {
         {
           model: User,
           as: 'usuario',
-          attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'telefono', 'estado', 'idRol'],
+          attributes: ['idUsuario', 'nombre', 'apellidos', 'tipoDocumento', 'numeroDocumento', 'email', 'telefono', 'estado', 'idRol'],
           include: [{ model: Role, as: 'rolInfo', attributes: ['idRol', 'nombre'] }]
         }
       ]
@@ -266,40 +274,74 @@ class ClienteService {
 
   static async create(data) {
     let idUsuario = data.idUsuario || null;
-    const sinCuenta = data.sinCuenta || data.crearSinCuenta || (!data.contrasena && !idUsuario);
     const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(data.nombre, data.apellidos);
     const cleanTel = sanitizeTelefono(data.telefono);
+    const cleanDoc = data.documento ? sanitizeDocumento(data.documento, data.tipoDocumento) : null;
 
-    // Only create a user if sinCuenta is false and credentials/data provided
-    if (!sinCuenta && !idUsuario && cleanNom && (data.email || data.contrasena)) {
+    // Validación de documento duplicado de inmediato en base de datos
+    if (cleanDoc) {
+      const existingUserDoc = await User.findOne({
+        where: { numeroDocumento: cleanDoc }
+      });
+      if (existingUserDoc) {
+        const error = new Error(`Ya existe un cliente registrado con el número de documento ${cleanDoc} (${existingUserDoc.nombre} ${existingUserDoc.apellidos || ''}).`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // Validación de correo duplicado
+    if (data.email && data.email.trim()) {
+      const existingEmail = await User.findOne({
+        where: { email: data.email.trim().toLowerCase() }
+      });
+      if (existingEmail) {
+        const error = new Error(`Ya existe un usuario registrado con el correo electrónico ${data.email.trim()}.`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // Siempre crear cuenta de acceso vinculada (Ítem 121: eliminada opción sin cuenta)
+    let tempPass = data.contrasena || `Chazin${Math.floor(1000 + Math.random() * 9000)}!`;
+    if (!idUsuario && cleanNom) {
       const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
-      const defaultPass = data.contrasena || '123456';
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(defaultPass, salt);
+      const hashedPassword = await bcrypt.hash(tempPass, salt);
+      const userEmail = data.email ? data.email.trim().toLowerCase() : `cliente_${cleanDoc || Date.now()}@chazinfood.com`;
 
       const user = await User.create({
         nombre: cleanNom,
         apellidos: cleanApe,
-        email: data.email ? data.email.trim() : `cliente_${Date.now()}@chazinfood.com`,
+        tipoDocumento: data.tipoDocumento || 'C.C.',
+        numeroDocumento: cleanDoc,
+        email: userEmail,
         telefono: cleanTel,
         contrasena: hashedPassword,
         idRol: clienteRol ? clienteRol.idRol : 4,
         estado: 'ACTIVO'
       });
       idUsuario = user.idUsuario;
+
+      // Despachar correo electrónico de activación para configurar contraseña
+      if (data.email && data.email.trim()) {
+        await EmailService.sendActivationEmail({
+          email: userEmail,
+          nombre: cleanNom,
+          apellidos: cleanApe,
+          password: tempPass,
+          activationLink: 'http://localhost:5173/login'
+        }).catch(err => console.error('Error enviando correo de activación:', err.message));
+      }
     }
 
     const tipo = data.tipo || 'Nuevo';
-    const defaultDesc = tipo === 'VIP' ? 15 : tipo === 'Frecuente' ? 10 : tipo === 'Regular' ? 5 : 0;
-    const descPorcent = defaultDesc;
-
-    // If client created without user account, it MUST be INACTIVO (0)
-    const estadoVal = (sinCuenta || !idUsuario || data.estado === 'Inactivo' || data.estado === 0) ? 0 : 1;
-
     const now = new Date();
     const fechaVence = tipo !== 'Nuevo' ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
 
     const direccionMeta = JSON.stringify({
+      tipoDocumento: data.tipoDocumento || 'C.C.',
+      documento: cleanDoc,
       direccion: data.direccion || '',
       tipo,
       ciclo: 0,
@@ -310,7 +352,7 @@ class ClienteService {
     const cliente = await Cliente.create({
       idUsuario: idUsuario,
       direccion: direccionMeta,
-      estado: estadoVal
+      estado: 1
     });
 
     await resetAutoIncrement('cliente', 'idCliente');

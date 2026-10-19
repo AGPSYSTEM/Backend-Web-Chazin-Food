@@ -2,7 +2,7 @@ const DashboardService = require('../../application/services/dashboardService');
 
 const getStats = async (req, res, next) => {
   try {
-    const stats = await DashboardService.getStats();
+    const stats = await DashboardService.getStats(req.query);
     res.json(stats);
   } catch (error) {
     next(error);
@@ -11,7 +11,7 @@ const getStats = async (req, res, next) => {
 
 const getVentasChart = async (req, res, next) => {
   try {
-    const data = await DashboardService.getVentasChart();
+    const data = await DashboardService.getVentasChart(req.query);
     res.json(data);
   } catch (error) {
     next(error);
@@ -20,7 +20,7 @@ const getVentasChart = async (req, res, next) => {
 
 const getProductosPopulares = async (req, res, next) => {
   try {
-    const data = await DashboardService.getProductosPopulares();
+    const data = await DashboardService.getProductosPopulares(req.query);
     res.json(data);
   } catch (error) {
     next(error);
@@ -29,7 +29,7 @@ const getProductosPopulares = async (req, res, next) => {
 
 const getAlertasStock = async (req, res, next) => {
   try {
-    const data = await DashboardService.getAlertasStock();
+    const data = await DashboardService.getAlertasStock(req.query);
     res.json(data);
   } catch (error) {
     next(error);
@@ -38,7 +38,7 @@ const getAlertasStock = async (req, res, next) => {
 
 const getVentasRecientes = async (req, res, next) => {
   try {
-    const data = await DashboardService.getVentasRecientes();
+    const data = await DashboardService.getVentasRecientes(req.query);
     res.json(data);
   } catch (error) {
     next(error);
