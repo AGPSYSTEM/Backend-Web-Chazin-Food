@@ -136,6 +136,7 @@ class ProductService {
       descripcion: descripcion || '',
       imagen: imagen || '',
       categoria: categoria || '',
+      precio: (precio !== undefined && precio !== null && precio !== '') ? Number(precio) : 0.00,
       stock: stock || 0,
       estado: normalizedEstado,
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
@@ -165,6 +166,9 @@ class ProductService {
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
+    if (precio !== undefined && precio !== null && precio !== '') {
+      p.precio = Number(precio) || 0;
+    }
     if (estado !== undefined) {
       p.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
     }
@@ -176,7 +180,7 @@ class ProductService {
       if (catObj) p.idCategoriaProducto = catObj.idCategoriaProducto;
     }
 
-    if (adiciones !== undefined) p.adiciones = JSON.stringify(adiciones);
+    if (adiciones !== undefined) p.adiciones = typeof adiciones === 'string' ? adiciones : JSON.stringify(adiciones);
 
     await p.save();
 
@@ -206,14 +210,39 @@ class ProductService {
       throw error;
     }
 
-    // Delete associated ficha técnica and its details
-    const { FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
-    const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
-    if (ficha) {
-      await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
-      await ficha.destroy();
+    const { FichaTecnica, DetalleFichaInsumo, Evento, Variante, DetalleVentaProducto } = require('../../persistence/models');
+
+    // 1. Delete associated events
+    try {
+      await Evento.destroy({ where: { idProducto: id } });
+    } catch (_) {}
+
+    // 2. Delete associated ficha técnica
+    try {
+      const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
+      if (ficha) {
+        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
+        await ficha.destroy();
+      }
+    } catch (_) {}
+
+    // 3. Check if any product variant is in sales details
+    const variantes = await Variante.findAll({ where: { idProducto: id } });
+    const varianteIds = variantes.map(v => v.idVariante);
+    
+    if (varianteIds.length > 0) {
+      const inVenta = await DetalleVentaProducto.findOne({ where: { idVariante: varianteIds } });
+      if (inVenta) {
+        // Soft delete (desactivar) if it has sales history to preserve relational integrity
+        p.estado = 0;
+        await p.save();
+        return { message: 'Producto desactivado (con historial de ventas)' };
+      }
+      // Delete variants first to prevent FK constraint failure
+      await Variante.destroy({ where: { idProducto: id } });
     }
 
+    // 4. Delete product
     await p.destroy();
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('producto', 'idProducto');

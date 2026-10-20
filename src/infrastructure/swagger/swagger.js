@@ -934,9 +934,6 @@ module.exports = {
  *     responses:
  *       201:
  *         description: Movimiento de trazabilidad registrado.
-<<<<<<< HEAD
- */
-=======
  *
  * /api/clientes:
  *   get:
@@ -1544,6 +1541,3 @@ module.exports = {
  *       200:
  *         description: Compra cancelada. Si estaba RECIBIDA se descuenta del stock.
  */
-
-
->>>>>>> develop
