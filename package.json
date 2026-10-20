@@ -12,6 +12,8 @@
     "cleanup:images": "node scripts/cleanup_orphan_cloudinary_images.js"
   },
   "dependencies": {
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.1.1",
     "bcryptjs": "^2.4.3",
     "chazin-food-frontend": "file:..",
     "cloudinary": "^1.41.3",
@@ -26,6 +28,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "mysql2": "^3.23.0",
     "nodemailer": "^9.0.3",
+    "react": "^19.3.1",
     "sequelize": "^6.37.0",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
