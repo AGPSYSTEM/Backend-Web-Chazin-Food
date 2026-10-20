@@ -1,15 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const { getUsers, getUserById, createUser, updateUser, changeUserPassword, toggleUserStatus, deleteUser } = require('../controllers/userController');
-const { registerUser, loginUser, forgotPassword, resetPassword } = require('../controllers/authController');
+const { registerUser, loginUser, forgotPassword, resetPassword, getUserProfile, updateUserProfile, googleAuth } = require('../controllers/authController');
+const { protect } = require('../../infrastructure/middlewares/authMiddleware');
 
 router.post('/login', loginUser);
+router.post('/google', googleAuth);
 router.post('/registro', registerUser);
 router.post('/register', registerUser);
 router.post('/recuperar-contrasena', forgotPassword);
 router.post('/forgot-password', forgotPassword);
 router.post('/restablecer-contrasena', resetPassword);
 router.post('/reset-password', resetPassword);
+
+// Perfil de usuario autenticado
+router.route('/perfil')
+  .get(protect, getUserProfile)
+  .put(protect, updateUserProfile);
 
 router.route('/')
   .get(getUsers)

@@ -4,7 +4,7 @@ class CategoryService {
   static async getAllCategories() {
     const categories = await CategoriaInsumo.findAll();
     const list = await Promise.all(categories.map(async (cat) => {
-      const cantidad = await Insumo.count({ where: { idCategoriaInsumo: cat.id } });
+      const cantidad = await Insumo.count({ where: { idCategoriaInsumo: cat.id, eliminado: 0 } });
       return {
         id: cat.id,
         idCategoriaInsumo: cat.id,
@@ -24,7 +24,7 @@ class CategoryService {
       error.statusCode = 404;
       throw error;
     }
-    const cantidad = await Insumo.count({ where: { idCategoriaInsumo: id } });
+    const cantidad = await Insumo.count({ where: { idCategoriaInsumo: id, eliminado: 0 } });
     return {
       id: cat.id,
       idCategoriaInsumo: cat.id,
@@ -38,6 +38,12 @@ class CategoryService {
   static async createCategory({ nombre, descripcion }) {
     if (!nombre || !nombre.trim()) {
       const error = new Error('El nombre de la categoría es obligatorio');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (/\d/.test(nombre)) {
+      const error = new Error('El nombre de la categoría no debe contener números');
       error.statusCode = 400;
       throw error;
     }
@@ -66,7 +72,14 @@ class CategoryService {
       throw error;
     }
 
-    if (data.nombre) cat.nombre = data.nombre.trim();
+    if (data.nombre) {
+      if (/\d/.test(data.nombre)) {
+        const error = new Error('El nombre de la categoría no debe contener números');
+        error.statusCode = 400;
+        throw error;
+      }
+      cat.nombre = data.nombre.trim();
+    }
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
     if (data.estado !== undefined) {
       cat.estado = data.estado === 'Activo' || data.estado === 1 ? 1 : 0;
@@ -84,12 +97,15 @@ class CategoryService {
       throw error;
     }
 
-    const cantidadInsumos = await Insumo.count({ where: { idCategoriaInsumo: id } });
+    const cantidadInsumos = await Insumo.count({ where: { idCategoriaInsumo: id, eliminado: 0 } });
     if (cantidadInsumos > 0) {
       const error = new Error('No se puede eliminar la categoría porque cuenta con insumos asociados');
       error.statusCode = 400;
       throw error;
     }
+
+    // Desasociar insumos en papelera / eliminados
+    await Insumo.update({ idCategoriaInsumo: null }, { where: { idCategoriaInsumo: id } });
 
     await cat.destroy();
 

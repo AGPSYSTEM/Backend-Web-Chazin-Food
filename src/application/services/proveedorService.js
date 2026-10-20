@@ -108,6 +108,17 @@ class ProveedorService {
       throw error;
     }
 
+    if (finalNumeroDocumento && String(finalNumeroDocumento).trim()) {
+      const existingDoc = await Proveedor.findOne({
+        where: { numeroDocumento: String(finalNumeroDocumento).trim() }
+      });
+      if (existingDoc) {
+        const error = new Error(`Ya existe un proveedor registrado con el número de documento / NIT: ${finalNumeroDocumento}`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     // Determinar idTipoProveedor (1: Mayorista, 2: Distribuidor, 3: Fabricante)
     let parsedTipoProv = Number(idTipoProveedor);
     if (!parsedTipoProv || isNaN(parsedTipoProv)) {
@@ -144,6 +155,15 @@ class ProveedorService {
       estado: estadoInt
     });
 
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Creado',
+      entidadNombre: proveedor.nombre,
+      detalle: `Se registró el proveedor en el sistema: ${proveedor.nombre}`,
+      motivo: 'Registro inicial de proveedor',
+      usuarioId: data.usuarioId || null
+    }).catch(() => {});
+
     return this.getById(proveedor.idProveedor);
   }
 
@@ -168,8 +188,8 @@ class ProveedorService {
     const errores = [];
 
     if (finalNumeroDocumento !== undefined && String(finalNumeroDocumento).trim() !== '') {
-      if (!/^[\d.\-\s]+$/.test(String(finalNumeroDocumento).trim()))
-        errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento solo puede contener dígitos, puntos y guiones.' });
+      if (!/^[\d]+$/.test(String(finalNumeroDocumento).trim()))
+        errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento solo puede contener dígitos, sin puntos ni guiones.' });
     }
 
     if (telefono !== undefined && String(telefono).trim() !== '') {
@@ -187,6 +207,21 @@ class ProveedorService {
       error.statusCode = 400;
       error.errores = errores;
       throw error;
+    }
+
+    if (finalNumeroDocumento && String(finalNumeroDocumento).trim()) {
+      const { Op } = require('sequelize');
+      const existingDoc = await Proveedor.findOne({
+        where: {
+          numeroDocumento: String(finalNumeroDocumento).trim(),
+          idProveedor: { [Op.ne]: idProveedor }
+        }
+      });
+      if (existingDoc) {
+        const error = new Error(`Ya existe otro proveedor registrado con el número de documento / NIT: ${finalNumeroDocumento}`);
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
     if (nombre !== undefined) p.nombre = nombre.trim();
@@ -217,10 +252,20 @@ class ProveedorService {
     if (estado !== undefined) p.estado = (estado === 'Activo' || estado === 1) ? 1 : 0;
 
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Editado',
+      entidadNombre: p.nombre,
+      detalle: `Se actualizaron los datos del proveedor: ${p.nombre}`,
+      motivo: 'Actualización de datos',
+      usuarioId: data.usuarioId || null
+    }).catch(() => {});
+
     return this.getById(idProveedor);
   }
 
-  static async toggleEstado(idProveedor, estado) {
+  static async toggleEstado(idProveedor, estado, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -237,10 +282,20 @@ class ProveedorService {
 
     p.estado = nuevoEstado;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Estado Cambiado',
+      entidadNombre: p.nombre,
+      detalle: `El proveedor ${p.nombre} cambió su estado a ${nuevoEstado === 1 ? 'Activo' : 'Inactivo'}`,
+      motivo: 'Cambio de estado',
+      usuarioId: options.usuarioId || null
+    }).catch(() => {});
+
     return this.getById(idProveedor);
   }
 
-  static async delete(idProveedor) {
+  static async delete(idProveedor, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -250,10 +305,20 @@ class ProveedorService {
 
     p.estado = 0;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado',
+      entidadNombre: p.nombre,
+      detalle: `Se envió a la papelera el proveedor: ${p.nombre}`,
+      motivo: 'Inactivación / Papelera',
+      usuarioId: options.usuarioId || null
+    }).catch(() => {});
+
     return { message: 'Proveedor inactivado exitosamente' };
   }
 
-  static async restore(idProveedor) {
+  static async restore(idProveedor, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -262,10 +327,20 @@ class ProveedorService {
     }
     p.estado = 1;
     await p.save();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Restaurado',
+      entidadNombre: p.nombre,
+      detalle: `Se restauró el proveedor: ${p.nombre}`,
+      motivo: 'Restauración desde papelera',
+      usuarioId: options.usuarioId || null
+    }).catch(() => {});
+
     return this.getById(idProveedor);
   }
 
-  static async deletePermanente(idProveedor) {
+  static async deletePermanente(idProveedor, options = {}) {
     const p = await Proveedor.findByPk(idProveedor);
     if (!p) {
       const error = new Error('Proveedor no encontrado');
@@ -282,7 +357,17 @@ class ProveedorService {
       throw error;
     }
 
+    const nombreProv = p.nombre;
     await p.destroy();
+
+    const TrazabilidadService = require('./trazabilidadService');
+    await TrazabilidadService.create({
+      tipo: 'Eliminado permanente',
+      entidadNombre: nombreProv,
+      detalle: `Se eliminó permanentemente el proveedor: ${nombreProv}`,
+      motivo: 'Eliminación física definitiva',
+      usuarioId: options.usuarioId || null
+    }).catch(() => {});
 
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
     await resequenceTableIds('proveedor', 'idProveedor', ['insumo', 'compra']);

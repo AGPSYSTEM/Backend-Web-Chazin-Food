@@ -84,6 +84,14 @@ class RoleService {
       throw error;
     }
 
+    if (Number(id) === 1 || (role.nombre && role.nombre.toLowerCase() === 'administrador')) {
+      if (estado !== undefined && (estado === 'Inactivo' || estado === 0 || estado === 'INACTIVO')) {
+        const error = new Error('El rol Administrador no se puede desactivar');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     if (nombre) role.nombre = nombre.trim();
     if (descripcion !== undefined) role.descripcion = descripcion ? descripcion.trim() : '';
     if (estado !== undefined) role.estado = estado === 'Activo' || estado === 1 ? 1 : 0;

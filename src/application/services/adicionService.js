@@ -1,104 +1,149 @@
-const { Adicion, Insumo } = require('../../persistence/models');
+const { Insumo } = require('../../persistence/models');
+
+function formatAdicion(insumo) {
+  return {
+    idAdicion: insumo.idInsumo,
+    id: insumo.idInsumo,
+    idInsumo: insumo.idInsumo,
+    nombre: insumo.nombre,
+    descripcion: insumo.descripcion || '',
+    imagen: insumo.imagen || '',
+    precio: parseFloat(insumo.precioAdicion || 0),
+    stock: parseFloat(insumo.stock || 0),
+    unidadMedida: insumo.unidadMedida,
+    estado: insumo.estado,
+    esAdicion: 1,
+    insumo: {
+      idInsumo: insumo.idInsumo,
+      nombre: insumo.nombre
+    }
+  };
+}
 
 class AdicionService {
   static async getAll() {
-    return await Adicion.findAll({
-      where: { estado: 1 },
-      include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre'] }]
+    const insumos = await Insumo.findAll({
+      where: { esAdicion: 1, estado: 1, eliminado: 0 }
     });
+    return insumos.map(formatAdicion);
   }
 
   static async getById(id) {
-    const adicion = await Adicion.findByPk(id, {
-      include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre'] }]
-    });
-    if (!adicion) {
+    const insumo = await Insumo.findByPk(id);
+    if (!insumo || !insumo.esAdicion) {
       const error = new Error('Adición no encontrada');
       error.statusCode = 404;
       throw error;
     }
-    return adicion;
+    return formatAdicion(insumo);
   }
 
   static async create(data) {
     const { idInsumo, nombre, descripcion, imagen, precio, estado } = data;
 
-    if (!idInsumo || !nombre || precio === undefined) {
-      const error = new Error('Insumo, nombre y precio son obligatorios para la adición');
-      error.statusCode = 400;
-      throw error;
+    let targetInsumo = null;
+    if (idInsumo) {
+      targetInsumo = await Insumo.findByPk(idInsumo);
     }
 
-    const adicion = await Adicion.create({
-      idInsumo,
-      nombre: nombre.trim(),
-      descripcion: descripcion || '',
-      imagen: imagen || '',
-      precio: parseFloat(precio),
-      estado: estado === 'Inactivo' || estado === 0 ? 0 : 1
-    });
+    if (targetInsumo) {
+      targetInsumo.esAdicion = 1;
+      if (precio !== undefined) targetInsumo.precioAdicion = parseFloat(precio);
+      if (imagen !== undefined) targetInsumo.imagen = imagen;
+      if (descripcion !== undefined) targetInsumo.descripcion = descripcion;
+      if (estado !== undefined) targetInsumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+      await targetInsumo.save();
+    } else {
+      if (!nombre || precio === undefined) {
+        const error = new Error('Nombre y precio son obligatorios para la adición');
+        error.statusCode = 400;
+        throw error;
+      }
+      targetInsumo = await Insumo.create({
+        nombre: nombre.trim(),
+        descripcion: descripcion || '',
+        imagen: imagen || '',
+        esAdicion: 1,
+        precioAdicion: parseFloat(precio),
+        precioUnitario: 0,
+        stock: 0,
+        stockMinimo: 5,
+        unidadMedida: 'und',
+        estado: estado === 'Inactivo' || estado === 0 ? 0 : 1
+      });
+    }
 
     const TrazabilidadService = require('./trazabilidadService');
-    await TrazabilidadService.registrarMovimiento({
-      entidad: 'Adicion',
-      idEntidad: adicion.idAdicion,
-      accion: 'Creacion',
-      detalles: `Se creó la adición ${adicion.nombre} por $${adicion.precio}`
+    await TrazabilidadService.create({
+      tipo: 'Creado',
+      entidadNombre: `Adición: ${targetInsumo.nombre}`,
+      detalle: `Se habilitó como adición ${targetInsumo.nombre} por $${targetInsumo.precioAdicion}`,
+      idInsumo: targetInsumo.idInsumo,
+      motivo: 'Creación/Habilitación de adición',
+      skipStockUpdate: true
     });
 
-    return this.getById(adicion.idAdicion);
+    return formatAdicion(targetInsumo);
   }
 
   static async update(id, data) {
-    const adicion = await Adicion.findByPk(id);
-    if (!adicion) {
+    const insumo = await Insumo.findByPk(id);
+    if (!insumo) {
       const error = new Error('Adición no encontrada');
       error.statusCode = 404;
       throw error;
     }
 
-    const { idInsumo, nombre, descripcion, imagen, precio, estado } = data;
-    
-    if (idInsumo !== undefined) adicion.idInsumo = idInsumo;
-    if (nombre !== undefined) adicion.nombre = nombre.trim();
-    if (descripcion !== undefined) adicion.descripcion = descripcion;
-    if (imagen !== undefined) adicion.imagen = imagen;
-    if (precio !== undefined) adicion.precio = parseFloat(precio);
-    if (estado !== undefined) adicion.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+    const { nombre, descripcion, imagen, precio, estado } = data;
 
-    await adicion.save();
-    
+    if (imagen !== undefined && insumo.imagen && insumo.imagen !== imagen && insumo.imagen.startsWith('http')) {
+      const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+      deleteImage(insumo.imagen).catch((err) => console.warn('⚠️ Error al eliminar imagen anterior de adición:', err.message));
+    }
+
+    if (nombre !== undefined) insumo.nombre = nombre.trim();
+    if (descripcion !== undefined) insumo.descripcion = descripcion;
+    if (imagen !== undefined) insumo.imagen = imagen;
+    if (precio !== undefined) insumo.precioAdicion = parseFloat(precio);
+    if (estado !== undefined) insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+
+    await insumo.save();
+
     const TrazabilidadService = require('./trazabilidadService');
-    await TrazabilidadService.registrarMovimiento({
-      entidad: 'Adicion',
-      idEntidad: adicion.idAdicion,
-      accion: 'Actualizacion',
-      detalles: `Se actualizó la adición ${adicion.nombre}`
+    await TrazabilidadService.create({
+      tipo: 'Editado',
+      entidadNombre: `Adición: ${insumo.nombre}`,
+      detalle: `Se actualizó la adición ${insumo.nombre}`,
+      idInsumo: insumo.idInsumo,
+      motivo: 'Actualización de adición',
+      skipStockUpdate: true
     });
 
-    return this.getById(id);
+    return formatAdicion(insumo);
   }
 
   static async softDelete(id) {
-    const adicion = await Adicion.findByPk(id);
-    if (!adicion) {
+    const insumo = await Insumo.findByPk(id);
+    if (!insumo) {
       const error = new Error('Adición no encontrada');
       error.statusCode = 404;
       throw error;
     }
 
-    adicion.estado = 0;
-    await adicion.save();
+    insumo.esAdicion = 0;
+    await insumo.save();
 
     const TrazabilidadService = require('./trazabilidadService');
-    await TrazabilidadService.registrarMovimiento({
-      entidad: 'Adicion',
-      idEntidad: adicion.idAdicion,
-      accion: 'Eliminacion (Soft)',
-      detalles: `Se desactivó la adición ${adicion.nombre}`
+    await TrazabilidadService.create({
+      tipo: 'Eliminado',
+      entidadNombre: `Adición: ${insumo.nombre}`,
+      detalle: `Se deshabilitó como adición el insumo: ${insumo.nombre}`,
+      idInsumo: insumo.idInsumo,
+      motivo: 'Deshabilitación de adición',
+      skipStockUpdate: true
     });
 
-    return { message: 'Adición desactivada' };
+    return { message: 'Adición deshabilitada correctamente' };
   }
 }
 

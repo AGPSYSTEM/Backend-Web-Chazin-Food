@@ -22,7 +22,8 @@ const getProveedorById = async (req, res, next) => {
 
 const createProveedor = async (req, res, next) => {
   try {
-    const nuevoProveedor = await ProveedorService.create(req.body);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const nuevoProveedor = await ProveedorService.create({ ...req.body, usuarioId });
     res.status(201).json(nuevoProveedor);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -39,7 +40,8 @@ const createProveedor = async (req, res, next) => {
 
 const updateProveedor = async (req, res, next) => {
   try {
-    const actualizado = await ProveedorService.update(req.params.id, req.body);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const actualizado = await ProveedorService.update(req.params.id, { ...req.body, usuarioId });
     res.json(actualizado);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -56,8 +58,9 @@ const updateProveedor = async (req, res, next) => {
 
 const toggleProveedorEstado = async (req, res, next) => {
   try {
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
     const { estado } = req.body;
-    const result = await ProveedorService.toggleEstado(req.params.id, estado);
+    const result = await ProveedorService.toggleEstado(req.params.id, estado, { usuarioId });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -67,7 +70,8 @@ const toggleProveedorEstado = async (req, res, next) => {
 
 const deleteProveedor = async (req, res, next) => {
   try {
-    const result = await ProveedorService.delete(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await ProveedorService.delete(req.params.id, { usuarioId });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -77,7 +81,8 @@ const deleteProveedor = async (req, res, next) => {
 
 const restoreProveedor = async (req, res, next) => {
   try {
-    const restaurado = await ProveedorService.restore(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const restaurado = await ProveedorService.restore(req.params.id, { usuarioId });
     res.json(restaurado);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);
@@ -87,7 +92,8 @@ const restoreProveedor = async (req, res, next) => {
 
 const deletePermanenteProveedor = async (req, res, next) => {
   try {
-    const result = await ProveedorService.deletePermanente(req.params.id);
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await ProveedorService.deletePermanente(req.params.id, { usuarioId });
     res.json(result);
   } catch (error) {
     if (error.statusCode) res.status(error.statusCode);

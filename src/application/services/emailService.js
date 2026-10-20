@@ -23,6 +23,73 @@ class EmailService {
     };
   }
 
+  static async sendActivationEmail({ email, nombre, apellidos, password, activationLink }) {
+    try {
+      const emailConfig = this.getTransporter();
+      const userName = `${nombre} ${apellidos || ''}`.trim();
+      const userEmail = email;
+      const targetLink = activationLink || 'http://localhost:5173/login';
+
+      if (!emailConfig) {
+        console.log('\n╔══════════════════════════════════════════════════════╗');
+        console.log('║  ✉️ CORREO DE ACTIVACIÓN DE CLIENTE (DEV - NO SMTP)  ║');
+        console.log('╠══════════════════════════════════════════════════════╣');
+        console.log(`║  Para: ${userName} <${userEmail}>`);
+        console.log(`║  Enlace Activación: ${targetLink}`);
+        console.log(`║  Clave Temporal: ${password}`);
+        console.log('╚══════════════════════════════════════════════════════╝\n');
+        return true;
+      }
+
+      const html = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #f1f5f9; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h1 style="color: #ef4444; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Chazin Food</h1>
+            <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Comidas Rápidas Artesanales</p>
+          </div>
+          
+          <div style="background-color: #f8fafc; border-radius: 16px; padding: 24px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+            <h2 style="color: #1e293b; font-size: 18px; margin-top: 0; margin-bottom: 12px;">¡Bienvenido a Chazin Food, ${userName}! 🎉</h2>
+            <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+              Tu cuenta de cliente ha sido registrada en nuestro sistema. Para configurar tu acceso y comenzar a disfrutar de nuestros productos artesanales y beneficios de fidelización, por favor activa tu cuenta ingresando con tus credenciales:
+            </p>
+            
+            <div style="background-color: #ffffff; padding: 16px; border-radius: 12px; border: 1px dashed #cbd5e1; margin-bottom: 20px;">
+              <p style="margin: 4px 0; color: #334155; font-size: 13px;"><strong>Usuario / Correo:</strong> <span style="color: #0284c7;">${userEmail}</span></p>
+              <p style="margin: 4px 0; color: #334155; font-size: 13px;"><strong>Contraseña temporal:</strong> <code style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #ef4444;">${password}</code></p>
+            </div>
+
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${targetLink}" style="background-color: #ef4444; color: #ffffff; text-decoration: none; padding: 13px 28px; border-radius: 12px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">
+                Activar Mi Cuenta y Configurar Acceso
+              </a>
+            </div>
+            
+            <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0; text-align: center;">
+              Por seguridad, te recomendamos cambiar tu contraseña una vez hayas iniciado sesión por primera vez.
+            </p>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+            Este es un correo automático generado por Chazin Food Web. Si no esperabas este mensaje, puedes ignorarlo.
+          </p>
+        </div>
+      `;
+
+      await emailConfig.transporter.sendMail({
+        from: emailConfig.from,
+        to: userEmail,
+        subject: '🍔 ¡Activa tu cuenta de cliente en Chazin Food! Credenciales de acceso',
+        html
+      });
+      console.log(`✅ Correo de activación de cliente enviado a ${userEmail}`);
+      return true;
+    } catch (err) {
+      console.error('Error al enviar correo de activación de cliente via Nodemailer:', err.message);
+      return false;
+    }
+  }
+
   static async sendWelcomeEmail({ email, nombre, apellidos, password }) {
     try {
       const emailConfig = this.getTransporter();

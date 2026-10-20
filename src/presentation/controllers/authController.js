@@ -34,6 +34,17 @@ const getUserProfile = async (req, res, next) => {
   }
 };
 
+const updateUserProfile = async (req, res, next) => {
+  try {
+    const userId = req.user._id || req.user.id || req.user.idUsuario;
+    const result = await AuthService.updateProfile(userId, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 const forgotPassword = async (req, res, next) => {
   try {
     const result = await AuthService.forgotPassword(req.body);
@@ -54,10 +65,27 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+const googleAuth = async (req, res, next) => {
+  try {
+    const { credential, token, email, correo, mode, allowRegister } = req.body;
+    const finalToken = credential || token || (email || correo ? req.body : null);
+    if (!finalToken) {
+      return res.status(400).json({ message: 'Token de Google no proporcionado' });
+    }
+    const result = await AuthService.googleLogin(finalToken, { mode, allowRegister });
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
+  updateUserProfile,
   forgotPassword,
   resetPassword,
+  googleAuth,
 };
