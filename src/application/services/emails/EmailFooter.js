@@ -115,7 +115,7 @@ function EmailFooter() {
           margin: 0
         }
       },
-      '📍 Bogotá D.C., Colombia • Pedidos Online y Presencial',
+      '📍 Cl. 21 #80-21, Belén, Medellín, Colombia • Pedidos Online y Presencial',
       e('br'),
       `© ${currentYear} Chazin Food. Todos los derechos reservados.`,
       e('br'),
