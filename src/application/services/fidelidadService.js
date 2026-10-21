@@ -89,15 +89,16 @@ class FidelidadService {
         enGracia = false;
         estadoCiclo = "ACTIVO";
       } else {
-        // El mes venció, evaluar periodos de gracia
-        const diasExpirado = Math.abs(diasVigenciaRestantes);
+        // El mes venció, evaluar periodos de gracia con precisión exacta
+        const msExpirado = Math.abs(msDiff);
+        const diasExpirado = msExpirado / (1000 * 60 * 60 * 24);
 
         if (tipo === "VIP") {
           const limiteGraciaVIP = 15;
           if (diasExpirado <= limiteGraciaVIP) {
             // Está en periodo de gracia VIP de 15 días
             enGracia = true;
-            diasGraciaRestantes = Math.max(1, limiteGraciaVIP - diasExpirado);
+            diasGraciaRestantes = Math.max(1, Math.ceil(limiteGraciaVIP - diasExpirado));
             diasRestantes = 0;
             estadoCiclo = "EN_GRACIA";
           } else {
@@ -109,7 +110,7 @@ class FidelidadService {
               // Ahora está en periodo de gracia de Frecuente (10 días)
               tipo = "Frecuente";
               enGracia = true;
-              diasGraciaRestantes = Math.max(1, limiteGraciaFrecuente - diasExcedidosFrecuente);
+              diasGraciaRestantes = Math.max(1, Math.ceil(limiteGraciaFrecuente - diasExcedidosFrecuente));
               diasRestantes = 0;
               estadoCiclo = "EN_GRACIA";
               comprasCiclo = 0;
@@ -130,7 +131,7 @@ class FidelidadService {
           if (diasExpirado <= limiteGraciaFrecuente) {
             // Está en periodo de gracia Frecuente de 10 días
             enGracia = true;
-            diasGraciaRestantes = Math.max(1, limiteGraciaFrecuente - diasExpirado);
+            diasGraciaRestantes = Math.max(1, Math.ceil(limiteGraciaFrecuente - diasExpirado));
             diasRestantes = 0;
             estadoCiclo = "EN_GRACIA";
           } else {

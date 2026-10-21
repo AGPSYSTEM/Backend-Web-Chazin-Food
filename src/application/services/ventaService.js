@@ -644,18 +644,23 @@ class VentaService {
       try {
         const clienteInfo = await ClienteService.getById(finalClienteId);
         if (clienteInfo && clienteInfo.tieneCuenta) {
-          const comprasPrevias = Number(clienteInfo.compras || 0);
-          const cicloActual = clienteInfo.fidelidad?.comprasCiclo !== undefined
-            ? Number(clienteInfo.fidelidad.comprasCiclo)
-            : (comprasPrevias % 3);
+          const nivel = clienteInfo.tipo || clienteInfo.fidelidad?.tipo || 'Nuevo';
+          let pct = Number(clienteInfo.descuentoPorcentaje !== undefined ? clienteInfo.descuentoPorcentaje : (clienteInfo.fidelidad?.descuentoPorcentaje || 0));
 
-          // Regla de fidelización: Descuento del 30% cada 3 compras
-          const esTerceraCompra = (cicloActual === 2) || ((comprasPrevias + 1) % 3 === 0);
+          // Descuentos oficiales del Club de Fidelización Chazin Food:
+          // - Cliente Nuevo: 0% OFF
+          // - Cliente Regular: 5% OFF (vigencia 30 días)
+          // - Cliente Frecuente: 10% OFF (vigencia 30 días + 10 días de gracia)
+          // - Cliente VIP: 15% OFF (vigencia 30 días + 15 días de gracia)
+          if (!pct || pct <= 0) {
+            if (nivel === 'Regular') pct = 5;
+            else if (nivel === 'Frecuente') pct = 10;
+            else if (nivel === 'VIP') pct = 15;
+            else pct = 0;
+          }
 
-          if (esTerceraCompra) {
-            finalDescuento = Math.round(finalSubtotal * 0.30); // 30% de descuento en cada 3ra compra
-          } else if (clienteInfo.tipo && ['Regular', 'Frecuente', 'VIP'].includes(clienteInfo.tipo) && Number(clienteInfo.descuentoPorcentaje) > 0) {
-            finalDescuento = Math.round(finalSubtotal * (Number(clienteInfo.descuentoPorcentaje) / 100));
+          if (pct > 0 && ['Regular', 'Frecuente', 'VIP'].includes(nivel)) {
+            finalDescuento = Math.round(finalSubtotal * (pct / 100));
           }
         }
       } catch (e) {
@@ -968,8 +973,8 @@ class VentaService {
       }
     }
 
-    // Trigger client loyalty progression (strictly only for registered customer accounts, never for Cliente Mostrador)
-    if (finalClienteId && !isMostradorSale) {
+    // Trigger client loyalty progression (strictly only for registered customer accounts and when sale is approved)
+    if (finalClienteId && !isMostradorSale && finalEstadoAprobacion === 'APROBADO') {
       ClienteService.registrarCompraFidelidad(finalClienteId).catch(err =>
         console.warn('Error registrando fidelidad:', err.message)
       );
@@ -1069,7 +1074,14 @@ class VentaService {
       }
     }
 
-    // Nota: la fidelidad se registra de forma única y atómica al crear la venta en el método create()
+    // Si la venta estaba PENDIENTE y ahora fue aprobada/procesada, registrar fidelidad del cliente
+    if (estadoAnterior === 'PENDIENTE' && (estadoEnum === 'PREPARANDO' || estadoEnum === 'LISTO' || estadoEnum === 'ENTREGADO')) {
+      if (v.idCliente && Number(v.idCliente) !== 26) {
+        ClienteService.registrarCompraFidelidad(v.idCliente).catch(err =>
+          console.warn('Error registrando fidelidad al aprobar venta pendiente:', err.message)
+        );
+      }
+    }
 
     return this.getById(id);
   }

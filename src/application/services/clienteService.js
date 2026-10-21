@@ -569,10 +569,30 @@ class ClienteService {
         }
       }
 
+      let prevPurchases = 0;
+      if (meta.ciclo === undefined || !meta.tipo) {
+        try {
+          const { Venta } = require('../../persistence/models');
+          prevPurchases = await Venta.count({
+            where: {
+              [Op.or]: [
+                { idCliente: c.idCliente },
+                ...(c.idUsuario ? [{ idUsuario: c.idUsuario }] : [])
+              ],
+              estadoEntrega: { [Op.ne]: 'CANCELADO' },
+              estadoAprobacion: { [Op.ne]: 'RECHAZADO' }
+            }
+          });
+        } catch (_) {}
+      }
+
+      const calculatedTier = prevPurchases >= 9 ? 'VIP' : prevPurchases >= 6 ? 'Frecuente' : prevPurchases >= 3 ? 'Regular' : 'Nuevo';
+      const calculatedCiclo = prevPurchases % 3;
+
       const fidelidadActual = meta.fidelidad || {
-        tipo: meta.tipo || 'Nuevo',
-        comprasCiclo: meta.ciclo !== undefined ? Number(meta.ciclo) : (meta.comprasCiclo !== undefined ? Number(meta.comprasCiclo) : 0),
-        comprasTotales: meta.comprasTotales || 0,
+        tipo: meta.tipo || calculatedTier,
+        comprasCiclo: meta.ciclo !== undefined ? Number(meta.ciclo) : (meta.comprasCiclo !== undefined ? Number(meta.comprasCiclo) : calculatedCiclo),
+        comprasTotales: meta.comprasTotales !== undefined ? Number(meta.comprasTotales) : prevPurchases,
         fechaInicioNivel: meta.inicio || meta.fechaInicioNivel || null,
         fechaVencimientoNivel: meta.vence || meta.fechaVencimientoNivel || null
       };

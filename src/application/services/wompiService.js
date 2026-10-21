@@ -192,6 +192,14 @@ class WompiService {
           estadoAprobacion: 'APROBADO',
           observaciones: JSON.stringify(obsObj)
         });
+
+        // Registrar compra de fidelidad tras confirmación de pago en Wompi
+        if (ventaEncontrada.idCliente && Number(ventaEncontrada.idCliente) !== 26) {
+          const ClienteService = require('./clienteService');
+          ClienteService.registrarCompraFidelidad(ventaEncontrada.idCliente).catch(err =>
+            console.warn('Error registrando fidelidad tras pago Wompi:', err.message)
+          );
+        }
       } else if (estadoWompi === 'DECLINED' || estadoWompi === 'ERROR' || estadoWompi === 'VOIDED') {
         obsObj.estadoPago = 'Rechazado';
         obsObj.estadoAprobacion = 'RECHAZADO';
