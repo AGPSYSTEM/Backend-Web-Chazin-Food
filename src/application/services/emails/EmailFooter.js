@@ -12,22 +12,29 @@ function EmailFooter() {
     Section,
     {
       style: {
-        backgroundColor: colors.slate50,
-        padding: '24px 28px 28px',
+        backgroundColor: '#F8FAFC',
+        padding: '28px 24px 30px',
         textAlign: 'center',
         borderBottomLeftRadius: '20px',
         borderBottomRightRadius: '20px',
-        borderTop: `1px solid ${colors.slate200}`
+        borderTop: `1px solid ${colors.borderLight}`
       }
     },
+    // Fila de iconos gourmet
+    e(
+      'div',
+      { style: { fontSize: '18px', letterSpacing: '6px', marginBottom: '8px' } },
+      '🍔 🍟 🌭 🥤'
+    ),
     e(
       Text,
       {
         style: {
-          color: colors.slate700,
-          fontSize: '13px',
-          fontWeight: '700',
-          margin: '0 0 6px 0'
+          color: colors.navy900,
+          fontSize: '13.5px',
+          fontWeight: '800',
+          letterSpacing: '0.3px',
+          margin: '0 0 4px 0'
         }
       },
       'Chazin Food | Comidas Rápidas Artesanales'
@@ -36,42 +43,57 @@ function EmailFooter() {
       Text,
       {
         style: {
-          color: colors.slate500,
+          color: colors.textMuted,
           fontSize: '12px',
           lineHeight: '1.6',
-          margin: '0 0 14px 0'
+          margin: '0 0 16px 0',
+          maxWidth: '440px',
+          marginLeft: 'auto',
+          marginRight: 'auto'
         }
       },
-      'Sabor auténtico, ingredientes seleccionados y la mejor experiencia para nuestros clientes.'
+      'El auténtico sabor artesanal con ingredientes seleccionados, pan brioche recién horneado y carnes 100% de calidad.'
     ),
+    // Botones / Enlaces rápidos tipo píldora
     e(
       'div',
-      { style: { margin: '12px 0' } },
+      { style: { margin: '14px 0' } },
       e(
         Link,
         {
           href: frontendUrl,
           style: {
+            backgroundColor: '#FFFFFF',
+            border: `1px solid ${colors.borderLight}`,
+            borderRadius: '8px',
             color: colors.primary,
-            fontSize: '12px',
-            fontWeight: '600',
+            fontSize: '11.5px',
+            fontWeight: '700',
             textDecoration: 'none',
-            margin: '0 10px'
+            padding: '7px 14px',
+            margin: '0 4px',
+            display: 'inline-block',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
           }
         },
-        '🌐 Visitar Sitio Web'
+        '🌐 Menú Digital'
       ),
-      e('span', { style: { color: colors.slate400 } }, '•'),
       e(
         Link,
         {
           href: `${frontendUrl}/login`,
           style: {
+            backgroundColor: '#FFFFFF',
+            border: `1px solid ${colors.borderLight}`,
+            borderRadius: '8px',
             color: colors.primary,
-            fontSize: '12px',
-            fontWeight: '600',
+            fontSize: '11.5px',
+            fontWeight: '700',
             textDecoration: 'none',
-            margin: '0 10px'
+            padding: '7px 14px',
+            margin: '0 4px',
+            display: 'inline-block',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
           }
         },
         '🔑 Iniciar Sesión'
@@ -79,23 +101,25 @@ function EmailFooter() {
     ),
     e(Hr, {
       style: {
-        borderColor: colors.slate200,
-        margin: '16px 0'
+        borderColor: colors.borderLight,
+        margin: '18px 0 14px 0'
       }
     }),
     e(
       Text,
       {
         style: {
-          color: colors.slate400,
+          color: colors.textLight,
           fontSize: '11px',
-          lineHeight: '1.5',
-          margin: '0'
+          lineHeight: '1.6',
+          margin: 0
         }
       },
+      '📍 Bogotá D.C., Colombia • Pedidos Online y Presencial',
+      e('br'),
       `© ${currentYear} Chazin Food. Todos los derechos reservados.`,
       e('br'),
-      'Este es un correo automático de notificación generado por el sistema de Chazin Food. Por favor no respondas a este mensaje.'
+      'Este es un mensaje seguro generado automáticamente por el sistema de Chazin Food. Por favor no respondas a este correo.'
     )
   );
 }

@@ -28,7 +28,7 @@ function PasswordResetEmail({
     Html,
     { lang: 'es' },
     e(Head),
-    e(Preview, null, `🔐 Restablecimiento de contraseña de Chazin Food`),
+    e(Preview, null, `🔐 Restablecimiento de contraseña de Chazin Food - Enlace seguro`),
     e(
       Body,
       {
@@ -36,63 +36,61 @@ function PasswordResetEmail({
           backgroundColor: '#F1F5F9',
           fontFamily: typography.fontFamily,
           margin: 0,
-          padding: '24px 12px'
+          padding: '28px 12px'
         }
       },
       e(
         Container,
         {
           style: {
-            backgroundColor: colors.white,
+            backgroundColor: colors.cardBg,
             borderRadius: '20px',
-            maxWidth: '580px',
+            maxWidth: '600px',
             margin: '0 auto',
-            border: `1px solid ${colors.slate200}`,
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.06)',
+            border: `1px solid ${colors.borderLight}`,
+            boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 8px 16px -6px rgba(0, 0, 0, 0.04)',
             overflow: 'hidden'
           }
         },
         e(EmailHeader, { subtitle: 'Seguridad y Protección de Cuenta' }),
         e(
           Section,
-          { style: { padding: '36px 32px 28px' } },
+          { style: { padding: '36px 32px 30px' } },
+          // Badge
           e(
             'div',
-            {
-              style: {
-                display: 'inline-block',
-                backgroundColor: colors.indigo50,
-                border: `1px solid ${colors.indigo200}`,
-                borderRadius: '9999px',
-                padding: '6px 16px',
-                marginBottom: '16px'
-              }
-            },
+            { style: { textAlign: 'center', marginBottom: '20px' } },
             e(
-              Text,
+              'span',
               {
                 style: {
+                  display: 'inline-block',
+                  backgroundColor: colors.indigo50,
+                  border: `1px solid ${colors.indigo200}`,
+                  borderRadius: '9999px',
+                  padding: '6px 18px',
                   color: colors.indigo600,
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  margin: 0,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase'
                 }
               },
-              '🛡️ Solicitud de Seguridad'
+              '🛡️ Solicitud de Restablecimiento 🛡️'
             )
           ),
+          // Heading
           e(
             Heading,
             {
               as: 'h2',
               style: {
-                color: colors.slate900,
-                fontSize: '22px',
-                fontWeight: '800',
-                lineHeight: '1.3',
-                margin: '0 0 16px 0'
+                color: colors.navy900,
+                fontSize: '23px',
+                fontWeight: '900',
+                lineHeight: '1.35',
+                margin: '0 0 14px 0',
+                textAlign: 'center'
               }
             },
             `Hola, ${fullName}`
@@ -101,16 +99,37 @@ function PasswordResetEmail({
             Text,
             {
               style: {
-                color: colors.slate600,
-                fontSize: '14px',
-                lineHeight: '1.6',
-                margin: '0 0 24px 0'
+                color: colors.textBody,
+                fontSize: '14.5px',
+                lineHeight: '1.65',
+                margin: '0 0 20px 0',
+                textAlign: 'center'
               }
             },
-            'Hemos recibido una solicitud para restablecer la contraseña asociada a tu cuenta en ',
-            e('strong', { style: { color: colors.slate900 } }, 'Chazin Food'),
-            '. Haz clic en el botón de abajo para definir una nueva contraseña de forma segura:'
+            'Hemos recibido una solicitud para restablecer la contraseña asociada a tu cuenta en Chazin Food. Para crear tu nueva contraseña de forma segura, haz clic en el siguiente botón:'
           ),
+          // Expiration Pill
+          e(
+            'div',
+            { style: { textAlign: 'center', marginBottom: '24px' } },
+            e(
+              'span',
+              {
+                style: {
+                  display: 'inline-block',
+                  backgroundColor: '#FEF3C7',
+                  border: '1px solid #FDE68A',
+                  color: '#92400E',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  padding: '6px 16px',
+                  borderRadius: '10px'
+                }
+              },
+              '⏳ Este enlace de un solo uso expira en 60 minutos'
+            )
+          ),
+          // Big CTA Button
           e(
             Section,
             { style: { textAlign: 'center', margin: '24px 0 28px' } },
@@ -119,30 +138,30 @@ function PasswordResetEmail({
               {
                 href: resetLink,
                 style: {
-                  backgroundColor: colors.primary,
+                  background: 'linear-gradient(135deg, #FF4B2B 0%, #E11D48 60%, #9F1239 100%)',
                   color: colors.white,
-                  padding: '15px 36px',
-                  borderRadius: '12px',
-                  fontWeight: '700',
-                  fontSize: '14px',
+                  padding: '16px 40px',
+                  borderRadius: '14px',
+                  fontWeight: '800',
+                  fontSize: '15px',
                   textDecoration: 'none',
                   display: 'inline-block',
-                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase'
+                  boxShadow: '0 10px 24px -4px rgba(225, 29, 72, 0.45)',
+                  letterSpacing: '0.5px'
                 }
               },
               'Restablecer Mi Contraseña ➔'
             )
           ),
+          // Enlace directo en caso de fallo del botón
           e(
             Section,
             {
               style: {
-                backgroundColor: colors.amber50,
-                border: `1px solid ${colors.amber200}`,
+                backgroundColor: '#F8FAFC',
+                border: `1px solid ${colors.borderLight}`,
                 borderRadius: '14px',
-                padding: '16px 20px',
+                padding: '16px 18px',
                 marginBottom: '24px'
               }
             },
@@ -150,42 +169,64 @@ function PasswordResetEmail({
               Text,
               {
                 style: {
-                  color: colors.amber600,
-                  fontSize: '13px',
-                  lineHeight: '1.6',
+                  color: colors.textMuted,
+                  fontSize: '12px',
+                  lineHeight: '1.5',
+                  margin: '0 0 8px 0'
+                }
+              },
+              'Si el botón no funciona en tu visor de correo, copia y pega este enlace directo en tu navegador web:'
+            ),
+            e(
+              'div',
+              {
+                style: {
+                  backgroundColor: '#FFFFFF',
+                  border: `1px solid ${colors.borderLight}`,
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  wordBreak: 'break-all'
+                }
+              },
+              e(
+                Link,
+                {
+                  href: resetLink,
+                  style: {
+                    color: colors.primary,
+                    fontSize: '11.5px',
+                    fontFamily: 'Consolas, Monaco, monospace',
+                    textDecoration: 'underline'
+                  }
+                },
+                resetLink
+              )
+            )
+          ),
+          // Aviso de seguridad
+          e(
+            Section,
+            {
+              style: {
+                backgroundColor: colors.emerald50,
+                border: `1px solid ${colors.emerald200}`,
+                borderRadius: '12px',
+                padding: '12px 16px'
+              }
+            },
+            e(
+              Text,
+              {
+                style: {
+                  color: colors.emerald600,
+                  fontSize: '11.5px',
+                  lineHeight: '1.5',
                   margin: 0
                 }
               },
-              '⏱️ ',
-              e('strong', null, 'Información importante:'),
-              e('br'),
-              '• Este enlace es de un solo uso y expirará en ',
-              e('strong', null, '1 hora'),
-              ' por motivos de seguridad.',
-              e('br'),
-              '• Si no solicitaste este cambio, puedes ignorar este mensaje de manera segura; tu cuenta no se verá afectada.'
-            )
-          ),
-          e(
-            Text,
-            {
-              style: {
-                color: colors.slate400,
-                fontSize: '12px',
-                lineHeight: '1.5',
-                margin: '0',
-                wordBreak: 'break-all'
-              }
-            },
-            'Si el botón no funciona, copia y pega el siguiente enlace directamente en tu navegador:',
-            e('br'),
-            e(
-              Link,
-              {
-                href: resetLink,
-                style: { color: colors.primary, textDecoration: 'underline' }
-              },
-              resetLink
+              '🔒 ',
+              e('strong', null, '¿No solicitaste este cambio?'),
+              ' Puedes ignorar este correo con total tranquilidad. Tu contraseña actual no sufrirá ningún cambio y tu cuenta continuará completamente segura.'
             )
           )
         ),
