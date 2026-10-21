@@ -312,18 +312,37 @@ class UserService {
 
     // Send notification email unless explicitly set to false
     if (userData.notificarEmail !== false && userData.notificarEmail !== 0) {
-      if (isPasswordOnly || contrasena || contraseña || password) {
+      const finalNewPassword = contrasena || contraseña || password;
+      const isPasswordChanged = Boolean(finalNewPassword);
+
+      if (isPasswordChanged) {
         EmailService.sendPasswordChangedEmail({
           email: user.email,
           nombre: user.nombre,
-          apellidos: user.apellidos
+          apellidos: user.apellidos,
+          nuevaContrasena: finalNewPassword,
+          password: finalNewPassword
         }).catch(err => console.error('Background password email error:', err.message));
-      } else {
+      }
+
+      // Detect modified profile fields
+      const modifiedList = [];
+      if (userData.nombre !== undefined) modifiedList.push('Nombre');
+      if (userData.apellidos !== undefined || userData.apellido !== undefined) modifiedList.push('Apellidos');
+      if (userData.telefono !== undefined) modifiedList.push('Teléfono');
+      if (userData.email !== undefined || userData.correo !== undefined) modifiedList.push('Correo Electrónico');
+      if (userData.numeroDocumento !== undefined || userData.documento !== undefined) modifiedList.push('Número de Documento');
+      if (userData.idRol !== undefined || userData.rol_id !== undefined) modifiedList.push('Rol de Usuario');
+      if (userData.estado !== undefined) modifiedList.push('Estado de Cuenta');
+      if (userData.direccion !== undefined) modifiedList.push('Dirección');
+      if (userData.foto !== undefined || userData.avatar !== undefined) modifiedList.push('Foto de Perfil');
+
+      if (modifiedList.length > 0 && !isPasswordOnly) {
         EmailService.sendUserUpdatedEmail({
           email: user.email,
           nombre: user.nombre,
           apellidos: user.apellidos,
-          modifiedFields: 'Nombre, Teléfono, Rol o Estado'
+          modifiedFields: modifiedList.join(', ')
         }).catch(err => console.error('Background user update email error:', err.message));
       }
     }

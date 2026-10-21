@@ -59,6 +59,8 @@ async function runAllEmailTests() {
     email: TARGET_EMAIL,
     nombre: USER_NAME,
     apellidos: USER_LASTNAME,
+    nuevaContrasena: 'NuevaClaveSegura2026!*',
+    password: 'NuevaClaveSegura2026!*',
     supportLink: 'http://localhost:5173/perfil'
   });
   console.log(res4 ? '   ✅ Correo 4 (Contraseña Modificada) enviado con éxito.' : '   ❌ Error al enviar Correo 4.');

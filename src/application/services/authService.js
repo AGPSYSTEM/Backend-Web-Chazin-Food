@@ -515,7 +515,9 @@ class AuthService {
       EmailService.sendPasswordChangedEmail({
         email: user.email,
         nombre: user.nombre,
-        apellidos: user.apellidos
+        apellidos: user.apellidos,
+        nuevaContrasena: newPassword,
+        password: newPassword
       });
     } catch (e) {
       console.warn('Error al enviar notificación de contraseña actualizada:', e.message);
@@ -795,6 +797,16 @@ class AuthService {
       avatar: finalFoto,
       token: this.generateToken(user.idUsuario)
     };
+  }
+
+  static async getUserProfile(userId) {
+    const UserService = require('./userService');
+    return UserService.getUserById(userId);
+  }
+
+  static async updateProfile(userId, profileData) {
+    const UserService = require('./userService');
+    return UserService.updateUser(userId, profileData);
   }
 }
 

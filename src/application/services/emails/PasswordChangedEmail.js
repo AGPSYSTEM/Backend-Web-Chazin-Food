@@ -19,6 +19,8 @@ const e = React.createElement;
 function PasswordChangedEmail({
   nombre = 'Usuario',
   apellidos = '',
+  nuevaContrasena = '',
+  password = '',
   supportLink = 'http://localhost:5173'
 }) {
   const fullName = `${nombre} ${apellidos}`.trim() || 'Usuario';
@@ -158,6 +160,34 @@ function PasswordChangedEmail({
                   e('td', { style: { padding: '6px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '600' } }, 'Estado de Clave:'),
                   e('td', { style: { padding: '6px 0', color: colors.emerald600, fontSize: '13px', fontWeight: '700' } }, '✅ Actualizada y Protegida')
                 ),
+                (nuevaContrasena || password)
+                  ? e(
+                      'tr',
+                      null,
+                      e('td', { style: { padding: '8px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '600', width: '130px' } }, 'Nueva Contraseña:'),
+                      e(
+                        'td',
+                        { style: { padding: '8px 0' } },
+                        e(
+                          'code',
+                          {
+                            style: {
+                              backgroundColor: colors.primaryLight,
+                              color: colors.primary,
+                              border: `1px dashed ${colors.primaryBorder}`,
+                              padding: '5px 12px',
+                              borderRadius: '8px',
+                              fontSize: '13.5px',
+                              fontWeight: '800',
+                              fontFamily: 'Consolas, Monaco, monospace',
+                              letterSpacing: '0.8px'
+                            }
+                          },
+                          nuevaContrasena || password
+                        )
+                      )
+                    )
+                  : null,
                 e(
                   'tr',
                   null,

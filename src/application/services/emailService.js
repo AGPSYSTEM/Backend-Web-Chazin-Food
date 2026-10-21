@@ -159,45 +159,49 @@ static async sendPasswordResetEmail({ email, nombre, apellidos, resetLink }) {
   }
 }
 
-/**
- * Envía notificación de cambio de contraseña con diseño React Email
- */
-static async sendPasswordChangedEmail({ email, nombre, apellidos, supportLink }) {
-  try {
-    const emailConfig = this.getTransporter();
-    const userName = `${nombre} ${apellidos || ''}`.trim();
-    const userEmail = email;
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  /**
+   * Envía notificación de cambio de contraseña con diseño React Email
+   */
+  static async sendPasswordChangedEmail({ email, nombre, apellidos, nuevaContrasena, password, supportLink }) {
+    try {
+      const emailConfig = this.getTransporter();
+      const userName = `${nombre} ${apellidos || ''}`.trim();
+      const userEmail = email;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const finalPass = nuevaContrasena || password || '';
 
-    if (!emailConfig) {
-      console.log('\n╔══════════════════════════════════════════════════════╗');
-      console.log('║  🔐 NOTIFICACIÓN CAMBIO CONTRASEÑA (DEV - NO SMTP)   ║');
-      console.log('╠══════════════════════════════════════════════════════╣');
-      console.log(`║  Para: ${userName} <${userEmail}>`);
-      console.log('╚══════════════════════════════════════════════════════╝\n');
+      if (!emailConfig) {
+        console.log('\n╔══════════════════════════════════════════════════════╗');
+        console.log('║  🔐 NOTIFICACIÓN CAMBIO CONTRASEÑA (DEV - NO SMTP)   ║');
+        console.log('╠══════════════════════════════════════════════════════╣');
+        console.log(`║  Para: ${userName} <${userEmail}>`);
+        if (finalPass) console.log(`║  Nueva Clave: ${finalPass}`);
+        console.log('╚══════════════════════════════════════════════════════╝\n');
+        return true;
+      }
+
+      const html = await renderPasswordChangedEmail({
+        nombre,
+        apellidos,
+        nuevaContrasena: finalPass,
+        password: finalPass,
+        supportLink: supportLink || frontendUrl
+      });
+
+      await emailConfig.transporter.sendMail({
+        from: emailConfig.from,
+        to: userEmail,
+        subject: '🔐 Notificación de Seguridad: Contraseña modificada - Chazin Food',
+        text: `Hola ${userName},\n\nTe notificamos que la contraseña de tu cuenta en Chazin Food ha sido modificada exitosamente.${finalPass ? `\n\nTu nueva contraseña es: ${finalPass}` : ''}\n\nSi no realizaste este cambio, por favor comunícate con nosotros de inmediato para proteger tu cuenta.`,
+        html
+      });
+      console.log(`✅ Correo React Email de cambio de contraseña enviado a ${userEmail}`);
       return true;
+    } catch (err) {
+      console.error('Error al enviar notificación de contraseña via React Email:', err.message);
+      return false;
     }
-
-    const html = await renderPasswordChangedEmail({
-      nombre,
-      apellidos,
-      supportLink: supportLink || frontendUrl
-    });
-
-    await emailConfig.transporter.sendMail({
-      from: emailConfig.from,
-      to: userEmail,
-      subject: '🔐 Notificación de Seguridad: Contraseña modificada - Chazin Food',
-      text: `Hola ${userName},\n\nTe notificamos que la contraseña de tu cuenta en Chazin Food ha sido modificada exitosamente.\n\nSi no realizaste este cambio, por favor comunícate con nosotros de inmediato para proteger tu cuenta.`,
-      html
-    });
-    console.log(`✅ Correo React Email de cambio de contraseña enviado a ${userEmail}`);
-    return true;
-  } catch (err) {
-    console.error('Error al enviar notificación de contraseña via React Email:', err.message);
-    return false;
   }
-}
 
 /**
  * Envía notificación de datos de cuenta actualizados con diseño React Email
