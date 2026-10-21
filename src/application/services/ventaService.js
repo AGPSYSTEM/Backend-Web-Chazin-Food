@@ -1215,6 +1215,12 @@ class VentaService {
       error.statusCode = 404;
       throw error;
     }
+    const raw = String(tiempoEstimadoEntrega || '').trim();
+    if (!raw || raw.length > 50 || /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(raw) || /[^a-zA-Z0-9\s.,\-áéíóúñÁÉÍÓÚÑ]/i.test(raw) || /\.{2,}|-{2,}/.test(raw)) {
+      const error = new Error('Formato de tiempo de entrega no válido.');
+      error.statusCode = 400;
+      throw error;
+    }
     let obsData = {};
     try {
       obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
@@ -1223,7 +1229,7 @@ class VentaService {
     } catch (e) {
       obsData = { nota: v.observaciones || '' };
     }
-    obsData.tiempoEstimadoEntrega = tiempoEstimadoEntrega;
+    obsData.tiempoEstimadoEntrega = raw;
     v.observaciones = JSON.stringify(obsData);
     await v.save();
     return this.getById(id);
