@@ -71,34 +71,34 @@ function EmailHeader({ subtitle = 'Comidas Rápidas Artesanales' }) {
                 )
           )
         )
-      ),
-      e(
-        Text,
-        {
-          style: {
-            color: colors.white,
-            fontSize: '22px',
-            fontWeight: '800',
-            letterSpacing: '1px',
-            margin: '14px 0 2px 0',
-            textTransform: 'uppercase'
-          }
-        },
-        'Chazin Food'
-      ),
-      e(
-        Text,
-        {
-          style: {
-            color: colors.slate400,
-            fontSize: '12px',
-            fontWeight: '500',
-            letterSpacing: '0.5px',
-            margin: '0'
-          }
-        },
-        subtitle
       )
+    ),
+    e(
+      Text,
+      {
+        style: {
+          color: colors.white,
+          fontSize: '22px',
+          fontWeight: '800',
+          letterSpacing: '1px',
+          margin: '14px 0 2px 0',
+          textTransform: 'uppercase'
+        }
+      },
+      'Chazin Food'
+    ),
+    e(
+      Text,
+      {
+        style: {
+          color: colors.slate400,
+          fontSize: '12px',
+          fontWeight: '500',
+          letterSpacing: '0.5px',
+          margin: '0'
+        }
+      },
+      subtitle
     )
   );
 }

@@ -166,7 +166,7 @@ class InsumoService {
     }
   }
 
-  static async update(idInsumo, insumoData) {
+  static async update(idInsumo, insumoData, options = {}) {
     const transaction = await database.sequelize.transaction();
     try {
       const insumo = await Insumo.findByPk(idInsumo, { transaction });
@@ -228,7 +228,7 @@ class InsumoService {
         detalle: `Se actualizaron los datos del insumo: ${insumo.nombre}`,
         idInsumo: insumo.idInsumo,
         motivo: 'Actualización de datos',
-        usuarioId: insumoData.usuarioId || (options && options.usuarioId) || null,
+        usuarioId: insumoData.usuarioId || options?.usuarioId || null,
         skipStockUpdate: true
       }, { transaction });
 

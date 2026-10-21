@@ -3,7 +3,7 @@ const { Product, CategoriaProducto, Evento, Variante } = require('../../persiste
 class ProductService {
   static async getProducts() {
     const products = await Product.findAll({
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -38,7 +38,7 @@ class ProductService {
           precio: realPrecio,
           descripcion: p.descripcion || '',
           imagen: p.imagen || '',
-          stock: p.stock || 0,
+          stock: 100,
           idCategoriaProducto: p.idCategoriaProducto,
           categoriaId: p.idCategoriaProducto,
           categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
@@ -52,7 +52,7 @@ class ProductService {
 
   static async getProductById(id) {
     const p = await Product.findByPk(id, {
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'stock', 'adiciones'],
+      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'adiciones'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
@@ -89,7 +89,7 @@ class ProductService {
       precio: realPrecio,
       descripcion: p.descripcion || '',
       imagen: p.imagen || '',
-      stock: p.stock || 0,
+      stock: 100,
       idCategoriaProducto: p.idCategoriaProducto,
       categoriaId: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : '',
@@ -137,7 +137,6 @@ class ProductService {
       imagen: imagen || '',
       categoria: categoria || '',
       precio: (precio !== undefined && precio !== null && precio !== '') ? Number(precio) : 0.00,
-      stock: stock || 0,
       estado: normalizedEstado,
       adiciones: adiciones ? JSON.stringify(adiciones) : '[]'
     });
