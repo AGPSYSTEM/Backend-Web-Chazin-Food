@@ -643,8 +643,20 @@ class VentaService {
     if (finalDescuento === 0 && finalClienteId && !isMostradorSale) {
       try {
         const clienteInfo = await ClienteService.getById(finalClienteId);
-        if (clienteInfo && clienteInfo.tieneCuenta && clienteInfo.tipo && ['Regular', 'Frecuente', 'VIP'].includes(clienteInfo.tipo) && Number(clienteInfo.descuentoPorcentaje) > 0) {
-          finalDescuento = Math.round(finalSubtotal * (Number(clienteInfo.descuentoPorcentaje) / 100));
+        if (clienteInfo && clienteInfo.tieneCuenta) {
+          const comprasPrevias = Number(clienteInfo.compras || 0);
+          const cicloActual = clienteInfo.fidelidad?.comprasCiclo !== undefined
+            ? Number(clienteInfo.fidelidad.comprasCiclo)
+            : (comprasPrevias % 3);
+
+          // Regla de fidelización: Descuento del 30% cada 3 compras
+          const esTerceraCompra = (cicloActual === 2) || ((comprasPrevias + 1) % 3 === 0);
+
+          if (esTerceraCompra) {
+            finalDescuento = Math.round(finalSubtotal * 0.30); // 30% de descuento en cada 3ra compra
+          } else if (clienteInfo.tipo && ['Regular', 'Frecuente', 'VIP'].includes(clienteInfo.tipo) && Number(clienteInfo.descuentoPorcentaje) > 0) {
+            finalDescuento = Math.round(finalSubtotal * (Number(clienteInfo.descuentoPorcentaje) / 100));
+          }
         }
       } catch (e) {
         // Continue without blocking
