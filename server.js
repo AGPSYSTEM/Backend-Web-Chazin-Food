@@ -131,7 +131,8 @@ app.use((req, res, next) => {
 app.use(
   helmet({
     contentSecurityPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" } // Permite recursos cruzados entre puertos
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Permite recursos cruzados entre puertos
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" } // Permite comunicación con ventanas emergentes de Google Auth
   })
 );
 
