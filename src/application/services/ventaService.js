@@ -28,6 +28,53 @@ function convertUnits(amount, fromUnit, toUnit) {
   return Number(amount);
 }
 
+function extractCleanSpecifications(raw) {
+  if (!raw) return '';
+  if (typeof raw === 'object') {
+    if (raw.especificaciones !== undefined && raw.especificaciones !== raw) {
+      const res = extractCleanSpecifications(raw.especificaciones);
+      if (res) return res;
+    }
+    if (raw.nota !== undefined && raw.nota !== raw) {
+      const res = extractCleanSpecifications(raw.nota);
+      if (res) return res;
+    }
+    if (raw.observacion !== undefined && raw.observacion !== raw) {
+      const res = extractCleanSpecifications(raw.observacion);
+      if (res) return res;
+    }
+    if (raw.instrucciones !== undefined && raw.instrucciones !== raw) {
+      const res = extractCleanSpecifications(raw.instrucciones);
+      if (res) return res;
+    }
+    return '';
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+      trimmed.includes('"tipoEntrega"') ||
+      trimmed.includes('"especificaciones"') ||
+      trimmed.includes('"codigoPedido"')
+    ) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return extractCleanSpecifications(parsed);
+      } catch (e) {
+        return '';
+      }
+    }
+    const lower = trimmed.toLowerCase();
+    if (['sin observaciones', 'ninguna', 'ninguno', 'n/a', 'null', 'undefined', ''].includes(lower)) {
+      return '';
+    }
+    return trimmed;
+  }
+  return '';
+}
+
 class VentaService {
   static formatVenta(v) {
     let obsData = {};
@@ -83,7 +130,7 @@ class VentaService {
     // Dynamic products from db details or order metadata
     let productos = [];
     if (Array.isArray(obsData.productos) && obsData.productos.length > 0) {
-      productos = obsData.productos.map(p => {
+      productos = obsData.productos.map((p, pIdx) => {
         const itemAdds = (p.adiciones || []).map(a => {
           if (typeof a === 'object' && a !== null) {
             return {
@@ -105,10 +152,22 @@ class VentaService {
         const pUnit = Number(p.precioUnitario || p.precio || 0);
         const pTot = Number(p.total || 0) > 0 ? Number(p.total) : (pUnit + addsSum) * pQty;
 
+        // Buscar detalle relacional en BD para resolver el nombre real del producto del catálogo
+        const matchingDetail = (v.detalles || []).find(d => 
+          Number(d.idVariante) === Number(p.idVariante || p.id)
+        ) || (v.detalles || [])[pIdx];
+
+        const realProductoNombre = matchingDetail?.variante?.producto?.nombre || null;
+        const realVarianteNombre = matchingDetail?.variante?.nombre || null;
+
+        const finalNombre = realProductoNombre || p.nombreProducto || p.nombre || "Producto";
+
         return {
           id: p.id || p.idVariante || p.idDetalleVenta,
           idVariante: p.idVariante || p.id,
-          nombre: p.nombre || p.nombreProducto || "Producto",
+          nombre: finalNombre,
+          nombreProducto: realProductoNombre || p.nombreProducto || finalNombre,
+          nombreVariante: realVarianteNombre || (p.nombre !== finalNombre ? p.nombre : null),
           cantidad: pQty,
           precioUnitario: pUnit,
           total: pTot,
@@ -153,10 +212,15 @@ class VentaService {
         const pUnit = parseFloat(d.precioUnitario || 0);
         const pTot = parseFloat(d.subtotal || 0) > 0 ? parseFloat(d.subtotal) : (pUnit + addsSum) * pQty;
 
+        const realProdName = d.variante?.producto?.nombre || pName || `Producto #${d.idVariante}`;
+        const realVarName = d.variante?.nombre || null;
+
         return {
           id: d.idDetalleVenta || d.idVariante,
           idVariante: d.idVariante,
-          nombre: pName || `Producto #${d.idVariante}`,
+          nombre: realProdName,
+          nombreProducto: realProdName,
+          nombreVariante: realVarName,
           cantidad: pQty,
           precioUnitario: pUnit,
           total: pTot,
@@ -304,6 +368,8 @@ class VentaService {
       montoDescuento,
       descuentoAplicado,
       total,
+      direccion: obsData.direccion || null,
+      especificaciones: extractCleanSpecifications(obsData.especificaciones || obsData.nota || ""),
       observaciones: v.observaciones,
       productos,
       detalles: v.detalles || []
@@ -701,7 +767,17 @@ class VentaService {
                 adiciones: it.adiciones || it.idAdiciones || []
               };
             }),
-      especificaciones: data.observacion || parsedObs.especificaciones || data.observaciones || "",
+      especificaciones: extractCleanSpecifications(
+        data.especificaciones !== undefined
+          ? data.especificaciones
+          : (data.observacion !== undefined
+            ? data.observacion
+            : (parsedObs.especificaciones !== undefined
+              ? parsedObs.especificaciones
+              : (parsedObs.nota !== undefined
+                ? parsedObs.nota
+                : "")))
+      ),
       efectivoConCuanto: parsedObs.efectivoConCuanto || (data.datosPago ? data.datosPago.efectivoConCuanto : null) || "",
       vueltoEfectivo: parsedObs.vueltoEfectivo || (data.datosPago ? data.datosPago.vueltoEfectivo : null) || 0,
       transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",

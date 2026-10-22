@@ -161,7 +161,47 @@ class ProductService {
       throw error;
     }
 
+    const { Variante, DetalleVentaProducto, CategoriaProducto } = require('../../persistence/models');
+
+    // Requisito 104: Restricción de edición si el producto ya cuenta con ventas asociadas
+    const variantes = await Variante.findAll({ where: { idProducto: id } });
+    const varianteIds = variantes.map(v => v.idVariante);
+    if (varianteIds.length > 0) {
+      const inVenta = await DetalleVentaProducto.findOne({ where: { idVariante: varianteIds } });
+      if (inVenta) {
+        // Solo permitir activar/desactivar estado si tiene ventas
+        const isOnlyEstadoChange = Object.keys(data).every(k => data[k] === undefined || k === 'estado');
+        if (!isOnlyEstadoChange) {
+          const error = new Error('No es posible editar las características de este producto porque ya cuenta con ventas registradas en el sistema para garantizar la integridad histórica y contable.');
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+    }
+
     const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto } = data;
+
+    // Requisito 105: Coherencia de Categoría (impedir pasar comida a bebidas o viceversa)
+    if (idCategoriaProducto || categoria) {
+      const currentCat = await CategoriaProducto.findByPk(p.idCategoriaProducto);
+      let targetCat = null;
+      if (idCategoriaProducto) {
+        targetCat = await CategoriaProducto.findByPk(idCategoriaProducto);
+      } else if (categoria) {
+        targetCat = await CategoriaProducto.findOne({ where: { nombre: categoria } });
+      }
+
+      if (currentCat && targetCat && currentCat.idCategoriaProducto !== targetCat.idCategoriaProducto) {
+        const isCurrentDrink = /bebida|refresco|gaseosa|jugo/i.test(currentCat.nombre || "");
+        const isTargetDrink = /bebida|refresco|gaseosa|jugo/i.test(targetCat.nombre || "");
+        if (isCurrentDrink !== isTargetDrink) {
+          const error = new Error(`Cambio de categoría incoherente: no se permite cambiar un producto de tipo "${isCurrentDrink ? 'Bebida' : 'Comida'}" a "${isTargetDrink ? 'Bebida' : 'Comida'}".`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+    }
+
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;

@@ -211,6 +211,11 @@ class CompraService {
     console.log(`==========================================================================`);
 
     const idProv = data.idProveedor ? parseInt(data.idProveedor) : null;
+    if (!idProv) {
+      const error = new Error('El proveedor es obligatorio para registrar la compra');
+      error.statusCode = 400;
+      throw error;
+    }
     const compra = await Compra.create({
       idProveedor: idProv,
       numeroFactura: data.numeroFactura ? String(data.numeroFactura).trim() : null,

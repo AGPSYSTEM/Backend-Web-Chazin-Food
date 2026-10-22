@@ -117,6 +117,19 @@ class InsumoService {
       throw error;
     }
 
+    if (idProveedor) {
+      const provExists = await Proveedor.findByPk(parseInt(idProveedor));
+      if (!provExists) idProveedor = null;
+    }
+
+    if (idCategoriaInsumo) {
+      const catExists = await CategoriaInsumo.findByPk(parseInt(idCategoriaInsumo));
+      if (!catExists) {
+        const firstCat = await CategoriaInsumo.findOne();
+        idCategoriaInsumo = firstCat ? (firstCat.idCategoriaInsumo || firstCat.id) : null;
+      }
+    }
+
     const transaction = await database.sequelize.transaction();
     try {
       const insumo = await Insumo.create({
@@ -124,8 +137,8 @@ class InsumoService {
         idCategoriaInsumo: idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null,
         stock: stock !== undefined && stock !== null ? parseFloat(stock) : 0,
         stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0,
-        fechaExpedicion: fechaExpedicion || null,
-        fechaVencimiento: fechaVencimiento || null,
+        fechaExpedicion: (fechaExpedicion && String(fechaExpedicion).trim() !== '') ? fechaExpedicion : null,
+        fechaVencimiento: (fechaVencimiento && String(fechaVencimiento).trim() !== '') ? fechaVencimiento : null,
         unidadMedida: unidadMedida || 'und',
         precioUnitario: precioUnitario !== undefined && precioUnitario !== null ? parseFloat(precioUnitario) : 0,
         idProveedor: idProveedor ? parseInt(idProveedor) : null,
@@ -197,11 +210,18 @@ class InsumoService {
       if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null;
       if (stock !== undefined) insumo.stock = parseFloat(stock);
       if (stockMinimo !== undefined) insumo.stockMinimo = parseFloat(stockMinimo);
-      if (fechaExpedicion !== undefined) insumo.fechaExpedicion = fechaExpedicion || null;
-      if (fechaVencimiento !== undefined) insumo.fechaVencimiento = fechaVencimiento || null;
+      if (fechaExpedicion !== undefined) insumo.fechaExpedicion = (fechaExpedicion && String(fechaExpedicion).trim() !== '') ? fechaExpedicion : null;
+      if (fechaVencimiento !== undefined) insumo.fechaVencimiento = (fechaVencimiento && String(fechaVencimiento).trim() !== '') ? fechaVencimiento : null;
       if (unidadMedida !== undefined) insumo.unidadMedida = unidadMedida;
       if (precioUnitario !== undefined) insumo.precioUnitario = parseFloat(precioUnitario);
-      if (idProveedor !== undefined) insumo.idProveedor = idProveedor ? parseInt(idProveedor) : null;
+      if (idProveedor !== undefined) {
+        let provVal = null;
+        if (idProveedor) {
+          const provExists = await Proveedor.findByPk(parseInt(idProveedor));
+          if (provExists) provVal = provExists.idProveedor;
+        }
+        insumo.idProveedor = provVal;
+      }
       if (descripcion !== undefined) insumo.descripcion = descripcion;
       if (insumoData.esAdicion !== undefined) insumo.esAdicion = insumoData.esAdicion ? 1 : 0;
       if (insumoData.precioAdicion !== undefined) insumo.precioAdicion = parseFloat(insumoData.precioAdicion || 0);

@@ -371,12 +371,62 @@ class UserService {
       throw error;
     }
 
-    await Cliente.destroy({ where: { idUsuario: id } });
-    await user.destroy();
+    const { Venta, Compra } = require('../../persistence/models');
+
+    // 1. Proteger integridad si el usuario tiene un perfil de Cliente con ventas
+    const cliente = await Cliente.findOne({ where: { idUsuario: id } });
+    if (cliente) {
+      const ventasCliente = await Venta.count({ where: { idCliente: cliente.idCliente } }).catch(() => 0);
+      if (ventasCliente > 0) {
+        const error = new Error(
+          `No es posible eliminar al usuario "${user.nombre}" porque cuenta con ${ventasCliente} ${ventasCliente === 1 ? 'venta o pedido asociado' : 'ventas o pedidos asociados'} como cliente. Por integridad contable y legal, solo puedes cambiar su estado a Inactivo.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // 2. Proteger integridad si el usuario ha registrado ventas como cajero/vendedor
+    const ventasUsuario = await Venta.count({ where: { idUsuario: id } }).catch(() => 0);
+    if (ventasUsuario > 0) {
+      const error = new Error(
+        `No es posible eliminar al usuario "${user.nombre}" porque tiene ${ventasUsuario} ${ventasUsuario === 1 ? 'venta registrada' : 'ventas registradas'} en el sistema. Para suspender su acceso, cambia su estado a Inactivo.`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Proteger integridad si el usuario ha registrado compras de insumos
+    if (Compra) {
+      const comprasUsuario = await Compra.count({ where: { idUsuario: id } }).catch(() => 0);
+      if (comprasUsuario > 0) {
+        const error = new Error(
+          `No es posible eliminar al usuario "${user.nombre}" porque cuenta con ${comprasUsuario} ${comprasUsuario === 1 ? 'orden de compra registrada' : 'órdenes de compra registradas'}. Solo puedes cambiar su estado a Inactivo.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // 4. Intentar eliminación protegida
+    try {
+      if (cliente) {
+        await cliente.destroy();
+      }
+      await user.destroy();
+    } catch (err) {
+      if (err.name === 'SequelizeForeignKeyConstraintError' || (err.message && err.message.toLowerCase().includes('foreign key constraint fails'))) {
+        const error = new Error(
+          `No es posible eliminar al usuario "${user.nombre}" porque tiene registros históricos vinculados en la base de datos (ventas, pedidos o compras). Por integridad de datos, cambia su estado a Inactivo para suspender su acceso.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      throw err;
+    }
 
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('usuario', 'idUsuario');
-
 
     return { message: 'Usuario eliminado exitosamente' };
   }
