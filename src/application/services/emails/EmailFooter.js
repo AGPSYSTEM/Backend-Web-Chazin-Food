@@ -12,52 +12,18 @@ function EmailFooter() {
     Section,
     {
       style: {
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#FAFAF9',
         padding: '28px 24px 30px',
         textAlign: 'center',
-        borderBottomLeftRadius: '20px',
-        borderBottomRightRadius: '20px',
+        borderBottomLeftRadius: '16px',
+        borderBottomRightRadius: '16px',
         borderTop: `1px solid ${colors.borderLight}`
       }
     },
-    // Fila de iconos gourmet
+    // Enlaces de utilidad / acceso rápido
     e(
       'div',
-      { style: { fontSize: '18px', letterSpacing: '6px', marginBottom: '8px' } },
-      '🍔 🍟 🌭 🥤'
-    ),
-    e(
-      Text,
-      {
-        style: {
-          color: colors.navy900,
-          fontSize: '13.5px',
-          fontWeight: '800',
-          letterSpacing: '0.3px',
-          margin: '0 0 4px 0'
-        }
-      },
-      'Chazin Food | Comidas Rápidas Artesanales'
-    ),
-    e(
-      Text,
-      {
-        style: {
-          color: colors.textMuted,
-          fontSize: '12px',
-          lineHeight: '1.6',
-          margin: '0 0 16px 0',
-          maxWidth: '440px',
-          marginLeft: 'auto',
-          marginRight: 'auto'
-        }
-      },
-      'El auténtico sabor artesanal con ingredientes seleccionados, pan brioche recién horneado y carnes 100% de calidad.'
-    ),
-    // Botones / Enlaces rápidos tipo píldora
-    e(
-      'div',
-      { style: { margin: '14px 0' } },
+      { style: { marginBottom: '18px' } },
       e(
         Link,
         {
@@ -66,17 +32,16 @@ function EmailFooter() {
             backgroundColor: '#FFFFFF',
             border: `1px solid ${colors.borderLight}`,
             borderRadius: '8px',
-            color: colors.primary,
-            fontSize: '11.5px',
-            fontWeight: '700',
+            color: colors.textTitle,
+            fontSize: '12px',
+            fontWeight: '600',
             textDecoration: 'none',
             padding: '7px 14px',
             margin: '0 4px',
-            display: 'inline-block',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            display: 'inline-block'
           }
         },
-        '🌐 Menú Digital'
+        'Explorar Menú'
       ),
       e(
         Link,
@@ -86,40 +51,80 @@ function EmailFooter() {
             backgroundColor: '#FFFFFF',
             border: `1px solid ${colors.borderLight}`,
             borderRadius: '8px',
-            color: colors.primary,
-            fontSize: '11.5px',
-            fontWeight: '700',
+            color: colors.textTitle,
+            fontSize: '12px',
+            fontWeight: '600',
             textDecoration: 'none',
             padding: '7px 14px',
             margin: '0 4px',
-            display: 'inline-block',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            display: 'inline-block'
           }
         },
-        '🔑 Iniciar Sesión'
+        'Mi Cuenta'
+      ),
+      e(
+        Link,
+        {
+          href: 'https://wa.me/573000000000',
+          style: {
+            backgroundColor: '#FFFFFF',
+            border: `1px solid ${colors.borderLight}`,
+            borderRadius: '8px',
+            color: colors.emeraldText,
+            fontSize: '12px',
+            fontWeight: '600',
+            textDecoration: 'none',
+            padding: '7px 14px',
+            margin: '0 4px',
+            display: 'inline-block'
+          }
+        },
+        'WhatsApp Soporte'
       )
+    ),
+    e(
+      Text,
+      {
+        style: {
+          color: colors.textBody,
+          fontSize: '12px',
+          fontWeight: '700',
+          margin: '0 0 4px 0'
+        }
+      },
+      'Chazin Food · Hamburguesería & Sabor Artesanal'
+    ),
+    e(
+      Text,
+      {
+        style: {
+          color: colors.textMuted,
+          fontSize: '11.5px',
+          lineHeight: '1.5',
+          margin: '0 0 14px 0'
+        }
+      },
+      'Calle 21 #80-21, Belén, Medellín, Colombia • Pedidos Online y Presencial'
     ),
     e(Hr, {
       style: {
         borderColor: colors.borderLight,
-        margin: '18px 0 14px 0'
+        margin: '14px 0'
       }
     }),
     e(
       Text,
       {
         style: {
-          color: colors.textLight,
+          color: colors.textSubtle,
           fontSize: '11px',
           lineHeight: '1.6',
           margin: 0
         }
       },
-      '📍 Cl. 21 #80-21, Belén, Medellín, Colombia • Pedidos Online y Presencial',
-      e('br'),
       `© ${currentYear} Chazin Food. Todos los derechos reservados.`,
       e('br'),
-      'Este es un mensaje seguro generado automáticamente por el sistema de Chazin Food. Por favor no respondas a este correo.'
+      'Este es un mensaje transaccional automatizado y seguro emitido por Chazin Food. No respondas directamente a este remitente.'
     )
   );
 }

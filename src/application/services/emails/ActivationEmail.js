@@ -12,7 +12,7 @@ const {
 } = require('@react-email/components');
 const EmailHeader = require('./EmailHeader');
 const EmailFooter = require('./EmailFooter');
-const { colors, typography } = require('./EmailStyles');
+const { colors, typography, commonStyles } = require('./EmailStyles');
 
 const e = React.createElement;
 
@@ -29,55 +29,32 @@ function ActivationEmail({
     Html,
     { lang: 'es' },
     e(Head),
-    e(Preview, null, `🍔 ¡Activa tu cuenta de cliente en Chazin Food, ${fullName}! Credenciales`),
+    e(Preview, null, `Tu cuenta en Chazin Food está lista. Accede con tus credenciales.`),
     e(
       Body,
-      {
-        style: {
-          backgroundColor: '#F1F5F9',
-          fontFamily: typography.fontFamily,
-          margin: 0,
-          padding: '28px 12px'
-        }
-      },
+      { style: commonStyles.body },
       e(
         Container,
-        {
-          style: {
-            backgroundColor: colors.cardBg,
-            borderRadius: '20px',
-            maxWidth: '600px',
-            margin: '0 auto',
-            border: `1px solid ${colors.borderLight}`,
-            boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 8px 16px -6px rgba(0, 0, 0, 0.04)',
-            overflow: 'hidden'
-          }
-        },
+        { style: commonStyles.container },
         e(EmailHeader, { subtitle: 'Activación de Cuenta de Cliente' }),
         e(
           Section,
-          { style: { padding: '36px 32px 30px' } },
-          // Badge
+          { style: commonStyles.contentSection },
+          // Badge de bienvenida sobrio y elegante
           e(
             'div',
-            { style: { textAlign: 'center', marginBottom: '20px' } },
+            { style: { textAlign: 'center', marginBottom: '18px' } },
             e(
               'span',
               {
                 style: {
-                  display: 'inline-block',
-                  backgroundColor: colors.primaryLight,
-                  border: `1px solid ${colors.primaryBorder}`,
-                  borderRadius: '9999px',
-                  padding: '6px 18px',
-                  color: colors.primary,
-                  fontSize: '11.5px',
-                  fontWeight: '800',
-                  letterSpacing: '0.6px',
-                  textTransform: 'uppercase'
+                  ...commonStyles.badge,
+                  backgroundColor: colors.emeraldLight,
+                  border: `1px solid ${colors.emeraldBorder}`,
+                  color: colors.emeraldText
                 }
               },
-              '✨ Registro Oficial de Cliente ✨'
+              'Registro Exitoso'
             )
           ),
           // Heading
@@ -86,15 +63,15 @@ function ActivationEmail({
             {
               as: 'h2',
               style: {
-                color: colors.navy900,
-                fontSize: '23px',
-                fontWeight: '900',
-                lineHeight: '1.35',
-                margin: '0 0 14px 0',
+                color: colors.textTitle,
+                fontSize: '22px',
+                fontWeight: '800',
+                lineHeight: '1.3',
+                margin: '0 0 12px 0',
                 textAlign: 'center'
               }
             },
-            `¡Te damos la bienvenida, ${fullName}! 🍔`
+            `¡Bienvenido a Chazin Food, ${fullName}!`
           ),
           e(
             Text,
@@ -102,24 +79,23 @@ function ActivationEmail({
               style: {
                 color: colors.textBody,
                 fontSize: '14.5px',
-                lineHeight: '1.65',
+                lineHeight: '1.6',
                 margin: '0 0 24px 0',
                 textAlign: 'center'
               }
             },
-            'Tu cuenta de cliente en Chazin Food ha sido registrada con éxito. Ya puedes ordenar tus comidas rápidas favoritas, seguir tus pedidos en tiempo real y disfrutar de nuestros beneficios exclusivos:'
+            'Tu cuenta ha sido creada exitosamente. Ya puedes disfrutar de nuestras hamburguesas al carbón, carnes seleccionadas y acompañamientos artesanales desde cualquier dispositivo.'
           ),
-          // Credenciales Card
+          // Tarjeta de credenciales de acceso
           e(
             Section,
             {
               style: {
-                backgroundColor: '#F8FAFC',
+                backgroundColor: colors.cardSubtle,
                 border: `1px solid ${colors.borderLight}`,
-                borderRadius: '16px',
-                padding: '22px 24px',
-                marginBottom: '28px',
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '26px'
               }
             },
             e(
@@ -138,28 +114,29 @@ function ActivationEmail({
                 'span',
                 {
                   style: {
-                    color: colors.navy900,
-                    fontSize: '12px',
-                    fontWeight: '800',
+                    color: colors.textTitle,
+                    fontSize: '11.5px',
+                    fontWeight: '700',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.6px'
+                    letterSpacing: '0.5px'
                   }
                 },
-                '🔐 Credenciales Temporales de Acceso'
+                'Credenciales de Ingreso'
               ),
               e(
                 'span',
                 {
                   style: {
-                    backgroundColor: '#FEF3C7',
-                    color: '#B45309',
+                    backgroundColor: colors.briocheAmberLight,
+                    color: colors.amberText,
+                    border: `1px solid ${colors.briocheAmberBorder}`,
                     fontSize: '10.5px',
-                    fontWeight: '700',
+                    fontWeight: '600',
                     padding: '2px 8px',
-                    borderRadius: '6px'
+                    borderRadius: '4px'
                   }
                 },
-                'Primer Acceso'
+                'Acceso Inicial'
               )
             ),
             e(
@@ -178,12 +155,27 @@ function ActivationEmail({
                   null,
                   e(
                     'td',
-                    { style: { padding: '8px 0', color: colors.textMuted, fontSize: '13px', width: '140px', fontWeight: '600' } },
-                    'Correo Electrónico:'
+                    {
+                      style: {
+                        padding: '6px 0',
+                        color: colors.textMuted,
+                        fontSize: '13px',
+                        width: '130px',
+                        fontWeight: '500'
+                      }
+                    },
+                    'Usuario / Correo:'
                   ),
                   e(
                     'td',
-                    { style: { padding: '8px 0', color: colors.navy900, fontSize: '13.5px', fontWeight: '700' } },
+                    {
+                      style: {
+                        padding: '6px 0',
+                        color: colors.textTitle,
+                        fontSize: '13.5px',
+                        fontWeight: '700'
+                      }
+                    },
                     email
                   )
                 ),
@@ -192,26 +184,33 @@ function ActivationEmail({
                   null,
                   e(
                     'td',
-                    { style: { padding: '8px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '600' } },
-                    'Clave Temporal:'
+                    {
+                      style: {
+                        padding: '6px 0',
+                        color: colors.textMuted,
+                        fontSize: '13px',
+                        fontWeight: '500'
+                      }
+                    },
+                    'Clave de acceso:'
                   ),
                   e(
                     'td',
-                    { style: { padding: '8px 0' } },
+                    { style: { padding: '6px 0' } },
                     password
                       ? e(
                           'code',
                           {
                             style: {
-                              backgroundColor: colors.primaryLight,
-                              color: colors.primary,
-                              border: `1px dashed ${colors.primaryBorder}`,
-                              padding: '5px 12px',
-                              borderRadius: '8px',
+                              backgroundColor: colors.crimsonLight,
+                              color: colors.crimson,
+                              border: `1px solid ${colors.crimsonBorder}`,
+                              padding: '4px 10px',
+                              borderRadius: '6px',
                               fontSize: '13.5px',
-                              fontWeight: '800',
-                              fontFamily: 'Consolas, Monaco, monospace',
-                              letterSpacing: '0.8px'
+                              fontWeight: '700',
+                              fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace',
+                              letterSpacing: '0.5px'
                             }
                           },
                           password
@@ -220,73 +219,43 @@ function ActivationEmail({
                           'span',
                           {
                             style: {
-                              backgroundColor: '#EFF6FF',
-                              color: '#1D4ED8',
-                              border: '1px solid #BFDBFE',
-                              padding: '4px 10px',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              fontWeight: '700'
+                              color: colors.textMuted,
+                              fontSize: '12.5px',
+                              fontStyle: 'italic'
                             }
                           },
-                          '🔵 (Autenticado con tu cuenta de Google)'
+                          'Acceso vinculado mediante Google'
                         )
                   )
                 )
               )
             )
           ),
-          // Big CTA Button
+          // Botón Principal CTA
           e(
             Section,
-            { style: { textAlign: 'center', margin: '26px 0 32px' } },
+            { style: { textAlign: 'center', margin: '24px 0 28px' } },
             e(
               Button,
               {
                 href: activationLink,
-                style: {
-                  background: 'linear-gradient(135deg, #FF4B2B 0%, #E11D48 60%, #9F1239 100%)',
-                  color: colors.white,
-                  padding: '16px 40px',
-                  borderRadius: '14px',
-                  fontWeight: '800',
-                  fontSize: '15px',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  boxShadow: '0 10px 24px -4px rgba(225, 29, 72, 0.45)',
-                  letterSpacing: '0.5px'
-                }
+                style: commonStyles.ctaButton
               },
-              'Activar Mi Cuenta y Entrar ➔'
+              'Activar Cuenta e Iniciar Sesión'
             )
           ),
-          // Beneficios de Cliente Chazin Food
+          // Beneficios en tabla limpia (100% compatible con clientes de correo)
           e(
             'div',
             {
               style: {
-                backgroundColor: '#F8FAFC',
+                backgroundColor: '#FFFFFF',
                 border: `1px solid ${colors.borderLight}`,
-                borderRadius: '16px',
-                padding: '20px',
+                borderRadius: '12px',
+                padding: '16px 14px',
                 marginBottom: '22px'
               }
             },
-            e(
-              'div',
-              {
-                style: {
-                  color: colors.navy900,
-                  fontSize: '12.5px',
-                  fontWeight: '800',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.6px',
-                  marginBottom: '14px',
-                  textAlign: 'center'
-                }
-              },
-              '✨ Privilegios de ser Cliente Chazin Food'
-            ),
             e(
               'table',
               { border: '0', cellPadding: '0', cellSpacing: '0', style: { width: '100%' } },
@@ -298,53 +267,49 @@ function ActivationEmail({
                   null,
                   e(
                     'td',
-                    { style: { padding: '8px 10px', verticalAlign: 'top', width: '33.3%' } },
-                    e('div', { style: { fontSize: '20px', marginBottom: '4px' } }, '🚀'),
-                    e('div', { style: { color: colors.navy900, fontSize: '12px', fontWeight: '800' } }, 'Pedidos Rápidos'),
-                    e('div', { style: { color: colors.textMuted, fontSize: '11px', lineHeight: '1.4' } }, 'Guarda tus direcciones y métodos de pago favoritos.')
+                    { style: { padding: '8px', verticalAlign: 'top', width: '33.3%', textAlign: 'center' } },
+                    e('div', { style: { color: colors.crimson, fontSize: '13px', fontWeight: '700', marginBottom: '2px' } }, '100% Artesanal'),
+                    e('div', { style: { color: colors.textMuted, fontSize: '11px', lineHeight: '1.4' } }, 'Pan brioche fresco y carnes preparadas al carbón.')
                   ),
                   e(
                     'td',
-                    { style: { padding: '8px 10px', verticalAlign: 'top', width: '33.3%' } },
-                    e('div', { style: { fontSize: '20px', marginBottom: '4px' } }, '🎁'),
-                    e('div', { style: { color: colors.navy900, fontSize: '12px', fontWeight: '800' } }, 'Fidelidad VIP'),
-                    e('div', { style: { color: colors.textMuted, fontSize: '11px', lineHeight: '1.4' } }, 'Descuentos acumulativos en todos tus consumos.')
+                    { style: { padding: '8px', verticalAlign: 'top', width: '33.3%', textAlign: 'center', borderLeft: `1px solid ${colors.borderLight}`, borderRight: `1px solid ${colors.borderLight}` } },
+                    e('div', { style: { color: colors.crimson, fontSize: '13px', fontWeight: '700', marginBottom: '2px' } }, 'En Vivo'),
+                    e('div', { style: { color: colors.textMuted, fontSize: '11px', lineHeight: '1.4' } }, 'Seguimiento en tiempo real de tu pedido y entrega.')
                   ),
                   e(
                     'td',
-                    { style: { padding: '8px 10px', verticalAlign: 'top', width: '33.3%' } },
-                    e('div', { style: { fontSize: '20px', marginBottom: '4px' } }, '💬'),
-                    e('div', { style: { color: colors.navy900, fontSize: '12px', fontWeight: '800' } }, 'Atención Directa'),
-                    e('div', { style: { color: colors.textMuted, fontSize: '11px', lineHeight: '1.4' } }, 'Soporte prioritario y contacto directo con la cocina.')
+                    { style: { padding: '8px', verticalAlign: 'top', width: '33.3%', textAlign: 'center' } },
+                    e('div', { style: { color: colors.crimson, fontSize: '13px', fontWeight: '700', marginBottom: '2px' } }, 'Club Chazin'),
+                    e('div', { style: { color: colors.textMuted, fontSize: '11px', lineHeight: '1.4' } }, 'Acumula puntos y promociones en cada compra.')
                   )
                 )
               )
             )
           ),
-          // Aviso de primer acceso
+          // Nota de seguridad y cambio de contraseña
           e(
             Section,
             {
               style: {
-                backgroundColor: colors.emerald50,
-                border: `1px solid ${colors.emerald200}`,
-                borderRadius: '12px',
-                padding: '12px 16px'
+                backgroundColor: colors.briocheAmberLight,
+                border: `1px solid ${colors.briocheAmberBorder}`,
+                borderRadius: '10px',
+                padding: '12px 14px'
               }
             },
             e(
               Text,
               {
                 style: {
-                  color: colors.emerald600,
-                  fontSize: '11.5px',
+                  color: colors.amberText,
+                  fontSize: '12px',
                   lineHeight: '1.5',
                   margin: 0
                 }
               },
-              '💡 ',
-              e('strong', null, 'Recomendación:'),
-              ' Al ingresar por primera vez con tu clave temporal, te sugerimos ir a tu perfil y configurar una contraseña definitiva de tu preferencia.'
+              e('strong', null, 'Consejo de seguridad: '),
+              'Al iniciar sesión con tu clave temporal, puedes dirigirte a tu perfil en cualquier momento para configurar una contraseña personalizada.'
             )
           )
         ),

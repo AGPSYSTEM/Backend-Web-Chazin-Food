@@ -12,7 +12,7 @@ const {
 } = require('@react-email/components');
 const EmailHeader = require('./EmailHeader');
 const EmailFooter = require('./EmailFooter');
-const { colors, typography } = require('./EmailStyles');
+const { colors, commonStyles } = require('./EmailStyles');
 
 const e = React.createElement;
 
@@ -27,62 +27,39 @@ function PasswordChangedEmail({
   const changeDate = new Date().toLocaleString('es-CO', {
     timeZone: 'America/Bogota',
     dateStyle: 'full',
-    timeStyle: 'medium'
+    timeStyle: 'short'
   });
 
   return e(
     Html,
     { lang: 'es' },
     e(Head),
-    e(Preview, null, `🔐 Tu contraseña de Chazin Food fue modificada exitosamente`),
+    e(Preview, null, `Tu contraseña de Chazin Food fue modificada exitosamente`),
     e(
       Body,
-      {
-        style: {
-          backgroundColor: '#F1F5F9',
-          fontFamily: typography.fontFamily,
-          margin: 0,
-          padding: '28px 12px'
-        }
-      },
+      { style: commonStyles.body },
       e(
         Container,
-        {
-          style: {
-            backgroundColor: colors.cardBg,
-            borderRadius: '20px',
-            maxWidth: '600px',
-            margin: '0 auto',
-            border: `1px solid ${colors.borderLight}`,
-            boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 8px 16px -6px rgba(0, 0, 0, 0.04)',
-            overflow: 'hidden'
-          }
-        },
-        e(EmailHeader, { subtitle: 'Alerta de Seguridad' }),
+        { style: commonStyles.container },
+        e(EmailHeader, { subtitle: 'Seguridad y Notificaciones' }),
         e(
           Section,
-          { style: { padding: '36px 32px 30px' } },
+          { style: commonStyles.contentSection },
           // Badge
           e(
             'div',
-            { style: { textAlign: 'center', marginBottom: '20px' } },
+            { style: { textAlign: 'center', marginBottom: '18px' } },
             e(
               'span',
               {
                 style: {
-                  display: 'inline-block',
-                  backgroundColor: colors.emerald50,
-                  border: `1px solid ${colors.emerald200}`,
-                  borderRadius: '9999px',
-                  padding: '6px 18px',
-                  color: colors.emerald600,
-                  fontSize: '11.5px',
-                  fontWeight: '800',
-                  letterSpacing: '0.6px',
-                  textTransform: 'uppercase'
+                  ...commonStyles.badge,
+                  backgroundColor: colors.emeraldLight,
+                  border: `1px solid ${colors.emeraldBorder}`,
+                  color: colors.emeraldText
                 }
               },
-              '🛡️ Cambio de Contraseña Confirmado 🛡️'
+              'Cambio Confirmado'
             )
           ),
           // Heading
@@ -91,11 +68,11 @@ function PasswordChangedEmail({
             {
               as: 'h2',
               style: {
-                color: colors.navy900,
-                fontSize: '23px',
-                fontWeight: '900',
-                lineHeight: '1.35',
-                margin: '0 0 14px 0',
+                color: colors.textTitle,
+                fontSize: '22px',
+                fontWeight: '800',
+                lineHeight: '1.3',
+                margin: '0 0 12px 0',
                 textAlign: 'center'
               }
             },
@@ -107,23 +84,23 @@ function PasswordChangedEmail({
               style: {
                 color: colors.textBody,
                 fontSize: '14.5px',
-                lineHeight: '1.65',
+                lineHeight: '1.6',
                 margin: '0 0 24px 0',
                 textAlign: 'center'
               }
             },
-            'Te informamos que la contraseña asociada a tu cuenta de Chazin Food ha sido modificada con éxito. Ya puedes utilizar tu nueva clave para acceder a todas las funciones de la plataforma.'
+            'Te confirmamos que la contraseña asociada a tu cuenta en Chazin Food ha sido modificada con éxito. Puedes ingresar al portal con tu nueva clave.'
           ),
           // Audit Log Card
           e(
             Section,
             {
               style: {
-                backgroundColor: '#F8FAFC',
+                backgroundColor: colors.cardSubtle,
                 border: `1px solid ${colors.borderLight}`,
-                borderRadius: '16px',
-                padding: '20px 24px',
-                marginBottom: '26px'
+                borderRadius: '12px',
+                padding: '18px 20px',
+                marginBottom: '24px'
               }
             },
             e(
@@ -133,14 +110,14 @@ function PasswordChangedEmail({
                   borderBottom: `1px solid ${colors.borderLight}`,
                   paddingBottom: '10px',
                   marginBottom: '12px',
-                  color: colors.navy900,
-                  fontSize: '12px',
-                  fontWeight: '800',
+                  color: colors.textTitle,
+                  fontSize: '11.5px',
+                  fontWeight: '700',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.6px'
+                  letterSpacing: '0.5px'
                 }
               },
-              '📋 Registro de Auditoría de Seguridad'
+              'Registro del Cambio'
             ),
             e(
               'table',
@@ -151,20 +128,20 @@ function PasswordChangedEmail({
                 e(
                   'tr',
                   null,
-                  e('td', { style: { padding: '6px 0', color: colors.textMuted, fontSize: '13px', width: '130px', fontWeight: '600' } }, 'Fecha y Hora:'),
-                  e('td', { style: { padding: '6px 0', color: colors.navy900, fontSize: '13px', fontWeight: '700' } }, changeDate)
+                  e('td', { style: { padding: '5px 0', color: colors.textMuted, fontSize: '13px', width: '130px', fontWeight: '500' } }, 'Fecha y hora:'),
+                  e('td', { style: { padding: '5px 0', color: colors.textTitle, fontSize: '13px', fontWeight: '600' } }, changeDate)
                 ),
                 e(
                   'tr',
                   null,
-                  e('td', { style: { padding: '6px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '600' } }, 'Estado de Clave:'),
-                  e('td', { style: { padding: '6px 0', color: colors.emerald600, fontSize: '13px', fontWeight: '700' } }, '✅ Actualizada y Protegida')
+                  e('td', { style: { padding: '5px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '500' } }, 'Estado:'),
+                  e('td', { style: { padding: '5px 0', color: colors.emeraldText, fontSize: '13px', fontWeight: '700' } }, 'Actualizada y protegida')
                 ),
                 (nuevaContrasena || password)
                   ? e(
                       'tr',
                       null,
-                      e('td', { style: { padding: '8px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '600', width: '130px' } }, 'Nueva Contraseña:'),
+                      e('td', { style: { padding: '8px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '500' } }, 'Nueva clave:'),
                       e(
                         'td',
                         { style: { padding: '8px 0' } },
@@ -172,15 +149,14 @@ function PasswordChangedEmail({
                           'code',
                           {
                             style: {
-                              backgroundColor: colors.primaryLight,
-                              color: colors.primary,
-                              border: `1px dashed ${colors.primaryBorder}`,
-                              padding: '5px 12px',
-                              borderRadius: '8px',
+                              backgroundColor: colors.crimsonLight,
+                              color: colors.crimson,
+                              border: `1px solid ${colors.crimsonBorder}`,
+                              padding: '4px 10px',
+                              borderRadius: '6px',
                               fontSize: '13.5px',
-                              fontWeight: '800',
-                              fontFamily: 'Consolas, Monaco, monospace',
-                              letterSpacing: '0.8px'
+                              fontWeight: '700',
+                              fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace'
                             }
                           },
                           nuevaContrasena || password
@@ -191,60 +167,48 @@ function PasswordChangedEmail({
                 e(
                   'tr',
                   null,
-                  e('td', { style: { padding: '6px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '600' } }, 'Plataforma:'),
-                  e('td', { style: { padding: '6px 0', color: colors.navy900, fontSize: '13px', fontWeight: '700' } }, 'Chazin Food Web (HTTPS)')
+                  e('td', { style: { padding: '5px 0', color: colors.textMuted, fontSize: '13px', fontWeight: '500' } }, 'Plataforma:'),
+                  e('td', { style: { padding: '5px 0', color: colors.textTitle, fontSize: '13px', fontWeight: '600' } }, 'Chazin Food Web (HTTPS)')
                 )
               )
             )
           ),
-          // Big CTA Button
+          // CTA
           e(
             Section,
-            { style: { textAlign: 'center', margin: '24px 0 28px' } },
+            { style: { textAlign: 'center', margin: '22px 0 26px' } },
             e(
               Button,
               {
                 href: supportLink,
-                style: {
-                  background: 'linear-gradient(135deg, #FF4B2B 0%, #E11D48 60%, #9F1239 100%)',
-                  color: colors.white,
-                  padding: '16px 40px',
-                  borderRadius: '14px',
-                  fontWeight: '800',
-                  fontSize: '15px',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  boxShadow: '0 10px 24px -4px rgba(225, 29, 72, 0.45)',
-                  letterSpacing: '0.5px'
-                }
+                style: commonStyles.ctaButton
               },
-              'Ir al Portal Chazin Food ➔'
+              'Ir al Portal Chazin Food'
             )
           ),
-          // Alerta crítica de seguridad
+          // Advertencia de seguridad en caso de actividad no autorizada
           e(
             Section,
             {
               style: {
-                backgroundColor: colors.primaryLight,
-                border: `1px solid ${colors.primaryBorder}`,
-                borderRadius: '12px',
-                padding: '14px 16px'
+                backgroundColor: colors.crimsonLight,
+                border: `1px solid ${colors.crimsonBorder}`,
+                borderRadius: '10px',
+                padding: '12px 14px'
               }
             },
             e(
               Text,
               {
                 style: {
-                  color: colors.primaryDark,
+                  color: colors.crimson,
                   fontSize: '12px',
                   lineHeight: '1.5',
                   margin: 0
                 }
               },
-              '⚠️ ',
-              e('strong', null, '¿No reconoces esta actividad?'),
-              ' Si no fuiste tú quien realizó este cambio, comunícate con nosotros inmediatamente para congelar temporalmente tu cuenta y restaurar tu acceso seguro.'
+              e('strong', null, '¿No reconoces esta actividad? '),
+              'Si no realizaste este cambio, comunícate de inmediato con el equipo de soporte de Chazin Food para asegurar tu cuenta.'
             )
           )
         ),
