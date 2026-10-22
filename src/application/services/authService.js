@@ -474,8 +474,17 @@ class AuthService {
   }
 
   static async resetPassword(data) {
-    const { token, email, contrasena, contraseña, password } = data || {};
+    let { token, email, contrasena, contraseña, password } = data || {};
     const newPassword = contrasena || contraseña || password;
+
+    if (!email && token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.email) {
+          email = decoded.email;
+        }
+      } catch (err) {}
+    }
 
     if (!token || !email || !newPassword) {
       const error = new Error('Token, email y nueva contraseña son requeridos');
