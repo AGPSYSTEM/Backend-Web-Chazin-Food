@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Evento, Product, Variante, FichaTecnica, DetalleFichaInsumo } = require('../../persistence/models');
 
 const stripEmojis = (str) => {
@@ -34,6 +35,8 @@ function evaluarVigenciaEvento(e, now = new Date()) {
   const msRestantes = finDate.getTime() - now.getTime();
   const diasRestantes = Math.ceil(msRestantes / (1000 * 60 * 60 * 24));
   const horasRestantes = Math.max(0, Math.floor(msRestantes / (1000 * 60 * 60)));
+  const minutosRestantes = Math.max(0, Math.floor((msRestantes % (1000 * 60 * 60)) / (1000 * 60)));
+  const segundosRestantes = Math.max(0, Math.floor((msRestantes % (1000 * 60)) / 1000));
 
   if (inicioDate && now < inicioDate) {
     const msHastaInicio = inicioDate.getTime() - now.getTime();
@@ -43,6 +46,8 @@ function evaluarVigenciaEvento(e, now = new Date()) {
       estaVigente: false,
       diasRestantes,
       horasRestantes,
+      minutosRestantes,
+      segundosRestantes,
       diasParaInicio,
       urgente: false,
       label: `Inicia en ${diasParaInicio} día${diasParaInicio !== 1 ? 's' : ''}`,
@@ -59,6 +64,8 @@ function evaluarVigenciaEvento(e, now = new Date()) {
       estaVigente: false,
       diasRestantes: 0,
       horasRestantes: 0,
+      minutosRestantes: 0,
+      segundosRestantes: 0,
       diasExpirado,
       urgente: false,
       label: `Finalizado hace ${diasExpirado} día${diasExpirado !== 1 ? 's' : ''}`,
@@ -73,12 +80,17 @@ function evaluarVigenciaEvento(e, now = new Date()) {
   let label = `Quedan ${diasRestantes} días`;
   let shortLabel = `${diasRestantes}d restantes`;
 
-  if (diasRestantes === 1) {
+  if (horasRestantes < 24) {
+    if (horasRestantes === 0) {
+      label = `¡Termina pronto! (Quedan ${minutosRestantes}m)`;
+      shortLabel = `${minutosRestantes}m restantes`;
+    } else {
+      label = `¡Termina hoy! (Quedan ${horasRestantes}h ${minutosRestantes > 0 ? `${minutosRestantes}m` : ''})`.trim();
+      shortLabel = `${horasRestantes}h restantes`;
+    }
+  } else if (diasRestantes === 1) {
     label = `¡Último día! (Quedan ${horasRestantes}h)`;
     shortLabel = '¡Último día!';
-  } else if (diasRestantes === 0) {
-    label = `¡Termina hoy! (Quedan ${horasRestantes}h)`;
-    shortLabel = 'Termina hoy';
   }
 
   return {
@@ -86,6 +98,8 @@ function evaluarVigenciaEvento(e, now = new Date()) {
     estaVigente: e.estado === 1,
     diasRestantes,
     horasRestantes,
+    minutosRestantes,
+    segundosRestantes,
     urgente,
     label,
     shortLabel,
@@ -96,6 +110,24 @@ function evaluarVigenciaEvento(e, now = new Date()) {
 
 class EventoService {
   static async getAll() {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Auto-expirar eventos cuya fecha límite ya pasó para mantener la base de datos sincronizada
+    try {
+      await Evento.update(
+        { estado: 0 },
+        {
+          where: {
+            estado: 1,
+            fechaFin: { [Op.ne]: null, [Op.lt]: todayStr }
+          }
+        }
+      );
+    } catch (e) {
+      // Ignorar si hay algún bloqueo transaccional menor
+    }
+
     const eventos = await Evento.findAll({
       order: [['idEvento', 'ASC']],
       include: [
@@ -108,7 +140,6 @@ class EventoService {
       ]
     });
 
-    const now = new Date();
     return eventos.map((e) => {
       const vigencia = evaluarVigenciaEvento(e, now);
       return {

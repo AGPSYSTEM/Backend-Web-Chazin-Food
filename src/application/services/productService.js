@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Product, CategoriaProducto, Evento, Variante, ComboProducto, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaProducto } = require('../../persistence/models');
 
 /**
@@ -65,7 +66,18 @@ class ProductService {
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
+        { 
+          model: Evento, 
+          as: 'eventos', 
+          required: false, 
+          where: { 
+            estado: 1,
+            [Op.or]: [
+              { fechaFin: null },
+              { fechaFin: { [Op.gte]: new Date().toISOString().split('T')[0] } }
+            ]
+          } 
+        },
         {
           model: ComboProducto,
           as: 'itemsCombo',
@@ -223,7 +235,18 @@ class ProductService {
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { model: Evento, as: 'eventos', required: false, where: { estado: 1 } },
+        { 
+          model: Evento, 
+          as: 'eventos', 
+          required: false, 
+          where: { 
+            estado: 1,
+            [Op.or]: [
+              { fechaFin: null },
+              { fechaFin: { [Op.gte]: new Date().toISOString().split('T')[0] } }
+            ]
+          } 
+        },
         {
           model: ComboProducto,
           as: 'itemsCombo',
