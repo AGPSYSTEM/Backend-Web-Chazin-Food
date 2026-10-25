@@ -36,19 +36,20 @@ class CategoryService {
   }
 
   static async createCategory({ nombre, descripcion }) {
-    if (!nombre || !nombre.trim()) {
+    const trimmedNombre = String(nombre || '').trim();
+    if (!trimmedNombre) {
       const error = new Error('El nombre de la categoría es obligatorio');
       error.statusCode = 400;
       throw error;
     }
 
-    if (/\d/.test(nombre)) {
-      const error = new Error('El nombre de la categoría no debe contener números');
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(trimmedNombre) || trimmedNombre.length < 2) {
+      const error = new Error('El nombre de la categoría solo puede contener letras y espacios (sin números ni caracteres especiales).');
       error.statusCode = 400;
       throw error;
     }
 
-    const existing = await CategoriaInsumo.findOne({ where: { nombre: nombre.trim() } });
+    const existing = await CategoriaInsumo.findOne({ where: { nombre: trimmedNombre } });
     if (existing) {
       const error = new Error('Ya existe una categoría con ese nombre');
       error.statusCode = 400;
@@ -56,7 +57,7 @@ class CategoryService {
     }
 
     const category = await CategoriaInsumo.create({
-      nombre: nombre.trim(),
+      nombre: trimmedNombre,
       descripcion: descripcion || '',
       estado: 1
     });
@@ -72,13 +73,25 @@ class CategoryService {
       throw error;
     }
 
-    if (data.nombre) {
-      if (/\d/.test(data.nombre)) {
-        const error = new Error('El nombre de la categoría no debe contener números');
+    if (data.nombre !== undefined) {
+      const trimmedNombre = String(data.nombre || '').trim();
+      if (!trimmedNombre) {
+        const error = new Error('El nombre de la categoría no puede estar vacío');
         error.statusCode = 400;
         throw error;
       }
-      cat.nombre = data.nombre.trim();
+      if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(trimmedNombre) || trimmedNombre.length < 2) {
+        const error = new Error('El nombre de la categoría solo puede contener letras y espacios (sin números ni caracteres especiales).');
+        error.statusCode = 400;
+        throw error;
+      }
+      const existing = await CategoriaInsumo.findOne({ where: { nombre: trimmedNombre } });
+      if (existing && existing.id !== Number(id)) {
+        const error = new Error('Ya existe otra categoría con ese nombre');
+        error.statusCode = 400;
+        throw error;
+      }
+      cat.nombre = trimmedNombre;
     }
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
     if (data.estado !== undefined) {

@@ -110,7 +110,11 @@ const Cliente = sequelize.define('cliente', {
     allowNull: true
   },
   direccion: {
-    type: DataTypes.STRING
+    type: DataTypes.TEXT
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
   }
 }, { tableName: 'cliente', timestamps: false });
 
@@ -198,6 +202,10 @@ const Proveedor = sequelize.define('proveedor', {
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
+  },
+  eliminado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
   }
 }, { tableName: 'proveedor', timestamps: false });
 
@@ -221,6 +229,10 @@ const Insumo = sequelize.define('insumo', {
   stockMinimo: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0
+  },
+  stockMaximo: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 100
   },
   fechaExpedicion: {
     type: DataTypes.DATEONLY
@@ -517,6 +529,14 @@ const Venta = sequelize.define('venta', {
   observaciones: {
     type: DataTypes.TEXT
   },
+  origen: {
+    type: DataTypes.STRING(30),
+    allowNull: true
+  },
+  tiempoEstimadoEntrega: {
+    type: DataTypes.STRING(60),
+    allowNull: true
+  },
   estadoAprobacion: {
     type: DataTypes.ENUM('PENDIENTE', 'APROBADO', 'RECHAZADO'),
     defaultValue: 'PENDIENTE'
@@ -697,7 +717,7 @@ const Compra = sequelize.define('compra', {
     defaultValue: 0
   },
   estado: {
-    type: DataTypes.ENUM('PENDIENTE', 'RECIBIDA', 'CANCELADA'),
+    type: DataTypes.STRING(30),
     defaultValue: 'RECIBIDA'
   },
   motivoCancelacion: {
@@ -1014,7 +1034,7 @@ const Pago = sequelize.define('pago', {
     allowNull: false
   },
   metodoPago: {
-    type: DataTypes.ENUM('EFECTIVO', 'TARJETA', 'NEQUI', 'DAVIPLATA', 'TRANSFERENCIA'),
+    type: DataTypes.STRING(50),
     allowNull: false
   },
   referenciaExterna: {
@@ -1198,6 +1218,41 @@ Product.hasMany(Resena, { foreignKey: 'idProducto', as: 'resenas' });
 Resena.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
 User.hasMany(Resena, { foreignKey: 'idUsuario', as: 'resenas' });
 
+// Modelo relacional diferenciado para Combos (Ítems 97 y 106)
+const ComboProducto = sequelize.define('detallecombo', {
+  idDetalleCombo: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idDetalleCombo'
+  },
+  idCombo: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idProducto: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  cantidad: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1
+  },
+  esOpcional: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
+  },
+  grupoSeleccion: {
+    type: DataTypes.STRING(80),
+    allowNull: true
+  }
+}, { tableName: 'detallecombo', timestamps: false });
+
+Product.hasMany(ComboProducto, { foreignKey: 'idCombo', as: 'itemsCombo', onDelete: 'CASCADE' });
+ComboProducto.belongsTo(Product, { foreignKey: 'idCombo', as: 'combo' });
+ComboProducto.belongsTo(Product, { foreignKey: 'idProducto', as: 'productoComponente' });
+
 module.exports = {
   sequelize,
   Role,
@@ -1214,6 +1269,7 @@ module.exports = {
   DetalleInsumoPreparadoInsumo,
   Trazabilidad,
   Product,
+  ComboProducto,
   CategoriaProducto,
   Venta,
   DetalleVentaProducto,

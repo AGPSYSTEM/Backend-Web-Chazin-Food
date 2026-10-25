@@ -22,6 +22,7 @@ function formatInsumo(i) {
     idCategoriaInsumo: i.idCategoriaInsumo,
     stock: parseFloat(i.stock || 0),
     stockMinimo: parseFloat(i.stockMinimo || 0),
+    stockMaximo: parseFloat(i.stockMaximo !== undefined && i.stockMaximo !== null ? i.stockMaximo : 100),
     fechaExpedicion: i.fechaExpedicion || null,
     fechaVencimiento: i.fechaVencimiento || null,
     unidadMedida: i.unidadMedida,
@@ -88,9 +89,9 @@ class InsumoService {
 
   static async create(insumoData) {
     let {
-      nombre, idCategoriaInsumo, stock, stockMinimo,
+      nombre, idCategoriaInsumo, stock, stockMinimo, stockMaximo,
       fechaExpedicion, fechaVencimiento, unidadMedida,
-      precioUnitario, idProveedor, descripcion,
+      precioUnitario, idProveedor, descripcion, estado,
       categoria, proveedor, fichaTecnica
     } = insumoData;
 
@@ -130,13 +131,26 @@ class InsumoService {
       }
     }
 
+    const minVal = stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0;
+    const maxVal = stockMaximo !== undefined && stockMaximo !== null ? parseFloat(stockMaximo) : 100;
+    if (maxVal < minVal) {
+      const error = new Error('La cantidad máxima no puede ser inferior a la cantidad mínima.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const normalizedEstado = estado !== undefined
+      ? (estado === 'Activo' || estado === 1 || estado === '1' ? 1 : 0)
+      : 1;
+
     const transaction = await database.sequelize.transaction();
     try {
       const insumo = await Insumo.create({
         nombre: nombre.trim(),
         idCategoriaInsumo: idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null,
         stock: stock !== undefined && stock !== null ? parseFloat(stock) : 0,
-        stockMinimo: stockMinimo !== undefined && stockMinimo !== null ? parseFloat(stockMinimo) : 0,
+        stockMinimo: minVal,
+        stockMaximo: maxVal,
         fechaExpedicion: (fechaExpedicion && String(fechaExpedicion).trim() !== '') ? fechaExpedicion : null,
         fechaVencimiento: (fechaVencimiento && String(fechaVencimiento).trim() !== '') ? fechaVencimiento : null,
         unidadMedida: unidadMedida || 'und',
@@ -147,7 +161,7 @@ class InsumoService {
         precioAdicion: insumoData.precioAdicion !== undefined && insumoData.precioAdicion !== null ? parseFloat(insumoData.precioAdicion) : 0,
         imagen: insumoData.imagen || null,
         incluyeIva: insumoData.incluyeIva ? 1 : 0,
-        estado: 1
+        estado: normalizedEstado
       }, { transaction });
 
       if (fichaTecnica) {
@@ -190,7 +204,7 @@ class InsumoService {
       }
 
       let {
-        nombre, idCategoriaInsumo, stock, stockMinimo,
+        nombre, idCategoriaInsumo, stock, stockMinimo, stockMaximo,
         fechaExpedicion, fechaVencimiento, unidadMedida,
         precioUnitario, idProveedor, descripcion, estado,
         categoria, proveedor, fichaTecnica
@@ -210,6 +224,16 @@ class InsumoService {
       if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null;
       if (stock !== undefined) insumo.stock = parseFloat(stock);
       if (stockMinimo !== undefined) insumo.stockMinimo = parseFloat(stockMinimo);
+      if (stockMaximo !== undefined) {
+        const minVal = stockMinimo !== undefined ? parseFloat(stockMinimo) : parseFloat(insumo.stockMinimo || 0);
+        const maxVal = parseFloat(stockMaximo);
+        if (maxVal < minVal) {
+          const error = new Error('La cantidad máxima no puede ser inferior a la cantidad mínima.');
+          error.statusCode = 400;
+          throw error;
+        }
+        insumo.stockMaximo = maxVal;
+      }
       if (fechaExpedicion !== undefined) insumo.fechaExpedicion = (fechaExpedicion && String(fechaExpedicion).trim() !== '') ? fechaExpedicion : null;
       if (fechaVencimiento !== undefined) insumo.fechaVencimiento = (fechaVencimiento && String(fechaVencimiento).trim() !== '') ? fechaVencimiento : null;
       if (unidadMedida !== undefined) insumo.unidadMedida = unidadMedida;

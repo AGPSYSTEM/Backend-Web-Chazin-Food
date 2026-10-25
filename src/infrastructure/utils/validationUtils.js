@@ -9,10 +9,19 @@ function sanitizeTelefono(value = '') {
 function sanitizeDocumento(value = '', tipoDoc = 'C.C.') {
   const norm = String(tipoDoc || 'C.C.').trim().toUpperCase();
   let val = String(value || '');
-  if (norm.includes('C.E.') || norm.includes('CE') || norm.includes('PASAPORTE')) {
+  if (
+    norm.includes('C.E.') ||
+    norm === 'CE' ||
+    norm.includes('PASAPORTE') ||
+    norm.includes('PPT') ||
+    norm.includes('OTRO')
+  ) {
     val = val.replace(/[^a-zA-Z0-9\-]/g, '');
     return val.slice(0, 20);
-  } else if (norm.includes('T.I.') || norm.includes('TI')) {
+  } else if (norm.includes('NIT')) {
+    val = val.replace(/\D/g, '');
+    return val.slice(0, 15);
+  } else if (norm.includes('T.I.') || norm === 'TI') {
     val = val.replace(/\D/g, '');
     return val.slice(0, 11);
   } else {
@@ -20,6 +29,31 @@ function sanitizeDocumento(value = '', tipoDoc = 'C.C.') {
     val = val.replace(/\D/g, '');
     return val.slice(0, 10);
   }
+}
+
+function isValidEmailStrict(email = '') {
+  const str = String(email || '').trim();
+  if (!str || !str.includes('@')) return false;
+  const parts = str.split('@');
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts;
+  if (!local || !domain) return false;
+  if (!/^[a-zA-Z0-9]+([._+-][a-zA-Z0-9]+)*$/.test(local)) return false;
+  const labels = domain.split('.');
+  if (labels.length < 2) return false;
+  for (const label of labels) {
+    if (!label || !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(label)) return false;
+  }
+  const tld = labels[labels.length - 1];
+  if (!/^[a-zA-Z]{2,}$/.test(tld)) return false;
+  return true;
+}
+
+function isValidPersonName(val = '') {
+  const str = String(val || '').trim();
+  if (!str || str.length < 2) return false;
+  if (str.includes('@') || /\d/.test(str)) return false;
+  return true;
 }
 
 function cleanNameAndLastName(nombre = '', apellidos = '') {
@@ -72,5 +106,7 @@ module.exports = {
   sanitizeTelefono,
   sanitizeDocumento,
   cleanNameAndLastName,
-  formatNombreCompleto
+  formatNombreCompleto,
+  isValidEmailStrict,
+  isValidPersonName
 };

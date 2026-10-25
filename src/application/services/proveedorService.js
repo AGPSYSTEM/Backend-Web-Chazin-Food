@@ -11,6 +11,18 @@ class ProveedorService {
 
   static async getAll() {
     const proveedores = await Proveedor.findAll({
+      where: { eliminado: 0 },
+      include: [
+        { model: TipoProveedor, as: 'tipoProveedor' },
+        { model: TipoDocumento, as: 'tipoDocumento' }
+      ]
+    });
+    return proveedores.map(p => this._mapProveedor(p));
+  }
+
+  static async getPapelera() {
+    const proveedores = await Proveedor.findAll({
+      where: { eliminado: 1 },
       include: [
         { model: TipoProveedor, as: 'tipoProveedor' },
         { model: TipoDocumento, as: 'tipoDocumento' }
@@ -58,7 +70,8 @@ class ProveedorService {
       direccion: p.direccion || '',
       nombreContacto: p.nombreContacto || '',
       contacto: p.nombreContacto || '',
-      estado: p.estado === 1 ? 'Activo' : 'Inactivo'
+      estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+      eliminado: p.eliminado || 0
     };
   }
 
@@ -303,7 +316,7 @@ class ProveedorService {
       throw error;
     }
 
-    p.estado = 0;
+    p.eliminado = 1;
     await p.save();
 
     const TrazabilidadService = require('./trazabilidadService');
@@ -311,11 +324,11 @@ class ProveedorService {
       tipo: 'Eliminado',
       entidadNombre: p.nombre,
       detalle: `Se envió a la papelera el proveedor: ${p.nombre}`,
-      motivo: 'Inactivación / Papelera',
+      motivo: 'Papelera de reciclaje',
       usuarioId: options.usuarioId || null
     }).catch(() => {});
 
-    return { message: 'Proveedor inactivado exitosamente' };
+    return { message: 'Proveedor enviado a la papelera exitosamente' };
   }
 
   static async restore(idProveedor, options = {}) {
@@ -325,14 +338,14 @@ class ProveedorService {
       error.statusCode = 404;
       throw error;
     }
-    p.estado = 1;
+    p.eliminado = 0;
     await p.save();
 
     const TrazabilidadService = require('./trazabilidadService');
     await TrazabilidadService.create({
       tipo: 'Restaurado',
       entidadNombre: p.nombre,
-      detalle: `Se restauró el proveedor: ${p.nombre}`,
+      detalle: `Se restauró el proveedor desde la papelera: ${p.nombre}`,
       motivo: 'Restauración desde papelera',
       usuarioId: options.usuarioId || null
     }).catch(() => {});

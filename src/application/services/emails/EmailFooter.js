@@ -65,7 +65,7 @@ function EmailFooter() {
       e(
         Link,
         {
-          href: 'https://wa.me/573000000000',
+          href: 'https://wa.me/573192028562',
           style: {
             backgroundColor: '#FFFFFF',
             border: `1px solid ${colors.borderLight}`,

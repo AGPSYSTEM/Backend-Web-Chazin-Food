@@ -113,10 +113,21 @@ class VentaService {
     }
     horario = horario || "12:30 PM";
 
+    // Ítem #11: "Empaque para llevar" es una opción de empaque, NO un tipo de entrega.
+    // Solo se clasifica como "Recoger" si el tipo de entrega explícito lo indica.
+    const rawObsLower = (v.observaciones || "").toLowerCase();
     const tipoEntrega = obsData.tipoEntrega || (
-      (v.observaciones || "").toLowerCase().includes("recoger") || (v.observaciones || "").toLowerCase().includes("para llevar") || (v.observaciones || "").toLowerCase().includes("llevar")
-        ? "Recoger"
-        : "Domicilio"
+      String(v.tipoVenta || '').toUpperCase() === 'DOMICILIO'
+        ? "Domicilio"
+        : (rawObsLower.includes("recoger") ? "Recoger" : (String(v.tipoVenta || '').toUpperCase() === 'PUNTO_DE_VENTA' ? "Recoger" : "Domicilio"))
+    );
+    const rawEspecText = typeof obsData.especificaciones === 'string'
+      ? obsData.especificaciones
+      : JSON.stringify(obsData.especificaciones || '');
+    const empaqueParaLlevar = Boolean(
+      obsData.empaqueParaLlevar ||
+      (obsData.especificaciones && typeof obsData.especificaciones === 'object' && obsData.especificaciones.empaqueParaLlevar) ||
+      /empaque para llevar/i.test(rawEspecText || '')
     );
     const metodoPago = obsData.metodoPago || (
       (v.observaciones || "").toLowerCase().includes("tarjeta")
@@ -312,7 +323,8 @@ class VentaService {
 
     const horaEstado = obsData.horaEstado || horario || "12:30 PM";
 
-    const isOnline = (
+    const origenColumna = String(v.origen || '').toUpperCase();
+    const isOnline = origenColumna ? origenColumna === 'ONLINE' : (
       String(v.tipoVenta || '').toUpperCase() === 'ONLINE' ||
       String(v.tipoVenta || '').toUpperCase() === 'DOMICILIO' ||
       String(obsData.origen || '').toUpperCase() === 'ONLINE' ||
@@ -325,7 +337,7 @@ class VentaService {
     const origen = isOnline ? 'ONLINE' : 'PUNTO_FISICO';
     const origenNombre = isOnline ? 'Venta Online' : 'Punto Físico';
 
-    const tiempoEstimadoEntrega = obsData.tiempoEstimadoEntrega || obsData.tiempoEstimado || (
+    const tiempoEstimadoEntrega = v.tiempoEstimadoEntrega || obsData.tiempoEstimadoEntrega || obsData.tiempoEstimado || (
       tipoEntrega === 'Domicilio' ? '35 - 45 min' : '15 - 20 min'
     );
 
@@ -356,9 +368,12 @@ class VentaService {
       origen,
       origenNombre,
       tiempoEstimadoEntrega,
+      empaqueParaLlevar,
       tipoEntrega,
       metodoPago,
+      metodoPagoNombre: String(metodoPago).toLowerCase() === 'wompi' ? 'Wompi (Pago en Línea)' : metodoPago,
       estadoPago,
+      estadoAprobacion: v.estadoAprobacion || obsData.estadoAprobacion || 'PENDIENTE',
       estadoEntrega: v.estadoEntrega,
       estado: estadoStr,
       subtotal,
@@ -736,6 +751,39 @@ class VentaService {
 
     const finalTotal = Math.max(0, finalSubtotal - finalDescuento);
 
+    // Ítem #123: origen de la venta (ONLINE = tienda web, PUNTO_FISICO = POS / mostrador)
+    const rawOrigen = String(data.origen || parsedObs.origen || '').toUpperCase().replace(/\s+/g, '_');
+    let origenVenta;
+    if (rawOrigen === 'ONLINE' || rawOrigen === 'WEB') {
+      origenVenta = 'ONLINE';
+    } else if (rawOrigen.includes('PUNTO') || rawOrigen.includes('FISICO') || rawOrigen === 'POS') {
+      origenVenta = 'PUNTO_FISICO';
+    } else {
+      origenVenta = isStaff ? 'PUNTO_FISICO' : 'ONLINE';
+    }
+    // Un cliente autenticado (no staff) nunca puede registrar ventas como punto físico
+    if (!isStaff) origenVenta = 'ONLINE';
+
+    // Ítem #122: las ventas online solo admiten pago electrónico con Wompi
+    const metodoPagoSolicitado = String(data.metodoPago || parsedObs.metodoPago || '').trim();
+    if (origenVenta === 'ONLINE' && (!metodoPagoSolicitado || metodoPagoSolicitado.toLowerCase() === 'efectivo')) {
+      const error = new Error('Las ventas online únicamente admiten pago electrónico a través de Wompi.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Ítem #124: tiempo estimado de entrega
+    const tiempoEstimadoEntregaVenta = String(
+      data.tiempoEstimadoEntrega || parsedObs.tiempoEstimadoEntrega ||
+      (origenVenta === 'ONLINE' ? '30 - 45 min' : '15 - 20 min')
+    ).trim().slice(0, 60);
+
+    // Ítem #11: el empaque para llevar es independiente del tipo de entrega
+    const empaqueParaLlevar = Boolean(
+      data.empaqueParaLlevar || parsedObs.empaqueParaLlevar ||
+      (data.especificaciones && typeof data.especificaciones === 'object' && data.especificaciones.empaqueParaLlevar)
+    );
+
     const now = new Date();
     const formattedHorario = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
 
@@ -782,14 +830,22 @@ class VentaService {
       vueltoEfectivo: parsedObs.vueltoEfectivo || (data.datosPago ? data.datosPago.vueltoEfectivo : null) || 0,
       transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",
       transferBanco: parsedObs.transferBanco || (data.datosPago ? data.datosPago.transferBanco : null) || "",
-      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || ""
+      tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || "",
+      origen: origenVenta,
+      tiempoEstimadoEntrega: tiempoEstimadoEntregaVenta,
+      empaqueParaLlevar
     };
+
+    // Las ventas online no pueden autodeclararse pagadas: quedan pendientes hasta confirmación de Wompi o aprobación manual (Ítem #116)
+    if (origenVenta === 'ONLINE' && !isStaff) {
+      obsObj.estadoPago = 'Pendiente';
+    }
 
     // Auto-aprobación en Ventas: las ventas en Punto de Venta (POS) o con pago confirmado/aprobado
     // se aprueban directamente en el módulo de Ventas, convirtiéndose en órdenes de producción (Ítem 114 y 116)
-    const esPOS = resolvedTipoVenta === 'PUNTO_DE_VENTA';
-    const esPagado = String(obsObj.estadoPago || data.estadoPago || '').toLowerCase() === 'pagado';
-    const esAprobadoExplicito = data.estadoAprobacion === 'APROBADO' || parsedObs.estadoAprobacion === 'APROBADO';
+    const esPOS = resolvedTipoVenta === 'PUNTO_DE_VENTA' && origenVenta === 'PUNTO_FISICO';
+    const esPagado = isStaff && String(obsObj.estadoPago || data.estadoPago || '').toLowerCase() === 'pagado';
+    const esAprobadoExplicito = isStaff && (data.estadoAprobacion === 'APROBADO' || parsedObs.estadoAprobacion === 'APROBADO');
 
     const finalEstadoAprobacion = (esPOS || esPagado || esAprobadoExplicito)
       ? 'APROBADO' 
@@ -809,7 +865,9 @@ class VentaService {
       total: finalTotal,
       estadoEntrega: data.estadoEntrega || data.estado || 'ENTREGADO',
       observaciones: obsStr,
-      estadoAprobacion: finalEstadoAprobacion
+      estadoAprobacion: finalEstadoAprobacion,
+      origen: origenVenta,
+      tiempoEstimadoEntrega: tiempoEstimadoEntregaVenta
     });
 
     if (rawDetails.length > 0) {
@@ -1051,9 +1109,7 @@ class VentaService {
 
     // Trigger client loyalty progression (strictly only for registered customer accounts and when sale is approved)
     if (finalClienteId && !isMostradorSale && finalEstadoAprobacion === 'APROBADO') {
-      ClienteService.registrarCompraFidelidad(finalClienteId).catch(err =>
-        console.warn('Error registrando fidelidad:', err.message)
-      );
+      await this.registrarFidelidadUnaVez(venta.idVenta);
     }
 
     return this.getById(venta.idVenta);
@@ -1150,12 +1206,10 @@ class VentaService {
       }
     }
 
-    // Si la venta estaba PENDIENTE y ahora fue aprobada/procesada, registrar fidelidad del cliente
+    // Si la venta estaba PENDIENTE y ahora fue aprobada/procesada, registrar fidelidad del cliente (una sola vez)
     if (estadoAnterior === 'PENDIENTE' && (estadoEnum === 'PREPARANDO' || estadoEnum === 'LISTO' || estadoEnum === 'ENTREGADO')) {
       if (v.idCliente && Number(v.idCliente) !== 26) {
-        ClienteService.registrarCompraFidelidad(v.idCliente).catch(err =>
-          console.warn('Error registrando fidelidad al aprobar venta pendiente:', err.message)
-        );
+        await VentaService.registrarFidelidadUnaVez(v.idVenta);
       }
     }
 
@@ -1331,12 +1385,131 @@ class VentaService {
     }
     obsData.tiempoEstimadoEntrega = raw;
     v.observaciones = JSON.stringify(obsData);
+    v.tiempoEstimadoEntrega = raw;
     await v.save();
     return this.getById(id);
   }
 
   static async cancelar(id) {
     return this.updateEstado(id, 'CANCELADO');
+  }
+
+  /**
+   * Registra la compra en el programa de fidelidad una única vez por venta (idempotente).
+   * Evita el doble conteo cuando el webhook de Wompi, la verificación manual y la aprobación
+   * del administrador se ejecutan sobre la misma venta (Ítem #119).
+   */
+  static async registrarFidelidadUnaVez(idVenta) {
+    const { sequelize } = require('../../persistence/models');
+    const transaction = await sequelize.transaction();
+    let idClienteARegistrar = null;
+    try {
+      const v = await Venta.findByPk(idVenta, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!v || !v.idCliente) {
+        await transaction.commit();
+        return false;
+      }
+      let obsData = {};
+      try {
+        obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+          ? JSON.parse(v.observaciones)
+          : { nota: v.observaciones || '' };
+      } catch (e) {
+        obsData = { nota: v.observaciones || '' };
+      }
+      const clienteNombre = String(obsData.clienteNombre || '').toLowerCase();
+      if (obsData.fidelidadContabilizada || Number(v.idCliente) === 26 || clienteNombre.includes('mostrador')) {
+        await transaction.commit();
+        return false;
+      }
+      const clienteRow = await Cliente.findByPk(v.idCliente, { transaction });
+      if (!clienteRow || !clienteRow.idUsuario) {
+        await transaction.commit();
+        return false;
+      }
+      obsData.fidelidadContabilizada = true;
+      obsData.fechaFidelidadContabilizada = new Date().toISOString();
+      v.observaciones = JSON.stringify(obsData);
+      await v.save({ transaction });
+      await transaction.commit();
+      idClienteARegistrar = v.idCliente;
+    } catch (err) {
+      await transaction.rollback().catch(() => {});
+      console.warn('Error marcando fidelidad de la venta:', err.message);
+      return false;
+    }
+
+    if (idClienteARegistrar) {
+      const ClienteService = require('./clienteService');
+      await ClienteService.registrarCompraFidelidad(idClienteARegistrar).catch(err =>
+        console.warn('Error registrando fidelidad:', err.message)
+      );
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Aprueba manualmente el pago de una venta pendiente (ej. transferencias o pagos verificados),
+   * pasándola a Producción (Ítem #116).
+   */
+  static async aprobarPago(id, usuarioAprobador = null) {
+    const { Pago } = require('../../persistence/models');
+    const v = await Venta.findByPk(id);
+    if (!v) {
+      const error = new Error('Venta no encontrada');
+      error.statusCode = 404;
+      throw error;
+    }
+    if (v.estadoEntrega === 'CANCELADO' || v.estadoAprobacion === 'RECHAZADO') {
+      const error = new Error('No se puede aprobar el pago de una venta anulada o rechazada.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (v.estadoAprobacion === 'APROBADO') {
+      const error = new Error('El pago de esta venta ya fue aprobado.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    let obsData = {};
+    try {
+      obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
+        ? JSON.parse(v.observaciones)
+        : { nota: v.observaciones || '' };
+    } catch (e) {
+      obsData = { nota: v.observaciones || '' };
+    }
+
+    const ahora = new Date();
+    const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    obsData.estadoPago = 'Pagado';
+    obsData.estadoAprobacion = 'APROBADO';
+    obsData.horaEstado = horaActual;
+    obsData.fechaCambioEstado = ahora.toISOString();
+    obsData.fechaAprobacionPago = ahora.toISOString();
+    obsData.aprobadoPor = usuarioAprobador
+      ? `${usuarioAprobador.nombre || ''} ${usuarioAprobador.apellidos || ''}`.trim() || 'Administrador'
+      : 'Administrador';
+    if (!Array.isArray(obsData.historialEstados)) obsData.historialEstados = [];
+    obsData.historialEstados.push({ estado: 'PAGO_APROBADO', hora: horaActual, fecha: ahora.toISOString() });
+
+    v.estadoAprobacion = 'APROBADO';
+    if (!v.estadoEntrega || v.estadoEntrega === 'PENDIENTE') {
+      v.estadoEntrega = 'PENDIENTE';
+    }
+    v.observaciones = JSON.stringify(obsData);
+    await v.save();
+
+    try {
+      await Pago.update({ estado: 'APROBADO' }, { where: { idVenta: v.idVenta } });
+    } catch (pagoErr) {
+      console.warn('Error actualizando pagos asociados:', pagoErr.message);
+    }
+
+    await this.registrarFidelidadUnaVez(v.idVenta);
+
+    return this.getById(v.idVenta);
   }
 }
 

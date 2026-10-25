@@ -57,20 +57,24 @@ class RoleService {
       throw error;
     }
 
+    if (!Array.isArray(permisos) || permisos.filter(Boolean).length === 0) {
+      const error = new Error('Debes asignar al menos un permiso o privilegio al rol');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const role = await Role.create({
       nombre: nombre.trim(),
       descripcion: descripcion ? descripcion.trim() : '',
       estado: 1
     });
 
-    if (permisos && Array.isArray(permisos) && permisos.length > 0) {
-      for (const permNombre of permisos) {
-        let permiso = await Permiso.findOne({ where: { nombrePermiso: permNombre } });
-        if (!permiso) {
-          permiso = await Permiso.create({ nombrePermiso: permNombre });
-        }
-        await RolPermiso.create({ idRol: role.idRol, idPermiso: permiso.idPermiso });
+    for (const permNombre of permisos.filter(Boolean)) {
+      let permiso = await Permiso.findOne({ where: { nombrePermiso: permNombre } });
+      if (!permiso) {
+        permiso = await Permiso.create({ nombrePermiso: permNombre });
       }
+      await RolPermiso.create({ idRol: role.idRol, idPermiso: permiso.idPermiso });
     }
 
     return this.getRoleById(role.idRol);
@@ -99,8 +103,13 @@ class RoleService {
     await role.save();
 
     if (permisos && Array.isArray(permisos)) {
+      if (permisos.filter(Boolean).length === 0) {
+        const error = new Error('El rol debe conservar al menos un permiso asignado');
+        error.statusCode = 400;
+        throw error;
+      }
       await RolPermiso.destroy({ where: { idRol: id } });
-      for (const permNombre of permisos) {
+      for (const permNombre of permisos.filter(Boolean)) {
         let permiso = await Permiso.findOne({ where: { nombrePermiso: permNombre } });
         if (!permiso) {
           permiso = await Permiso.create({ nombrePermiso: permNombre });

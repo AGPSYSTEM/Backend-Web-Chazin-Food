@@ -59,18 +59,20 @@ async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables =
 }
 
 /**
- * Resequences all core system tables so IDs remain strictly continuous (1, 2, 3...)
+ * Safely resets AUTO_INCREMENT on core tables without rewriting primary keys
+ * (rewriting PKs with FOREIGN_KEY_CHECKS=0 corrupts child references in loteinsumo,
+ * trazabilidad, evento, resena, detallecombo, detalleventaadicion, etc.).
  */
 async function resequenceAllCoreTables() {
   try {
-    await resequenceTableIds('fichatecnica', 'idFichaTecnica', [{ table: 'detallefichainsumo', column: 'idFichaTecnica' }]);
-    await resequenceTableIds('insumo', 'idInsumo', [{ table: 'detallefichainsumo', column: 'idInsumo' }, { table: 'detallecomprainsumo', column: 'idInsumo' }]);
-    await resequenceTableIds('producto', 'idProducto', [{ table: 'fichatecnica', column: 'idProducto' }, { table: 'variante', column: 'idProducto' }]);
-    await resequenceTableIds('proveedor', 'idProveedor', [{ table: 'insumo', column: 'idProveedor' }, { table: 'compra', column: 'idProveedor' }]);
-    await resequenceTableIds('categoriainsumo', 'idCategoriaInsumo', [{ table: 'insumo', column: 'idCategoriaInsumo' }]);
-    await resequenceTableIds('categoriaproducto', 'idCategoriaProducto', [{ table: 'producto', column: 'idCategoriaProducto' }]);
+    await resetAutoIncrement('fichatecnica', 'idFichaTecnica');
+    await resetAutoIncrement('insumo', 'idInsumo');
+    await resetAutoIncrement('producto', 'idProducto');
+    await resetAutoIncrement('proveedor', 'idProveedor');
+    await resetAutoIncrement('categoriainsumo', 'idCategoriaInsumo');
+    await resetAutoIncrement('categoriaproducto', 'idCategoriaProducto');
   } catch (err) {
-    console.warn('Error resequencing core tables:', err.message);
+    console.warn('Error resetting auto increment on core tables:', err.message);
   }
 }
 
@@ -687,6 +689,114 @@ async function ensureCompraLotesYCancelacionSchema() {
   }
 }
 
+/**
+ * Ensures Acta de Revisión schema fixes:
+ * - Drops duplicate trigger `trg_EntradaInventario` (+200% stock bug)
+ * - Adds `insumo.stockMaximo` (Ítem 58)
+ * - Expands `cliente.direccion` to TEXT and adds `cliente.estado` (Ítem 119)
+ * - Adds `proveedor.eliminado` (Ítem 67)
+ * - Removes `PENDIENTE` purchases and widens `compra.estado` / `pago.metodoPago` (Ítems 86, 122)
+ * - Adds `venta.origen` and `venta.tiempoEstimadoEntrega` (Ítems 123, 124)
+ * - Creates relational `detallecombo` table (Ítems 97, 106)
+ */
+async function ensureActaRevisionSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    // 1. Eliminar trigger duplicado de entrada de inventario
+    await sequelize.query('DROP TRIGGER IF EXISTS `trg_EntradaInventario`');
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ No se pudo eliminar trg_EntradaInventario:', err.message);
+  }
+
+  try {
+    // 2. insumo.stockMaximo
+    const [insCols] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'stockMaximo'");
+    if (!insCols || insCols.length === 0) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `stockMaximo` DECIMAL(10, 2) NOT NULL DEFAULT 100.00 AFTER `stockMinimo`");
+      await sequelize.query("UPDATE `insumo` SET `stockMaximo` = GREATEST(`stock` * 2, `stockMinimo` * 3, 100) WHERE `stockMaximo` <= 0 OR `stockMaximo` < `stockMinimo`");
+      console.log('[DB Migration] ✅ Columna insumo.stockMaximo agregada.');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando insumo.stockMaximo:', err.message);
+  }
+
+  try {
+    // 3. cliente.direccion TEXT + cliente.estado
+    const [cliDirCols] = await sequelize.query("SHOW COLUMNS FROM `cliente` LIKE 'direccion'");
+    if (cliDirCols && cliDirCols.length > 0 && String(cliDirCols[0].Type || '').toLowerCase().includes('varchar')) {
+      await sequelize.query("ALTER TABLE `cliente` MODIFY COLUMN `direccion` TEXT NULL");
+      console.log('[DB Migration] ✅ Columna cliente.direccion ampliada a TEXT.');
+    }
+    const [cliEstCols] = await sequelize.query("SHOW COLUMNS FROM `cliente` LIKE 'estado'");
+    if (!cliEstCols || cliEstCols.length === 0) {
+      await sequelize.query("ALTER TABLE `cliente` ADD COLUMN `estado` TINYINT NOT NULL DEFAULT 1");
+      console.log('[DB Migration] ✅ Columna cliente.estado agregada.');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando columnas en cliente:', err.message);
+  }
+
+  try {
+    // 4. proveedor.eliminado
+    const [provCols] = await sequelize.query("SHOW COLUMNS FROM `proveedor` LIKE 'eliminado'");
+    if (!provCols || provCols.length === 0) {
+      await sequelize.query("ALTER TABLE `proveedor` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`");
+      console.log('[DB Migration] ✅ Columna proveedor.eliminado agregada.');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando proveedor.eliminado:', err.message);
+  }
+
+  try {
+    // 5. compra.estado sin PENDIENTE y pago.metodoPago compatible con WOMPI
+    await sequelize.query("ALTER TABLE `compra` MODIFY COLUMN `estado` VARCHAR(30) NOT NULL DEFAULT 'RECIBIDA'");
+    await sequelize.query("UPDATE `compra` SET `estado` = 'RECIBIDA' WHERE `estado` = 'PENDIENTE'");
+    await sequelize.query("ALTER TABLE `pago` MODIFY COLUMN `metodoPago` VARCHAR(50) NOT NULL");
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error actualizando compra.estado / pago.metodoPago:', err.message);
+  }
+
+  try {
+    // 6. venta.origen y venta.tiempoEstimadoEntrega
+    const [origenCols] = await sequelize.query("SHOW COLUMNS FROM `venta` LIKE 'origen'");
+    if (!origenCols || origenCols.length === 0) {
+      await sequelize.query("ALTER TABLE `venta` ADD COLUMN `origen` VARCHAR(30) NULL AFTER `observaciones`");
+    }
+    const [tiempoCols] = await sequelize.query("SHOW COLUMNS FROM `venta` LIKE 'tiempoEstimadoEntrega'");
+    if (!tiempoCols || tiempoCols.length === 0) {
+      await sequelize.query("ALTER TABLE `venta` ADD COLUMN `tiempoEstimadoEntrega` VARCHAR(60) NULL AFTER `origen`");
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando venta.origen / tiempoEstimadoEntrega:', err.message);
+  }
+
+  try {
+    // 7. Tabla relacional detallecombo para Combos (Ítems 97 y 106)
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`detallecombo\` (
+        \`idDetalleCombo\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`idCombo\` INT NOT NULL,
+        \`idProducto\` INT NOT NULL,
+        \`cantidad\` INT NOT NULL DEFAULT 1,
+        \`esOpcional\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`grupoSeleccion\` VARCHAR(80) NULL,
+        KEY \`idx_combo_id\` (\`idCombo\`),
+        KEY \`idx_combo_prod\` (\`idProducto\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('[DB] ✅ Tabla relacional detallecombo verificada/creada.');
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando tabla detallecombo:', err.message);
+  }
+
+  try {
+    // 8. Asegurar tipos de documento PPT y TI en tabla tipodocumento (Ítems 21, 120)
+    await sequelize.query("INSERT IGNORE INTO `tipodocumento` (`nombre`) VALUES ('PPT'), ('TI')");
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando tipodocumento PPT/TI:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -707,5 +817,6 @@ module.exports = {
   ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema,
-  ensureCompraLotesYCancelacionSchema
+  ensureCompraLotesYCancelacionSchema,
+  ensureActaRevisionSchema
 };

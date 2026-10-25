@@ -65,46 +65,68 @@ class DashboardService {
 
       // Cálculo de variación porcentual según el período seleccionado
       let ventasVariacion = 0;
+      let pedidosVariacion = 0;
       let labelVariacion = "vs período anterior";
 
       if (periodo === 'hoy') {
         const startYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
         const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
-        const ventasAyer = todasVentas
-          .filter(v => v.fechaVenta && new Date(v.fechaVenta) >= startYesterday && new Date(v.fechaVenta) <= endYesterday && v.estadoEntrega !== 'CANCELADO')
-          .reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosAyerList = todasVentas
+          .filter(v => v.fechaVenta && new Date(v.fechaVenta) >= startYesterday && new Date(v.fechaVenta) <= endYesterday && v.estadoEntrega !== 'CANCELADO');
+        const ventasAyer = pedidosAyerList.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosAyer = pedidosAyerList.length;
 
         if (ventasAyer > 0) {
           ventasVariacion = parseFloat((((totalVentasPeriodo - ventasAyer) / ventasAyer) * 100).toFixed(1));
         } else if (totalVentasPeriodo > 0) {
           ventasVariacion = 100;
         }
+
+        if (pedidosAyer > 0) {
+          pedidosVariacion = parseFloat((((pedidosTotal - pedidosAyer) / pedidosAyer) * 100).toFixed(1));
+        } else if (pedidosTotal > 0) {
+          pedidosVariacion = 100;
+        }
         labelVariacion = "vs ayer";
       } else if (periodo === '7_dias' || periodo === '7dias') {
         const startPrev7 = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000));
         const endPrev7 = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-        const ventasPrev7 = todasVentas
-          .filter(v => v.fechaVenta && new Date(v.fechaVenta) >= startPrev7 && new Date(v.fechaVenta) <= endPrev7 && v.estadoEntrega !== 'CANCELADO')
-          .reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosPrev7List = todasVentas
+          .filter(v => v.fechaVenta && new Date(v.fechaVenta) >= startPrev7 && new Date(v.fechaVenta) <= endPrev7 && v.estadoEntrega !== 'CANCELADO');
+        const ventasPrev7 = pedidosPrev7List.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosPrev7 = pedidosPrev7List.length;
 
         if (ventasPrev7 > 0) {
           ventasVariacion = parseFloat((((totalVentasPeriodo - ventasPrev7) / ventasPrev7) * 100).toFixed(1));
         } else if (totalVentasPeriodo > 0) {
           ventasVariacion = 100;
         }
+
+        if (pedidosPrev7 > 0) {
+          pedidosVariacion = parseFloat((((pedidosTotal - pedidosPrev7) / pedidosPrev7) * 100).toFixed(1));
+        } else if (pedidosTotal > 0) {
+          pedidosVariacion = 100;
+        }
         labelVariacion = "vs 7 días ant.";
       } else if (periodo === 'este_ano' || (filtro.year && parseInt(filtro.year) !== now.getFullYear())) {
         const prevYear = year - 1;
         const startPrevYear = new Date(prevYear, 0, 1, 0, 0, 0);
         const endPrevYear = new Date(prevYear, 11, 31, 23, 59, 59);
-        const ventasPrevYear = todasVentas
-          .filter(v => v.fechaVenta && new Date(v.fechaVenta) >= startPrevYear && new Date(v.fechaVenta) <= endPrevYear && v.estadoEntrega !== 'CANCELADO')
-          .reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosPrevYearList = todasVentas
+          .filter(v => v.fechaVenta && new Date(v.fechaVenta) >= startPrevYear && new Date(v.fechaVenta) <= endPrevYear && v.estadoEntrega !== 'CANCELADO');
+        const ventasPrevYear = pedidosPrevYearList.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosPrevYear = pedidosPrevYearList.length;
 
         if (ventasPrevYear > 0) {
           ventasVariacion = parseFloat((((totalVentasPeriodo - ventasPrevYear) / ventasPrevYear) * 100).toFixed(1));
         } else if (totalVentasPeriodo > 0) {
           ventasVariacion = 100;
+        }
+
+        if (pedidosPrevYear > 0) {
+          pedidosVariacion = parseFloat((((pedidosTotal - pedidosPrevYear) / pedidosPrevYear) * 100).toFixed(1));
+        } else if (pedidosTotal > 0) {
+          pedidosVariacion = 100;
         }
         labelVariacion = "vs año anterior";
       } else {
@@ -118,11 +140,18 @@ class DashboardService {
 
         const totalMesActual = ventasMesActual.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
         const totalMesAnterior = ventasMesAnterior.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+        const pedidosMesAnterior = ventasMesAnterior.length;
 
         if (totalMesAnterior > 0) {
           ventasVariacion = parseFloat((((totalMesActual - totalMesAnterior) / totalMesAnterior) * 100).toFixed(1));
         } else if (totalMesActual > 0) {
           ventasVariacion = 100;
+        }
+
+        if (pedidosMesAnterior > 0) {
+          pedidosVariacion = parseFloat((((ventasMesActual.length - pedidosMesAnterior) / pedidosMesAnterior) * 100).toFixed(1));
+        } else if (ventasMesActual.length > 0) {
+          pedidosVariacion = 100;
         }
         labelVariacion = "vs mes anterior";
       }
@@ -162,7 +191,7 @@ class DashboardService {
         ventasVariacion,
         labelVariacion,
         pedidosTotal,
-        pedidosVariacion: ventasVariacion,
+        pedidosVariacion,
         frecuenciaVentas,
         clientesTotal,
         clientesActivos,
@@ -304,9 +333,46 @@ class DashboardService {
             compras: Math.round(comprasSem.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
           });
         }
+      } else if (periodo === 'todos' || periodo === 'historico' || periodo === 'all') {
+        // Ítem #30: Histórico multi-anual real agrupado por año
+        const ventasAll = await Venta.findAll({
+          where: { estadoEntrega: { [Op.ne]: 'CANCELADO' } },
+          attributes: ['fechaVenta', 'total'],
+          raw: true
+        }).catch(() => []);
+
+        const comprasAll = await Compra.findAll({
+          where: { estado: { [Op.ne]: 'CANCELADA' } },
+          attributes: ['fechaCompra', 'total', 'subtotal'],
+          raw: true
+        }).catch(() => []);
+
+        const yearMap = new Map();
+        const currentY = now.getFullYear();
+        for (let y = currentY - 2; y <= currentY; y++) {
+          yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
+        }
+
+        ventasAll.forEach(v => {
+          if (!v.fechaVenta) return;
+          const y = new Date(v.fechaVenta).getFullYear();
+          if (!yearMap.has(y)) yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
+          yearMap.get(y).ventas += Math.round(parseFloat(v.total || 0));
+        });
+
+        comprasAll.forEach(c => {
+          if (!c.fechaCompra) return;
+          const y = new Date(c.fechaCompra).getFullYear();
+          if (!yearMap.has(y)) yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
+          yearMap.get(y).compras += Math.round(parseFloat(c.total || c.subtotal || 0));
+        });
+
+        return Array.from(yearMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([_, val]) => val);
       } else {
-        // 'este_ano', 'todos' o año específico (12 meses)
-        const targetYear = (periodo === 'todos') ? now.getFullYear() : year;
+        // 'este_ano' o año específico (12 meses)
+        const targetYear = year;
         for (let m = 0; m < 12; m++) {
           const startOfMonth = new Date(targetYear, m, 1, 0, 0, 0);
           const endOfMonth = new Date(targetYear, m + 1, 0, 23, 59, 59);
@@ -451,11 +517,20 @@ class DashboardService {
     }
   }
 
-  static async getVentasRecientes() {
+  static async getVentasRecientes(filtro = {}) {
     try {
       const VentaService = require('./ventaService');
       const { Venta, Cliente, User, DetalleVentaProducto } = require('../../persistence/models');
+      const { startDate, endDate } = parseDateRange(filtro);
+      const where = {};
+      if (startDate) {
+        where.fechaVenta = {
+          [Op.between]: [startDate, endDate || new Date()]
+        };
+      }
+
       const ventas = await Venta.findAll({
+        where,
         include: [
           { 
             model: Cliente, 
@@ -466,7 +541,7 @@ class DashboardService {
           { model: DetalleVentaProducto, as: 'detalles' }
         ],
         order: [['idVenta', 'DESC']],
-        limit: 5
+        limit: 10
       });
 
       return ventas.map(v => VentaService.formatVenta(v));

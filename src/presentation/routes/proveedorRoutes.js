@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getProveedores,
+  getPapeleraProveedores,
   getProveedorById,
   getTiposProveedor,
   createProveedor,
@@ -15,24 +16,25 @@ const {
   validateCreateProveedor,
   validateUpdateProveedor,
 } = require('../../infrastructure/middlewares/proveedorValidation');
-const { optionalProtect } = require('../../infrastructure/middlewares/authMiddleware');
+const { protect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
 
-router.use(optionalProtect);
+router.use(protect);
 
 router.get('/tipos', getTiposProveedor);
+router.get('/papelera', requirePrivilege('Proveedores', 'Ver'), getPapeleraProveedores);
 
 router.route('/')
   .get(getProveedores)
-  .post(validateCreateProveedor, createProveedor);
+  .post(requirePrivilege(['Proveedores', 'Gestión de Compras'], 'Crear'), validateCreateProveedor, createProveedor);
 
 router.route('/:id')
   .get(getProveedorById)
-  .put(validateUpdateProveedor, updateProveedor)
-  .delete(deleteProveedor);
+  .put(requirePrivilege('Proveedores', 'Editar'), validateUpdateProveedor, updateProveedor)
+  .delete(requirePrivilege('Proveedores', 'Eliminar'), deleteProveedor);
 
-router.put('/:id/estado', toggleProveedorEstado);
-router.patch('/:id/estado', toggleProveedorEstado);
-router.put('/:id/restaurar', restoreProveedor);
-router.delete('/:id/permanente', deletePermanenteProveedor);
+router.put('/:id/estado', requirePrivilege('Proveedores', 'Editar'), toggleProveedorEstado);
+router.patch('/:id/estado', requirePrivilege('Proveedores', 'Editar'), toggleProveedorEstado);
+router.put('/:id/restaurar', requirePrivilege('Proveedores', 'Editar'), restoreProveedor);
+router.delete('/:id/permanente', requirePrivilege('Proveedores', 'Eliminar'), deletePermanenteProveedor);
 
 module.exports = router;

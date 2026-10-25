@@ -30,13 +30,14 @@ const {
   ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema,
-  ensureCompraLotesYCancelacionSchema
+  ensureCompraLotesYCancelacionSchema,
+  ensureActaRevisionSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
-// Connect to Database and run schema verifications
-(async () => {
+async function initializeDatabaseSchema() {
   try {
     await connectDB();
+    await ensureActaRevisionSchema();
     await ensureInsumoEliminadoSchema();
     await ensureInsumoCategoriaNullableSchema();
     await ensureInsumoAdicionSchema();
@@ -74,28 +75,32 @@ const {
   } catch (err) {
     console.error('Error al verificar esquemas de base de datos:', err.message);
   }
-})();
+}
 
 const app = express();
 
-// ── Configuración de CORS Explícita para Frontend (Vite en puerto 5173) ──
+// ── Configuración de CORS Explícita para Frontend ──
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
   'http://localhost:4173',
   'http://127.0.0.1:4173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir peticiones sin origen (como Postman, Swagger o herramientas locales)
+    // Permitir peticiones sin origen (Postman, Swagger, health checks o servidor a servidor)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(null, true); // En desarrollo permitimos la petición para evitar bloqueos
+    const isLocalDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+    if (allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && isLocalDev)) {
+      return callback(null, true);
     }
+    return callback(new Error(`Origen CORS no autorizado: ${origin}`), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -189,23 +194,27 @@ app.get('/', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+let server;
 
-const server = app.listen(PORT, () => {
-  console.log(`Servidor monolítico unificado escuchando en el puerto ${PORT} en modo ${process.env.NODE_ENV || 'development'}`);
-});
+initializeDatabaseSchema().finally(() => {
+  server = app.listen(PORT, () => {
+    console.log(`Servidor monolítico unificado escuchando en el puerto ${PORT} en modo ${process.env.NODE_ENV || 'development'}`);
+  });
 
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`❌ El puerto ${PORT} ya está en uso. Cierra el proceso anterior o cambia el valor de PORT.`);
-  } else {
-    console.error('❌ Error al iniciar el servidor:', error.message);
-  }
-  process.exit(1);
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ El puerto ${PORT} ya está en uso. Cierra el proceso anterior o cambia el valor de PORT.`);
+    } else {
+      console.error('❌ Error al iniciar el servidor:', error.message);
+    }
+    process.exit(1);
+  });
 });
 
 // Manejo de cierre limpio para evitar errores EADDRINUSE con nodemon
 const handleShutdown = (signal) => {
   console.log(`Recibida señal ${signal}. Cerrando servidor en puerto ${PORT}...`);
+  if (!server) process.exit(0);
   server.close(() => {
     console.log('Servidor HTTP cerrado correctamente.');
     process.exit(0);
@@ -213,6 +222,10 @@ const handleShutdown = (signal) => {
 };
 
 process.once('SIGUSR2', () => {
+  if (!server) {
+    process.kill(process.pid, 'SIGUSR2');
+    return;
+  }
   server.close(() => {
     process.kill(process.pid, 'SIGUSR2');
   });

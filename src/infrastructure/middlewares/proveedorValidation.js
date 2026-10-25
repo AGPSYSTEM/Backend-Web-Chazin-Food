@@ -1,6 +1,6 @@
-const SOLO_NUMERICOS   = /^[\d.\-\s]+$/;
-const SOLO_TELEFONO    = /^[\d\s+\-()]+$/;
-const CONTIENE_NUMERO  = /\d/;
+const { isValidEmailStrict } = require('../utils/validationUtils');
+
+const SOLO_TELEFONO = /^[\d\s+\-()]+$/;
 
 const validateCreateProveedor = (req, res, next) => {
   const errores = _validarCampos(req.body, true);
@@ -18,35 +18,59 @@ const validateUpdateProveedor = (req, res, next) => {
 
 function _validarCampos(data, esCreacion) {
   const errores = [];
-  const { nombre, numeroDocumento, telefono, nombreContacto, correo } = data;
+  const { nombre, numeroDocumento, nit, documento, telefono, nombreContacto, contacto, correo, email, tipoPersona, idTipoDocumento } = data;
 
-  if (esCreacion && (!nombre || !String(nombre).trim()))
-    errores.push({ campo: 'nombre', mensaje: 'El nombre del proveedor es obligatorio.' });
+  const finalDoc = numeroDocumento !== undefined ? numeroDocumento : (nit !== undefined ? nit : documento);
+  const finalCorreo = correo !== undefined ? correo : email;
+  const finalContacto = nombreContacto !== undefined ? nombreContacto : contacto;
 
-  if (esCreacion && (!numeroDocumento || !String(numeroDocumento).trim()))
-    errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento es obligatorio.' });
-  else if (numeroDocumento !== undefined && String(numeroDocumento).trim() !== '') {
-    if (!SOLO_NUMERICOS.test(String(numeroDocumento).trim()))
-      errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento solo puede contener dígitos, puntos y guiones.' });
+  // Validación de Razón Social / Nombre (Ítem #71)
+  if (esCreacion && (!nombre || !String(nombre).trim())) {
+    errores.push({ campo: 'nombre', mensaje: 'El nombre o razón social del proveedor es obligatorio.' });
+  } else if (nombre !== undefined && String(nombre).trim() !== '') {
+    const normNombre = String(nombre).trim();
+    if (normNombre.length < 2 || !/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(normNombre)) {
+      errores.push({ campo: 'nombre', mensaje: 'La razón social / nombre solo puede contener letras, números y espacios (sin guiones ni caracteres especiales como -, ., &, @, #).' });
+    }
   }
 
-  if (esCreacion && (!telefono || !String(telefono).trim()))
+  // Validación de Número de Documento / NIT (Ítem #72: sin puntos ni guiones)
+  const docVal = finalDoc !== undefined ? String(finalDoc).trim() : '';
+  if (esCreacion && !docVal) {
+    errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento / NIT es obligatorio.' });
+  } else if (docVal) {
+    if (!/^\d+$/.test(docVal)) {
+      errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento solo puede contener dígitos numéricos, sin puntos ni guiones.' });
+    } else if (docVal.length < 6 || docVal.length > 20) {
+      errores.push({ campo: 'numeroDocumento', mensaje: 'El número de documento debe tener entre 6 y 20 dígitos.' });
+    }
+  }
+
+  // Validación de Teléfono
+  if (esCreacion && (!telefono || !String(telefono).trim())) {
     errores.push({ campo: 'telefono', mensaje: 'El teléfono es obligatorio.' });
-  else if (telefono !== undefined && String(telefono).trim() !== '') {
-    if (!SOLO_TELEFONO.test(String(telefono).trim()))
-      errores.push({ campo: 'telefono', mensaje: 'El teléfono solo puede contener dígitos. No se permiten letras.' });
+  } else if (telefono !== undefined && String(telefono).trim() !== '') {
+    const cleanTel = String(telefono).replace(/\D/g, '');
+    if (!SOLO_TELEFONO.test(String(telefono).trim()) || cleanTel.length < 7) {
+      errores.push({ campo: 'telefono', mensaje: 'El teléfono debe ser un número válido (mínimo 7 dígitos, sin letras).' });
+    }
   }
 
-  if (esCreacion && (!nombreContacto || !String(nombreContacto).trim()))
-    errores.push({ campo: 'nombreContacto', mensaje: 'La persona de contacto es obligatoria.' });
-  else if (nombreContacto !== undefined && String(nombreContacto).trim() !== '') {
-    if (CONTIENE_NUMERO.test(String(nombreContacto)))
-      errores.push({ campo: 'nombreContacto', mensaje: 'El nombre de contacto no puede contener números.' });
+  // Persona Natural vs Jurídica para Nombre de Contacto (Ítem #66)
+  const esNatural = String(tipoPersona || '').toLowerCase().includes('natural') || (Number(idTipoDocumento) && Number(idTipoDocumento) !== 3);
+  if (esCreacion && !esNatural && (!finalContacto || !String(finalContacto).trim())) {
+    errores.push({ campo: 'nombreContacto', mensaje: 'La persona de contacto es obligatoria para personas jurídicas.' });
+  } else if (finalContacto !== undefined && String(finalContacto).trim() !== '') {
+    if (/\d/.test(String(finalContacto)) || String(finalContacto).includes('@')) {
+      errores.push({ campo: 'nombreContacto', mensaje: 'El nombre de contacto no puede contener números ni el símbolo @.' });
+    }
   }
 
-  if (correo !== undefined && String(correo).trim() !== '') {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(correo).trim()))
-      errores.push({ campo: 'correo', mensaje: 'El correo electrónico no tiene un formato válido.' });
+  // Correo electrónico estricto (Ítem #73)
+  if (finalCorreo !== undefined && String(finalCorreo).trim() !== '') {
+    if (!isValidEmailStrict(String(finalCorreo).trim())) {
+      errores.push({ campo: 'correo', mensaje: 'El correo electrónico no tiene un formato válido o contiene caracteres no permitidos.' });
+    }
   }
 
   return errores;

@@ -1,18 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const { getVentas, getVentasStats, getVentaById, createVenta, updateEstadoVenta, updateTiempoEntregaVenta, cancelarVenta } = require('../controllers/ventaController');
+const { getVentas, getVentasStats, getVentaById, createVenta, updateEstadoVenta, updateTiempoEntregaVenta, cancelarVenta, aprobarPagoVenta } = require('../controllers/ventaController');
+const { protect, optionalProtect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
 
 router.route('/')
-  .get(getVentas)
-  .post(createVenta);
+  .get(protect, getVentas)
+  .post(optionalProtect, createVenta);
 
-router.get('/stats', getVentasStats);
+router.get('/stats', protect, requirePrivilege(['Gestión de Ventas', 'Dashboard'], 'Ver'), getVentasStats);
 
 router.route('/:id')
-  .get(getVentaById);
+  .get(protect, getVentaById);
 
-router.put('/:id/estado', updateEstadoVenta);
-router.put('/:id/tiempo-entrega', updateTiempoEntregaVenta);
-router.put('/:id/cancelar', cancelarVenta);
+router.put('/:id/estado', protect, requirePrivilege(['Gestión de Ventas', 'Gestión de Producción'], 'Editar'), updateEstadoVenta);
+router.put('/:id/aprobar-pago', protect, requirePrivilege('Gestión de Ventas', 'Editar'), aprobarPagoVenta);
+router.put('/:id/tiempo-entrega', protect, requirePrivilege(['Gestión de Ventas', 'Gestión de Producción'], 'Editar'), updateTiempoEntregaVenta);
+router.put('/:id/cancelar', protect, cancelarVenta);
 
 module.exports = router;

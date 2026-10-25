@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const { User, Role, Cliente, Permiso } = require('../../persistence/models');
-const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName, formatNombreCompleto } = require('../../infrastructure/utils/validationUtils');
+const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName, formatNombreCompleto, isValidEmailStrict, isValidPersonName } = require('../../infrastructure/utils/validationUtils');
 const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
@@ -38,6 +38,18 @@ class AuthService {
 
     if (!finalEmail || !finalPassword || !cleanNom) {
       const error = new Error('Por favor complete todos los campos requeridos');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!isValidPersonName(cleanNom) || (cleanApe && !isValidPersonName(cleanApe))) {
+      const error = new Error('El nombre y los apellidos no pueden contener números ni el símbolo @');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!isValidEmailStrict(finalEmail)) {
+      const error = new Error('El correo electrónico debe incluir @ y un dominio válido (ej: usuario@dominio.com)');
       error.statusCode = 400;
       throw error;
     }
@@ -197,16 +209,25 @@ class AuthService {
       throw error;
     }
 
+    if (user.estado === 'PENDIENTE') {
+      const error = new Error('Tu cuenta está pendiente de activación. Revisa tu correo electrónico para activar tu acceso y definir tu contraseña.');
+      error.statusCode = 403;
+      throw error;
+    }
+
     if (user.estado === 'INACTIVO' || user.estado === '0' || user.estado === 0) {
       const error = new Error('Tu usuario está inactivo. Comunícate con el administrador para activar tu cuenta.');
       error.statusCode = 403;
       throw error;
     }
 
-    let isMatch = await bcrypt.compare(password, user.contrasena);
-    if (!isMatch && user.email === 'cocinero@chazinfood.com' && (password === 'cocina123' || password === 'cocinero123')) {
-      isMatch = true;
+    if (user.rolInfo && (user.rolInfo.estado === 0 || user.rolInfo.estado === '0')) {
+      const error = new Error('El rol asignado a tu cuenta se encuentra inactivo. Comunícate con el administrador.');
+      error.statusCode = 403;
+      throw error;
     }
+
+    const isMatch = await bcrypt.compare(password, user.contrasena);
     if (!isMatch) {
       const error = new Error('Credenciales inválidas');
       error.statusCode = 401;
@@ -301,7 +322,10 @@ class AuthService {
 
   static async getUserProfile(userId) {
     const user = await User.findByPk(userId, {
-      include: [{ model: Role, as: 'rolInfo' }, { model: Cliente, as: 'clienteInfo' }]
+      include: [
+        { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
+        { model: Cliente, as: 'clienteInfo' }
+      ]
     });
 
     if (!user) {
@@ -309,6 +333,10 @@ class AuthService {
       error.statusCode = 404;
       throw error;
     }
+
+    const permisos = user.rolInfo && user.rolInfo.permisos
+      ? user.rolInfo.permisos.map(p => p.nombrePermiso)
+      : [];
 
     let fidelidadObj = null;
     let idCliente = null;
@@ -379,7 +407,9 @@ class AuthService {
       email: user.email,
       correo: user.email,
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
+      rolEstado: user.rolInfo ? user.rolInfo.estado : 1,
       idRol: user.idRol,
+      permisos,
       estado: user.estado,
       direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       tipo: tipoCliente,
@@ -643,6 +673,18 @@ class AuthService {
         throw error;
       }
 
+      if (user.rolInfo && (user.rolInfo.estado === 0 || user.rolInfo.estado === '0')) {
+        const error = new Error('El rol asignado a tu cuenta se encuentra inactivo. Comunícate con el administrador.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      // Si estaba PENDIENTE y se autentica con su cuenta verificada de Google, queda activado
+      if (user.estado === 'PENDIENTE') {
+        await user.update({ estado: 'ACTIVO' });
+        user.estado = 'ACTIVO';
+      }
+
       if (!user.foto && picture) {
         try {
           await user.update({ foto: picture });
@@ -808,14 +850,128 @@ class AuthService {
     };
   }
 
-  static async getUserProfile(userId) {
-    const UserService = require('./userService');
-    return UserService.getUserById(userId);
+  static generateActivationToken(user) {
+    const jwtSecret = process.env.JWT_SECRET || 'chazin_food_secret_key_2026';
+    return jwt.sign(
+      { id: user.idUsuario, email: user.email, purpose: 'activate_account' },
+      jwtSecret + user.contrasena,
+      { expiresIn: '72h' }
+    );
   }
 
-  static async updateProfile(userId, profileData) {
-    const UserService = require('./userService');
-    return UserService.updateUser(userId, profileData);
+  static async verifyActivationToken(token) {
+    if (!token) {
+      const error = new Error('Token de activación no proporcionado');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.id || decoded.purpose !== 'activate_account') {
+      const error = new Error('El enlace de activación es inválido');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      const error = new Error('Usuario no encontrado');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const jwtSecret = process.env.JWT_SECRET || 'chazin_food_secret_key_2026';
+    try {
+      jwt.verify(token, jwtSecret + user.contrasena);
+    } catch (err) {
+      const error = new Error(
+        user.estado === 'ACTIVO'
+          ? 'Esta cuenta ya fue activada anteriormente. Ya puedes iniciar sesión.'
+          : 'El enlace de activación es inválido o ha expirado.'
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      valid: true,
+      email: user.email,
+      nombre: user.nombre,
+      apellidos: user.apellidos || '',
+      estado: user.estado
+    };
+  }
+
+  static async activateAccount(data = {}) {
+    const { token, contrasena, contraseña, password } = data;
+    const newPassword = contrasena || contraseña || password;
+
+    if (!token || !newPassword) {
+      const error = new Error('El enlace de activación y la nueva contraseña son obligatorios');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (String(newPassword).length < 6) {
+      const error = new Error('La contraseña debe tener al menos 6 caracteres');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.id || decoded.purpose !== 'activate_account') {
+      const error = new Error('El enlace de activación es inválido');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const user = await User.findByPk(decoded.id, {
+      include: [
+        { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
+        { model: Cliente, as: 'clienteInfo' }
+      ]
+    });
+
+    if (!user) {
+      const error = new Error('Usuario no encontrado');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const jwtSecret = process.env.JWT_SECRET || 'chazin_food_secret_key_2026';
+    try {
+      jwt.verify(token, jwtSecret + user.contrasena);
+    } catch (err) {
+      const error = new Error(
+        user.estado === 'ACTIVO'
+          ? 'Esta cuenta ya fue activada. Inicia sesión con tu contraseña.'
+          : 'El enlace de activación es inválido o ha expirado.'
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(String(newPassword), salt);
+    await user.update({ contrasena: hashedPassword, estado: 'ACTIVO' });
+
+    if (user.clienteInfo) {
+      try {
+        let meta = {};
+        if (user.clienteInfo.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
+          meta = JSON.parse(user.clienteInfo.direccion);
+        }
+        meta.estado = 'Activo';
+        await user.clienteInfo.update({ direccion: JSON.stringify(meta), estado: 1 });
+      } catch (e) {}
+    }
+
+    const profile = await this.getUserProfile(user.idUsuario);
+    return {
+      message: 'Cuenta activada exitosamente',
+      ...profile,
+      token: this.generateToken(user.idUsuario)
+    };
   }
 }
 

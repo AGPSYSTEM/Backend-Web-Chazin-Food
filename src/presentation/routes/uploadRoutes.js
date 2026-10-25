@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../../infrastructure/middlewares/uploadMiddleware');
 const { deleteImage } = require('../../infrastructure/services/cloudinaryService');
+const { protect } = require('../../infrastructure/middlewares/authMiddleware');
+
+router.use(protect);
 
 router.post('/', upload.single('image'), (req, res) => {
   if (!req.file) {

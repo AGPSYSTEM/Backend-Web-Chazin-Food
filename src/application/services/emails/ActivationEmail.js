@@ -192,7 +192,7 @@ function ActivationEmail({
                         fontWeight: '500'
                       }
                     },
-                    'Clave de acceso:'
+                    'Estado de clave:'
                   ),
                   e(
                     'td',
@@ -219,12 +219,12 @@ function ActivationEmail({
                           'span',
                           {
                             style: {
-                              color: colors.textMuted,
+                              color: colors.emeraldText,
                               fontSize: '12.5px',
-                              fontStyle: 'italic'
+                              fontWeight: '600'
                             }
                           },
-                          'Acceso vinculado mediante Google'
+                          'Definirás tu contraseña personal al activar la cuenta'
                         )
                   )
                 )

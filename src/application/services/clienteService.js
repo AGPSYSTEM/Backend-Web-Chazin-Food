@@ -1,10 +1,11 @@
 const { Op } = require('sequelize');
 const { Cliente, User, Role, Venta, DetalleVentaProducto } = require('../../persistence/models');
 const { resetAutoIncrement, resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
-const { sanitizeTelefono, cleanNameAndLastName, formatNombreCompleto, sanitizeDocumento } = require('../../infrastructure/utils/validationUtils');
+const { sanitizeTelefono, cleanNameAndLastName, formatNombreCompleto, sanitizeDocumento, isValidEmailStrict, isValidPersonName } = require('../../infrastructure/utils/validationUtils');
 const bcrypt = require('bcryptjs');
 const EmailService = require('./emailService');
 const FidelidadService = require('./fidelidadService');
+const AuthService = require('./authService');
 
 class ClienteService {
   static async formatCliente(c) {
@@ -157,13 +158,15 @@ class ClienteService {
       }
     }
 
-    // Determine state: if user account linked and not active, client state is Inactivo
+    // Determine state: if user account linked and not active, client state is Inactivo or Pendiente
     const isUserActive = c.usuario
       ? Boolean(String(c.usuario.estado).toUpperCase() === 'ACTIVO' || c.usuario.estado === 1 || c.usuario.estado === true)
       : (c.estado !== 0 && c.estado !== false && meta.estado !== 'Inactivo' && meta.estado !== 0);
 
     let estadoStr = 'Activo';
-    if ((c.usuario && !isUserActive) || c.estado === 0 || c.estado === false || meta.estado === 'Inactivo' || meta.estado === 0) {
+    if (c.usuario && String(c.usuario.estado).toUpperCase() === 'PENDIENTE') {
+      estadoStr = 'Pendiente';
+    } else if ((c.usuario && !isUserActive) || c.estado === 0 || c.estado === false || meta.estado === 'Inactivo' || meta.estado === 0) {
       estadoStr = 'Inactivo';
     }
     const rawNombre = c.usuario ? c.usuario.nombre : (meta.nombre || 'Cliente');
@@ -191,6 +194,7 @@ class ClienteService {
       email: c.usuario ? c.usuario.email : (meta.email || ''),
       telefono: cleanTelefono,
       estado: estadoStr,
+      estadoCuenta: c.usuario ? (c.usuario.estado || 'ACTIVO') : (c.estado === 1 ? 'ACTIVO' : 'INACTIVO'),
       compras: comprasCount,
       totalConsumido: `$${totalGastadoSum.toLocaleString('es-CO')}`,
       totalGastado: `$${totalGastadoSum.toLocaleString('es-CO')}`,
@@ -274,6 +278,26 @@ class ClienteService {
 
   static async create(data) {
     let idUsuario = data.idUsuario || null;
+
+    if (data.nombre && !isValidPersonName(data.nombre)) {
+      const error = new Error('El nombre contiene caracteres inválidos (no se permiten números ni arrobas).');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (data.apellidos && !isValidPersonName(data.apellidos)) {
+      const error = new Error('Los apellidos contienen caracteres inválidos (no se permiten números ni arrobas).');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (data.email && data.email.trim()) {
+      if (!isValidEmailStrict(data.email.trim())) {
+        const error = new Error('El correo electrónico tiene un formato inválido o caracteres especiales no permitidos.');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(data.nombre, data.apellidos);
     const cleanTel = sanitizeTelefono(data.telefono);
     const cleanDoc = data.documento ? sanitizeDocumento(data.documento, data.tipoDocumento) : null;
@@ -302,12 +326,13 @@ class ClienteService {
       }
     }
 
-    // Siempre crear cuenta de acceso vinculada (Ítem 121: eliminada opción sin cuenta)
-    let tempPass = data.contrasena || `Chazin${Math.floor(1000 + Math.random() * 9000)}!`;
+    // Siempre crear cuenta de acceso vinculada (Ítem 121: cuenta PENDIENTE con enlace de activación)
     if (!idUsuario && cleanNom) {
       const clienteRol = await Role.findOne({ where: { nombre: 'Cliente' } });
+      const crypto = require('crypto');
+      const randomSeed = crypto.randomBytes(32).toString('hex');
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(tempPass, salt);
+      const hashedPassword = await bcrypt.hash(randomSeed, salt);
       const userEmail = data.email ? data.email.trim().toLowerCase() : `cliente_${cleanDoc || Date.now()}@chazinfood.com`;
 
       const user = await User.create({
@@ -319,19 +344,27 @@ class ClienteService {
         telefono: cleanTel,
         contrasena: hashedPassword,
         idRol: clienteRol ? clienteRol.idRol : 4,
-        estado: 'ACTIVO'
+        estado: 'PENDIENTE'
       });
       idUsuario = user.idUsuario;
 
-      // Despachar correo electrónico de activación para configurar contraseña
+      // Despachar correo electrónico con token de activación firmado (sin contraseña en texto plano)
       if (data.email && data.email.trim()) {
-        await EmailService.sendActivationEmail({
-          email: userEmail,
-          nombre: cleanNom,
-          apellidos: cleanApe,
-          password: tempPass,
-          activationLink: 'http://localhost:5173/login'
-        }).catch(err => console.error('Error enviando correo de activación:', err.message));
+        try {
+          const activationToken = AuthService.generateActivationToken(user);
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const activationLink = `${frontendUrl}/activar-cuenta?token=${encodeURIComponent(activationToken)}`;
+
+          await EmailService.sendActivationEmail({
+            email: userEmail,
+            nombre: cleanNom,
+            apellidos: cleanApe,
+            password: '', // Sin contraseña en texto claro
+            activationLink
+          });
+        } catch (mailErr) {
+          console.error('Error enviando correo de activación:', mailErr.message);
+        }
       }
     }
 
@@ -360,6 +393,24 @@ class ClienteService {
   }
 
   static async update(id, data) {
+    if (data.nombre && !isValidPersonName(data.nombre)) {
+      const error = new Error('El nombre contiene caracteres inválidos (no se permiten números ni arrobas).');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (data.apellidos && !isValidPersonName(data.apellidos)) {
+      const error = new Error('Los apellidos contienen caracteres inválidos (no se permiten números ni arrobas).');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (data.email && data.email.trim()) {
+      if (!isValidEmailStrict(data.email.trim())) {
+        const error = new Error('El correo electrónico tiene un formato inválido o caracteres especiales no permitidos.');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     const c = await Cliente.findByPk(id, {
       include: [{ model: User, as: 'usuario' }]
     });

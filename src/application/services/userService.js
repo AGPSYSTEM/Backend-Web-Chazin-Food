@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
-const { User, Role, Cliente } = require('../../persistence/models');
-const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName, formatNombreCompleto } = require('../../infrastructure/utils/validationUtils');
+const { User, Role, Cliente, Permiso } = require('../../persistence/models');
+const { sanitizeTelefono, sanitizeDocumento, cleanNameAndLastName, formatNombreCompleto, isValidEmailStrict, isValidPersonName } = require('../../infrastructure/utils/validationUtils');
 const EmailService = require('./emailService');
 
 function getCleanDireccion(raw) {
@@ -52,7 +52,10 @@ class UserService {
 
   static async getUserById(id) {
     const user = await User.findByPk(id, {
-      include: [{ model: Role, as: 'rolInfo' }, { model: Cliente, as: 'clienteInfo' }]
+      include: [
+        { model: Role, as: 'rolInfo', include: [{ model: Permiso, as: 'permisos', through: { attributes: [] } }] },
+        { model: Cliente, as: 'clienteInfo' }
+      ]
     });
 
     if (!user) {
@@ -64,6 +67,9 @@ class UserService {
     const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
     const cleanTel = sanitizeTelefono(user.telefono);
     const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+    const permisos = user.rolInfo && user.rolInfo.permisos
+      ? user.rolInfo.permisos.map(p => p.nombrePermiso)
+      : [];
 
     let metaFoto = null;
     if (user.clienteInfo?.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
@@ -89,6 +95,8 @@ class UserService {
       correo: user.email,
       idRol: user.idRol,
       rol: user.rolInfo ? user.rolInfo.nombre : 'Usuario',
+      rolEstado: user.rolInfo ? user.rolInfo.estado : 1,
+      permisos,
       estado: user.estado,
       direccion: getCleanDireccion(user.clienteInfo ? user.clienteInfo.direccion : ''),
       foto: finalFoto,
@@ -110,6 +118,18 @@ class UserService {
 
     if (!cleanNom || !finalEmail) {
       const error = new Error('Nombre y correo son requeridos');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!isValidPersonName(cleanNom) || (cleanApe && !isValidPersonName(cleanApe))) {
+      const error = new Error('El nombre y los apellidos no pueden contener números ni el símbolo @');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!isValidEmailStrict(finalEmail)) {
+      const error = new Error('El correo electrónico debe incluir @ y un dominio válido (ej: usuario@dominio.com)');
       error.statusCode = 400;
       throw error;
     }
@@ -203,6 +223,11 @@ class UserService {
       const rawNom = nombre !== undefined ? nombre : user.nombre;
       const rawApe = (apellidos !== undefined || apellido !== undefined) ? (apellidos || apellido || '') : user.apellidos;
       const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(rawNom, rawApe);
+      if (!isValidPersonName(cleanNom) || (cleanApe && !isValidPersonName(cleanApe))) {
+        const error = new Error('El nombre y los apellidos no pueden contener números ni el símbolo @');
+        error.statusCode = 400;
+        throw error;
+      }
       const newFullName = formatNombreCompleto(cleanNom, cleanApe).toLowerCase();
       const currentFullName = formatNombreCompleto(user.nombre, user.apellidos).toLowerCase();
 
@@ -225,6 +250,11 @@ class UserService {
     // 2. Email & Uniqueness Check (ignoring current user)
     const finalEmail = (email || correo || '').trim().toLowerCase();
     if (finalEmail && finalEmail !== (user.email || '').toLowerCase()) {
+      if (!isValidEmailStrict(finalEmail)) {
+        const error = new Error('El correo electrónico debe incluir @ y un dominio válido (ej: usuario@dominio.com)');
+        error.statusCode = 400;
+        throw error;
+      }
       const existingEmail = await User.findOne({
         where: {
           email: finalEmail,

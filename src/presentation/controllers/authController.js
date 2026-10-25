@@ -80,6 +80,27 @@ const googleAuth = async (req, res, next) => {
   }
 };
 
+const verifyActivation = async (req, res, next) => {
+  try {
+    const token = req.query.token || req.body?.token;
+    const result = await AuthService.verifyActivationToken(token);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+const activateAccount = async (req, res, next) => {
+  try {
+    const result = await AuthService.activateAccount(req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -88,4 +109,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   googleAuth,
+  verifyActivation,
+  activateAccount,
 };

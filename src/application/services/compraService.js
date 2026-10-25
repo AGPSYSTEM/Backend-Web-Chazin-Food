@@ -4,12 +4,14 @@ const TrazabilidadService = require('./trazabilidadService');
 const ESTADO_RECIBIDA = 'RECIBIDA';
 const ESTADO_PENDIENTE = 'PENDIENTE';
 const ESTADO_CANCELADA = 'CANCELADA';
+const ESTADO_DEVUELTA_PARCIAL = 'DEVUELTA_PARCIAL';
 
 function normalizarEstado(estado) {
   const e = String(estado || '').trim().toUpperCase();
   if (e === ESTADO_RECIBIDA) return ESTADO_RECIBIDA;
   if (e === ESTADO_PENDIENTE) return ESTADO_PENDIENTE;
   if (e === ESTADO_CANCELADA) return ESTADO_CANCELADA;
+  if (e === ESTADO_DEVUELTA_PARCIAL || e === 'PARCIAL' || e === 'DEVUELTA') return ESTADO_DEVUELTA_PARCIAL;
   if (e === 'COMPLETADA') return ESTADO_RECIBIDA;
   if (e === 'ANULADA') return ESTADO_CANCELADA;
   if (e === 'PENDIENTE' || e === 'PENDIENTES' || e === 'PEND') return ESTADO_PENDIENTE;
@@ -216,10 +218,51 @@ class CompraService {
       error.statusCode = 400;
       throw error;
     }
+
+    const numFactura = data.numeroFactura ? String(data.numeroFactura).trim() : '';
+    if (!numFactura) {
+      const error = new Error('El número de factura es obligatorio');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Ítem #75: Validar que el número de factura no esté duplicado para el mismo proveedor
+    const facturaExistente = await Compra.findOne({
+      where: {
+        idProveedor: idProv,
+        numeroFactura: numFactura
+      }
+    });
+    if (facturaExistente) {
+      const error = new Error(`El número de factura "${numFactura}" ya se encuentra registrado para este proveedor.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Ítem #76: Fecha de factura obligatoria
+    if (!data.fechaFactura) {
+      const error = new Error('La fecha de la factura es obligatoria');
+      error.statusCode = 400;
+      throw error;
+    }
+    const fechaFacturaValida = new Date(data.fechaFactura);
+    if (isNaN(fechaFacturaValida.getTime())) {
+      const error = new Error('La fecha de la factura no es válida');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Validar detalles mínimos
+    if (!data.detalles || !Array.isArray(data.detalles) || data.detalles.length === 0) {
+      const error = new Error('La compra debe incluir al menos un insumo');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const compra = await Compra.create({
       idProveedor: idProv,
-      numeroFactura: data.numeroFactura ? String(data.numeroFactura).trim() : null,
-      fechaFactura: data.fechaFactura || null,
+      numeroFactura: numFactura,
+      fechaFactura: data.fechaFactura,
       fechaCompra: data.fechaCompra || new Date(),
       subtotal: parseFloat(data.subtotal) || parseFloat(data.total) || 0,
       iva: parseFloat(data.iva) || 0,
@@ -229,15 +272,25 @@ class CompraService {
     });
 
     if (data.detalles && data.detalles.length > 0) {
-      const detallesParaGuardar = data.detalles.map(d => {
-        const lotesArr = Array.isArray(d.lotes) && d.lotes.length > 0
+      const detallesParaGuardar = data.detalles.map((d, index) => {
+        let lotesArr = Array.isArray(d.lotes) && d.lotes.length > 0
           ? d.lotes
           : (d.numeroLote ? [{ numeroLote: d.numeroLote, fechaVencimiento: d.fechaVencimiento, cantidad: d.cantidad }] : []);
+
+        // Ítem #79: Generar número de lote automáticamente de forma sugerida si viene vacío
+        if (lotesArr.length === 0) {
+          const autoLote = `LOT-${compra.idCompra}-${d.idInsumo}-${Date.now().toString().slice(-4)}`;
+          lotesArr = [{
+            numeroLote: autoLote,
+            fechaVencimiento: d.fechaVencimiento || null,
+            cantidad: d.cantidad
+          }];
+        }
 
         const primerLote = lotesArr[0];
         const numLote = (d.numeroLote && String(d.numeroLote).trim()) 
           || (primerLote && primerLote.numeroLote && String(primerLote.numeroLote).trim()) 
-          || null;
+          || `LOT-${compra.idCompra}-${d.idInsumo}`;
         const rawVenc = (d.fechaVencimiento && String(d.fechaVencimiento).trim()) 
           || (primerLote && primerLote.fechaVencimiento && String(primerLote.fechaVencimiento).trim()) 
           || null;
@@ -253,7 +306,7 @@ class CompraService {
           cantidad: cant,
           precioUnitario: pUnit,
           subtotal: sub,
-          lotes: lotesArr.length > 0 ? JSON.stringify(lotesArr) : null,
+          lotes: JSON.stringify(lotesArr),
           numeroLote: numLote,
           fechaVencimiento: fVenc
         };
@@ -462,102 +515,164 @@ class CompraService {
   }
 
   static async cancelar(id, opts = {}) {
-    const { motivo, detallesCancelacion, cantidadesAjuste, usuarioId, fechaCancelacion } = opts;
-    const c = await Compra.findByPk(id);
+    const { motivo, detallesCancelacion, cantidadesAjuste, usuarioId, fechaCancelacion, tipoCompensacion } = opts;
+    const c = await Compra.findByPk(id, {
+      include: [
+        { model: Proveedor, as: 'proveedor', attributes: ['idProveedor', 'nombre'] },
+        { model: DetalleCompraInsumo, as: 'detalles', include: [{ model: Insumo, as: 'insumo' }] },
+        { model: LoteInsumo, as: 'lotes' }
+      ]
+    });
     if (!c) {
       const error = new Error('Compra no encontrada');
       error.statusCode = 404;
       throw error;
     }
 
-    let detCancStr = null;
+    let parsedDetalles = [];
     if (detallesCancelacion) {
-      detCancStr = typeof detallesCancelacion === 'string'
-        ? detallesCancelacion
-        : JSON.stringify(detallesCancelacion);
+      try {
+        parsedDetalles = typeof detallesCancelacion === 'string'
+          ? JSON.parse(detallesCancelacion)
+          : detallesCancelacion;
+      } catch (_) {
+        parsedDetalles = [];
+      }
+    } else if (Array.isArray(cantidadesAjuste) && cantidadesAjuste.length > 0) {
+      parsedDetalles = cantidadesAjuste;
     } else {
-      const det = await DetalleCompraInsumo.findAll({
-        where: { idCompra: id },
-        include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
-      });
-      detCancStr = JSON.stringify(det.map(d => ({
+      parsedDetalles = (c.detalles || []).map(d => ({
         idInsumo: d.idInsumo,
         nombre: d.insumo ? d.insumo.nombre : `Insumo #${d.idInsumo}`,
         unidadMedida: d.insumo ? d.insumo.unidadMedida : '',
         cantidadCancelada: parseFloat(d.cantidad) || 0,
-        subtotal: parseFloat(d.subtotal) || 0
-      })));
+        subtotal: parseFloat(d.subtotal) || 0,
+        motivo: motivo || 'Devolución completa de compra',
+        tipoCompensacion: tipoCompensacion || 'DEVOLUCION_DINERO'
+      }));
     }
 
-    c.motivoCancelacion = motivo || 'Cancelada por el usuario';
-    c.detallesCancelacion = detCancStr;
-    if (usuarioId) {
-      c.usuarioCancelacionId = usuarioId;
+    // Validar motivo individual en cada insumo devuelto (Ítem #89)
+    parsedDetalles = (parsedDetalles || []).map(item => {
+      const itemMotivo = String(item.motivo || motivo || 'Devolución de insumo').trim();
+      return {
+        ...item,
+        motivo: itemMotivo,
+        tipoCompensacion: item.tipoCompensacion || tipoCompensacion || 'DEVOLUCION_DINERO'
+      };
+    });
+
+    const idCompra = Number(id);
+    const proveedorNombre = c.proveedor ? c.proveedor.nombre : 'Proveedor Genérico';
+    const numeroFactura = c.numeroFactura || `COMP-${String(idCompra).padStart(4, '0')}`;
+
+    // Determinar si es devolución total o parcial (Ítem #91)
+    let esTotal = true;
+    for (const d of (c.detalles || [])) {
+      const cantOriginal = parseFloat(d.cantidad) || 0;
+      const cantDevuelta = parsedDetalles
+        .filter(p => Number(p.idInsumo) === Number(d.idInsumo))
+        .reduce((sum, p) => sum + (parseFloat(p.cantidadCancelada || p.cantidad || 0)), 0);
+      if (cantDevuelta < cantOriginal - 0.001) {
+        esTotal = false;
+        break;
+      }
     }
-    if (fechaCancelacion) {
-      c.fechaCancelacion = new Date(fechaCancelacion);
-    } else if (!c.fechaCancelacion) {
-      c.fechaCancelacion = new Date();
-    }
 
-    const estadoActual = normalizarEstado(c.estado);
+    const nuevoEstado = esTotal ? ESTADO_CANCELADA : ESTADO_DEVUELTA_PARCIAL;
 
-    // Si la compra YA está cancelada, se trata de una EDICIÓN de los detalles/estados de la devolución
-    if (estadoActual === ESTADO_CANCELADA) {
-      console.log(`[COMPRA CANCELAR] #${id}: Actualización de detalles de cancelación/devolución existente (sin tocar inventario).`);
-      await c.save();
-      return this.getById(id);
-    }
+    // Procesar cada insumo devuelto (reducir stock y LoteInsumo, registrar trazabilidad)
+    for (const item of parsedDetalles) {
+      const idInsumo = Number(item.idInsumo);
+      const cantDev = parseFloat(item.cantidadCancelada || item.cantidad || 0);
+      if (!idInsumo || cantDev <= 0) continue;
 
-    // Si el usuario envió cantidades editadas individualmente, hacer ajuste PARCIAL de stock
-    // en lugar de usar _ajustarStockPorCompra que usa las cantidades originales de la BD.
-    if (esEstadoRecibida(estadoActual) && Array.isArray(cantidadesAjuste) && cantidadesAjuste.length > 0) {
-      console.log(`[COMPRA CANCELAR] #${id}: Ajuste PARCIAL de stock con cantidades editadas por el usuario.`);
-      const idCompra = Number(id);
-      const compraInfo = await Compra.findByPk(idCompra, {
-        include: [{ model: Proveedor, as: 'proveedor', attributes: ['idProveedor', 'nombre'] }]
-      });
-      const proveedorNombre = compraInfo && compraInfo.proveedor ? compraInfo.proveedor.nombre : 'Proveedor Genérico';
-      const numeroFactura = `COMP-${String(idCompra).padStart(4, '0')}`;
-
-      for (const ajuste of cantidadesAjuste) {
-        const { idInsumo, cantidadCancelada } = ajuste;
-        if (!idInsumo || !(parseFloat(cantidadCancelada) > 0)) continue;
-        try {
-          const insumo = await Insumo.findByPk(idInsumo);
-          if (!insumo) continue;
+      try {
+        const insumo = await Insumo.findByPk(idInsumo);
+        if (insumo) {
           const stockActual = parseFloat(insumo.stock) || 0;
-          const nuevoStock = Math.max(0, stockActual - parseFloat(cantidadCancelada));
-          console.log(`[COMPRA CANCELAR PARCIAL] Insumo #${idInsumo}: stock=${stockActual} - ${cantidadCancelada} = ${nuevoStock}`);
+          const nuevoStock = Math.max(0, stockActual - cantDev);
           await Insumo.update({ stock: nuevoStock }, { where: { idInsumo } });
-          try {
+
+          // Descontar del LoteInsumo correspondiente (Ítem #81, #91)
+          const lotesInsumo = await LoteInsumo.findAll({
+            where: { idCompra, idInsumo }
+          });
+          let restantePorDescontar = cantDev;
+          for (const lote of lotesInsumo) {
+            if (restantePorDescontar <= 0) break;
+            const disp = parseFloat(lote.cantidadDisponible) || 0;
+            const aDescontar = Math.min(disp, restantePorDescontar);
+            const nuevoDisp = Math.max(0, disp - aDescontar);
+            await LoteInsumo.update(
+              { cantidadDisponible: nuevoDisp, estado: nuevoDisp === 0 ? 'AGOTADO' : lote.estado },
+              { where: { idLote: lote.idLote } }
+            );
+            restantePorDescontar -= aDescontar;
+          }
+
+          // Registrar trazabilidad de salida por devolución
+          await TrazabilidadService.create({
+            tipo: 'Devolución de Compra',
+            entidadNombre: insumo.nombre,
+            detalle: `Devolución de insumo en compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Cantidad devuelta: ${cantDev} ${insumo.unidadMedida || ''} | Motivo: ${item.motivo} | Compensación: ${item.tipoCompensacion}`,
+            idInsumo,
+            tipoMovimiento: 'Salida',
+            cantidad: cantDev,
+            motivo: `Devolución compra ${numeroFactura}: ${item.motivo}`,
+            usuarioId: usuarioId || null,
+            skipStockUpdate: true
+          }).catch(e => console.warn('[COMPRA CANCELAR] Trazabilidad error:', e.message));
+        }
+
+        // Si tipoCompensacion es CAMBIO_PRODUCTO (Ítem #90)
+        if (item.tipoCompensacion === 'CAMBIO_PRODUCTO' && (item.idInsumoReemplazo || item.insumoReemplazo)) {
+          const idReemplazo = Number(item.idInsumoReemplazo || item.insumoReemplazo?.idInsumo || idInsumo);
+          const cantReemplazo = parseFloat(item.cantidadReemplazo || item.insumoReemplazo?.cantidad || cantDev);
+          const numLoteReemplazo = item.numeroLoteReemplazo || item.insumoReemplazo?.numeroLote || `LOT-REP-${idCompra}-${Date.now().toString().slice(-4)}`;
+          const fVencReemplazo = item.fechaVencimientoReemplazo || item.insumoReemplazo?.fechaVencimiento || null;
+
+          const insReemplazo = await Insumo.findByPk(idReemplazo);
+          if (insReemplazo && cantReemplazo > 0) {
+            const stockActualReemp = parseFloat(insReemplazo.stock) || 0;
+            await Insumo.update({ stock: stockActualReemp + cantReemplazo }, { where: { idInsumo: idReemplazo } });
+
+            await LoteInsumo.create({
+              idInsumo: idReemplazo,
+              idCompra,
+              numeroLote: numLoteReemplazo,
+              cantidad: cantReemplazo,
+              cantidadDisponible: cantReemplazo,
+              fechaVencimiento: fVencReemplazo,
+              estado: 'ACTIVO'
+            }).catch(e => console.warn('[COMPRA CANCELAR] Error creando lote reemplazo:', e.message));
+
             await TrazabilidadService.create({
-              tipo: 'Cancelación de Compra',
-              entidadNombre: insumo.nombre,
-              detalle: `Cancelación/Devolución de compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Cantidad revertida: ${cantidadCancelada} ${insumo.unidadMedida || ''} | Motivo: ${motivo || 'Sin motivo'}`,
-              idInsumo,
-              tipoMovimiento: 'Salida',
-              cantidad: parseFloat(cantidadCancelada),
-              motivo: `Reversa por devolución/cancelación compra ${numeroFactura}`,
+              tipo: 'Reemplazo por Devolución',
+              entidadNombre: insReemplazo.nombre,
+              detalle: `Entrada por cambio de producto en compra ${numeroFactura} — Proveedor: ${proveedorNombre} | Cantidad: ${cantReemplazo} ${insReemplazo.unidadMedida || ''} | Lote: ${numLoteReemplazo}`,
+              idInsumo: idReemplazo,
+              tipoMovimiento: 'Entrada',
+              cantidad: cantReemplazo,
+              motivo: `Reposición por devolución en compra ${numeroFactura}`,
               usuarioId: usuarioId || null,
               skipStockUpdate: true
-            });
-          } catch (tzErr) {
-            console.warn(`[COMPRA CANCELAR PARCIAL] Error trazabilidad insumo #${idInsumo}:`, tzErr.message);
+            }).catch(e => console.warn('[COMPRA CANCELAR] Trazabilidad reemplazo error:', e.message));
           }
-        } catch (err) {
-          console.warn(`[COMPRA CANCELAR PARCIAL] Error ajustando insumo #${idInsumo}:`, err.message);
         }
+      } catch (err) {
+        console.warn(`[COMPRA CANCELAR] Error procesando insumo #${idInsumo}:`, err.message);
       }
-
-      // Cambiar estado a CANCELADA sin re-ajustar stock (ya lo hicimos arriba)
-      c.estado = ESTADO_CANCELADA;
-      await c.save();
-      return this.getById(id);
     }
 
-    // Si no hay cantidadesAjuste explícitas, usar el flujo estándar (ajuste completo)
-    return this.updateEstado(id, ESTADO_CANCELADA, { usuarioId, motivo: c.motivoCancelacion });
+    c.motivoCancelacion = motivo || 'Devolución de insumos';
+    c.detallesCancelacion = JSON.stringify(parsedDetalles);
+    if (usuarioId) c.usuarioCancelacionId = usuarioId;
+    c.fechaCancelacion = fechaCancelacion ? new Date(fechaCancelacion) : new Date();
+    c.estado = nuevoEstado;
+    await c.save();
+
+    return this.getById(id);
   }
 
   static async _agruparCantidadesPorInsumo(detalles) {

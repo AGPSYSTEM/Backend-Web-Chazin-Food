@@ -46,13 +46,19 @@ class CategoriaProductoService {
   }
 
   static async create({ nombre, descripcion, icon }) {
-    if (!nombre || !nombre.trim()) {
+    const trimmedNombre = String(nombre || '').trim();
+    if (!trimmedNombre) {
       const error = new Error('El nombre de la categoría es obligatorio');
       error.statusCode = 400;
       throw error;
     }
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(trimmedNombre) || trimmedNombre.length < 2) {
+      const error = new Error('El nombre de la categoría solo puede contener letras y espacios (mínimo 2 caracteres sin números ni símbolos).');
+      error.statusCode = 400;
+      throw error;
+    }
 
-    const existing = await CategoriaProducto.findOne({ where: { nombre: nombre.trim() } });
+    const existing = await CategoriaProducto.findOne({ where: { nombre: trimmedNombre } });
     if (existing) {
       const error = new Error('Ya existe una categoría de producto con ese nombre');
       error.statusCode = 400;
@@ -60,7 +66,7 @@ class CategoriaProductoService {
     }
 
     const category = await CategoriaProducto.create({
-      nombre: nombre.trim(),
+      nombre: trimmedNombre,
       descripcion: descripcion || '',
       icon: icon || '',
       estado: 1
@@ -83,7 +89,26 @@ class CategoriaProductoService {
       deleteImage(cat.icon).catch((err) => console.warn('⚠️ Error al eliminar icono anterior de categoría:', err.message));
     }
 
-    if (data.nombre) cat.nombre = data.nombre.trim();
+    if (data.nombre !== undefined) {
+      const trimmedNombre = String(data.nombre || '').trim();
+      if (!trimmedNombre) {
+        const error = new Error('El nombre de la categoría no puede estar vacío');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(trimmedNombre) || trimmedNombre.length < 2) {
+        const error = new Error('El nombre de la categoría solo puede contener letras y espacios (mínimo 2 caracteres sin números ni símbolos).');
+        error.statusCode = 400;
+        throw error;
+      }
+      const existing = await CategoriaProducto.findOne({ where: { nombre: trimmedNombre } });
+      if (existing && existing.idCategoriaProducto !== Number(id)) {
+        const error = new Error('Ya existe otra categoría de producto con ese nombre');
+        error.statusCode = 400;
+        throw error;
+      }
+      cat.nombre = trimmedNombre;
+    }
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
     if (data.icon !== undefined) cat.icon = data.icon;
     if (data.estado !== undefined) {

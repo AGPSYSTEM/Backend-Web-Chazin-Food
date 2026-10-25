@@ -80,7 +80,7 @@ class ProduccionService {
         order: [['idVenta', 'DESC']]
       });
 
-      return ventas.map((v) => {
+      const mappedOrders = ventas.map((v) => {
         let obsObj = {};
         if (v.observaciones) {
           try {
@@ -553,6 +553,16 @@ class ProduccionService {
 
     // Also keep obsObj JSON in sync for backward compatibility
     obsObj.estadoAprobacion = newAprobacion;
+    const ahora = new Date();
+    const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    obsObj.horaEstado = horaActual;
+    obsObj.fechaCambioEstado = ahora.toISOString();
+    if (!Array.isArray(obsObj.historialEstados)) obsObj.historialEstados = [];
+    obsObj.historialEstados.push({
+      estado: estadoEnum,
+      hora: horaActual,
+      fecha: ahora.toISOString()
+    });
     v.observaciones = JSON.stringify(obsObj);
 
     await v.save();
@@ -563,88 +573,15 @@ class ProduccionService {
       estado: nuevoEstado,
       estadoEntrega: estadoEnum,
       estadoAprobacion: newAprobacion,
+      horaEstado: horaActual,
       message: `Estado de la orden #${v.idVenta} actualizado a "${nuevoEstado}" con éxito`
     };
   }
 
   static async delete(id) {
-    const { Op } = require('sequelize');
-    let v = null;
-    let idVentaNum = Number(id);
-
-    if (!isNaN(idVentaNum) && idVentaNum > 0) {
-      v = await Venta.findByPk(idVentaNum);
-    }
-
-    if (!v && typeof id === 'string') {
-      v = await Venta.findOne({
-        where: {
-          observaciones: {
-            [Op.like]: `%"codigoPedido":"${id}"%`
-          }
-        }
-      });
-    }
-
-    if (!v) {
-      const numMatch = String(id).match(/\d+/);
-      if (numMatch) {
-        v = await Venta.findByPk(Number(numMatch[0]));
-      }
-    }
-
-    if (v) {
-      const targetId = v.idVenta;
-      const { sequelize, DetalleVentaProducto, DetalleVentaAdicion, Pago, Devolucion } = require('../../persistence/models');
-
-      // Execute physical deletion in a managed transaction
-      await sequelize.transaction(async (t) => {
-        // 1. Get all DetalleVentaProducto IDs for this venta
-        const detalles = await DetalleVentaProducto.findAll({
-          where: { idVenta: targetId },
-          attributes: ['idDetalleVenta'],
-          transaction: t
-        });
-        const detalleIds = detalles.map(d => d.idDetalleVenta);
-
-        // 2. Delete all DetalleVentaAdicion associated with those detalles
-        if (detalleIds.length > 0) {
-          await DetalleVentaAdicion.destroy({
-            where: { idDetalleVenta: { [Op.in]: detalleIds } },
-            transaction: t
-          });
-        }
-
-        // 3. Delete all DetalleVentaProducto
-        await DetalleVentaProducto.destroy({
-          where: { idVenta: targetId },
-          transaction: t
-        });
-
-        // 4. Delete associated Pagos if table exists
-        if (Pago) {
-          await Pago.destroy({
-            where: { idVenta: targetId },
-            transaction: t
-          });
-        }
-
-        // 5. Delete associated Devoluciones if table exists
-        if (Devolucion) {
-          await Devolucion.destroy({
-            where: { idVenta: targetId },
-            transaction: t
-          });
-        }
-
-        // 6. Physically delete the Venta row
-        await v.destroy({ transaction: t });
-      });
-
-      return { message: `Orden #${targetId} eliminada de la base de datos con éxito` };
-    }
-
-    return { message: "Orden procesada o no encontrada" };
+    const error = new Error('Las órdenes de producción asociadas a ventas no pueden eliminarse físicamente; gestione su anulación desde Ventas.');
+    error.statusCode = 400;
+    throw error;
   }
 }
 

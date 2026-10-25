@@ -27,15 +27,36 @@ class InsumoPreparadoService {
     });
 
     return preparados.map(p => {
-      const insumos = p.detalles ? p.detalles.map(d => ({
-        idDetalle: d.idDetalle,
-        idInsumo: d.idInsumo,
-        insumoNombre: d.insumo ? d.insumo.nombre : '',
-        cantidad: parseFloat(d.cantidad || 0),
-        unidadMedida: d.unidadMedida,
-        precioUnitario: parseFloat(d.precioUnitario || 0),
-        subtotal: parseFloat(d.cantidad || 0) * parseFloat(d.precioUnitario || 0)
-      })) : [];
+      let calcCosto = 0;
+      let minPorciones = Infinity;
+
+      const insumos = p.detalles ? p.detalles.map(d => {
+        const cant = parseFloat(d.cantidad || 0);
+        const pUnit = parseFloat(d.precioUnitario !== undefined && d.precioUnitario !== null && d.precioUnitario > 0
+          ? d.precioUnitario
+          : (d.insumo?.precioUnitario || 0));
+        const sub = cant * pUnit;
+        calcCosto += sub;
+
+        if (d.insumo && cant > 0) {
+          const st = Math.max(0, parseFloat(d.insumo.stock || 0));
+          minPorciones = Math.min(minPorciones, Math.floor(st / cant));
+        }
+
+        return {
+          idDetalle: d.idDetalle,
+          idInsumo: d.idInsumo,
+          insumoNombre: d.insumo ? d.insumo.nombre : '',
+          cantidad: cant,
+          unidadMedida: d.unidadMedida,
+          precioUnitario: pUnit,
+          subtotal: sub
+        };
+      }) : [];
+
+      const finalCosto = parseFloat(p.costoTotal || 0) > 0 ? parseFloat(p.costoTotal) : calcCosto;
+      const rend = parseFloat(p.rendimiento || 1);
+      const stockDisponible = minPorciones !== Infinity ? (minPorciones * rend) : 0;
 
       return {
         id: p.id,
@@ -44,10 +65,11 @@ class InsumoPreparadoService {
         unidadMedida: p.unidadMedida || 'und',
         estado: p.estado,
         eliminado: p.eliminado || 0,
-        rendimiento: parseFloat(p.rendimiento || 1),
+        rendimiento: rend,
         unidadRendimiento: p.unidadRendimiento || 'und',
         precioVenta: parseFloat(p.precioVenta || 0),
-        costoTotal: parseFloat(p.costoTotal || 0),
+        costoTotal: finalCosto,
+        stock: p.estado === 0 ? 0 : stockDisponible,
         fechaCreacion: p.fechaCreacion,
         insumos,
         componentes: insumos,
@@ -126,15 +148,36 @@ class InsumoPreparadoService {
       throw error;
     }
 
-    const insumos = p.detalles ? p.detalles.map(d => ({
-      idDetalle: d.idDetalle,
-      idInsumo: d.idInsumo,
-      insumoNombre: d.insumo ? d.insumo.nombre : '',
-      cantidad: parseFloat(d.cantidad || 0),
-      unidadMedida: d.unidadMedida,
-      precioUnitario: parseFloat(d.precioUnitario || 0),
-      subtotal: parseFloat(d.cantidad || 0) * parseFloat(d.precioUnitario || 0)
-    })) : [];
+    let calcCosto = 0;
+    let minPorciones = Infinity;
+
+    const insumos = p.detalles ? p.detalles.map(d => {
+      const cant = parseFloat(d.cantidad || 0);
+      const pUnit = parseFloat(d.precioUnitario !== undefined && d.precioUnitario !== null && d.precioUnitario > 0
+        ? d.precioUnitario
+        : (d.insumo?.precioUnitario || 0));
+      const sub = cant * pUnit;
+      calcCosto += sub;
+
+      if (d.insumo && cant > 0) {
+        const st = Math.max(0, parseFloat(d.insumo.stock || 0));
+        minPorciones = Math.min(minPorciones, Math.floor(st / cant));
+      }
+
+      return {
+        idDetalle: d.idDetalle,
+        idInsumo: d.idInsumo,
+        insumoNombre: d.insumo ? d.insumo.nombre : '',
+        cantidad: cant,
+        unidadMedida: d.unidadMedida,
+        precioUnitario: pUnit,
+        subtotal: sub
+      };
+    }) : [];
+
+    const finalCosto = parseFloat(p.costoTotal || 0) > 0 ? parseFloat(p.costoTotal) : calcCosto;
+    const rend = parseFloat(p.rendimiento || 1);
+    const stockDisponible = minPorciones !== Infinity ? (minPorciones * rend) : 0;
 
     return {
       id: p.id,
@@ -142,10 +185,11 @@ class InsumoPreparadoService {
       descripcion: p.descripcion || '',
       unidadMedida: p.unidadMedida || 'und',
       estado: p.estado,
-      rendimiento: parseFloat(p.rendimiento || 1),
+      rendimiento: rend,
       unidadRendimiento: p.unidadRendimiento || 'und',
       precioVenta: parseFloat(p.precioVenta || 0),
-      costoTotal: parseFloat(p.costoTotal || 0),
+      costoTotal: finalCosto,
+      stock: p.estado === 0 ? 0 : stockDisponible,
       fechaCreacion: p.fechaCreacion,
       insumos,
       componentes: insumos,

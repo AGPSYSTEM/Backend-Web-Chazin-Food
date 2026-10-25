@@ -7,9 +7,9 @@ const {
   markAllAsRead,
   clearAll
 } = require('../controllers/trazabilidadController');
-const { optionalProtect } = require('../../infrastructure/middlewares/authMiddleware');
+const { protect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
 
-router.use(optionalProtect);
+router.use(protect);
 
 router.route('/')
   .get(getMovimientos)
@@ -17,7 +17,7 @@ router.route('/')
 
 router.get('/unread-count', getUnreadCount);
 router.put('/read-all', markAllAsRead);
-router.delete('/clear', clearAll);
+router.delete('/clear', requirePrivilege('Insumos', 'Eliminar'), clearAll);
 
 module.exports = router;
 

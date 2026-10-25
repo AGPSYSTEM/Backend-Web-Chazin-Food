@@ -10,6 +10,16 @@ const getProveedores = async (req, res, next) => {
   }
 };
 
+const getPapeleraProveedores = async (req, res, next) => {
+  try {
+    const proveedores = await ProveedorService.getPapelera();
+    res.json(proveedores);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 const getProveedorById = async (req, res, next) => {
   try {
     const proveedor = await ProveedorService.getById(req.params.id);
@@ -113,6 +123,7 @@ const getTiposProveedor = async (req, res, next) => {
 
 module.exports = {
   getProveedores,
+  getPapeleraProveedores,
   getProveedorById,
   getTiposProveedor,
   createProveedor,

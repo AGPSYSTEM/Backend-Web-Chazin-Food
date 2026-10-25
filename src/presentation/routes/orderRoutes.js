@@ -6,14 +6,15 @@ const {
   getOrderById,
   updateOrderStatus,
 } = require('../controllers/orderController');
+const { protect, optionalProtect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
 
 router.route('/')
-  .get(getOrders)
-  .post(createOrder);
+  .get(protect, requirePrivilege(['Gestión de Ventas', 'Gestión de Producción', 'Punto de Venta'], 'Ver'), getOrders)
+  .post(optionalProtect, createOrder);
 
 router.route('/:id')
-  .get(getOrderById);
+  .get(protect, getOrderById);
 
-router.put('/:id/status', updateOrderStatus);
+router.put('/:id/status', protect, requirePrivilege(['Gestión de Ventas', 'Gestión de Producción'], 'Editar'), updateOrderStatus);
 
 module.exports = router;

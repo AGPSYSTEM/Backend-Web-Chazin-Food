@@ -52,6 +52,81 @@ class WompiService {
   }
 
   /**
+   * Recalcula el subtotal del pedido con precios reales de la base de datos
+   * (producto/variante, eventos activos y adiciones) para no confiar en montos enviados por el cliente.
+   * Retorna null si algún ítem no puede resolverse con certeza.
+   */
+  static async calcularSubtotalServidor(pedidoData) {
+    const { Variante, Product, Insumo, Evento } = require('../../persistence/models');
+    const items = pedidoData.detalles || pedidoData.items || pedidoData.productos || [];
+    if (!Array.isArray(items) || items.length === 0) return null;
+
+    const hoy = new Date().toISOString().slice(0, 10);
+    const eventosActivos = await Evento.findAll({ where: { estado: 1 } }).catch(() => []);
+    const eventosVigentes = eventosActivos.filter(e =>
+      (!e.fechaInicio || String(e.fechaInicio) <= hoy) && (!e.fechaFin || String(e.fechaFin) >= hoy)
+    );
+
+    let subtotal = 0;
+    for (const it of items) {
+      const cantidad = Math.max(1, Number(it.cantidad || 1));
+      let precioBase = null;
+      let idProducto = it.idProducto || null;
+
+      if (it.idVariante || it.varianteId) {
+        const variante = await Variante.findByPk(it.idVariante || it.varianteId).catch(() => null);
+        if (variante) {
+          idProducto = idProducto || variante.idProducto;
+        }
+      }
+      if (idProducto) {
+        const producto = await Product.findByPk(idProducto).catch(() => null);
+        if (producto) precioBase = Number(producto.precio || 0);
+      }
+      if (precioBase === null || !(precioBase > 0)) return null;
+
+      // Precio mínimo legítimo considerando eventos vigentes asociados al producto
+      let precioUnitario = precioBase;
+      for (const ev of eventosVigentes) {
+        let aplica = Number(ev.idProducto) === Number(idProducto);
+        if (!aplica && ev.productosAsociados) {
+          try {
+            const asociados = JSON.parse(ev.productosAsociados);
+            if (Array.isArray(asociados)) {
+              const match = asociados.find(p => Number(p.idProducto || p.id) === Number(idProducto));
+              if (match) {
+                aplica = true;
+                const precioAsoc = Number(match.precioPromocional || match.nuevoPrecio || match.precio || 0);
+                if (precioAsoc > 0) precioUnitario = Math.min(precioUnitario, precioAsoc);
+              }
+            }
+          } catch (e) { /* ignorar */ }
+        }
+        if (!aplica) continue;
+        if (Number(ev.nuevoPrecio) > 0) {
+          precioUnitario = Math.min(precioUnitario, Number(ev.nuevoPrecio));
+        } else if (Number(ev.descuento) > 0) {
+          precioUnitario = Math.min(precioUnitario, Math.round(precioBase * (1 - Number(ev.descuento) / 100)));
+        }
+      }
+
+      let adicionesTotal = 0;
+      if (Array.isArray(it.adiciones)) {
+        for (const ad of it.adiciones) {
+          const adId = typeof ad === 'object' ? (ad.idAdicion || ad.idInsumo || ad.id) : ad;
+          const adCant = typeof ad === 'object' ? Math.max(1, Number(ad.cantidad || 1)) : 1;
+          if (!adId) continue;
+          const insumoAd = await Insumo.findByPk(adId).catch(() => null);
+          if (insumoAd) adicionesTotal += Number(insumoAd.precioAdicion || 0) * adCant;
+        }
+      }
+
+      subtotal += (precioUnitario + adicionesTotal) * cantidad;
+    }
+    return Math.round(subtotal);
+  }
+
+  /**
    * Crea una intención de pago: genera la referencia única, registra la orden en estado PENDIENTE
    * y calcula la firma de integridad para el widget de Wompi.
    */
@@ -63,27 +138,36 @@ class WompiService {
       throw err;
     }
 
-    const total = Number(pedidoData.total || 0);
-    if (total <= 0) {
+    const totalCliente = Number(pedidoData.total || 0);
+    if (totalCliente <= 0) {
       const err = new Error('El monto total de la venta debe ser mayor a 0.');
       err.statusCode = 400;
       throw err;
+    }
+
+    // Validación del monto en servidor: el total cobrado nunca puede ser inferior al precio real
+    // menos el máximo descuento de fidelidad permitido (15%).
+    const subtotalServidor = await this.calcularSubtotalServidor(pedidoData);
+    if (subtotalServidor !== null) {
+      const minimoPermitido = Math.round(subtotalServidor * 0.85) - 100;
+      if (totalCliente < minimoPermitido) {
+        const err = new Error('El total del pedido no coincide con los precios vigentes. Actualiza tu carrito e inténtalo de nuevo.');
+        err.statusCode = 400;
+        throw err;
+      }
     }
 
     // Generar referencia única para Wompi
     const timestamp = Date.now();
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const referencia = `CHAZIN-${timestamp}-${randomSuffix}`;
-    const montoEnCentavos = Math.round(total * 100);
     const moneda = 'COP';
-
-    // Generar la firma SHA-256
-    const firmaIntegridad = this.generarFirmaIntegridad(referencia, montoEnCentavos, moneda);
 
     // Preparar y registrar la orden en BD como PENDIENTE de pago
     const datosConWompi = {
       ...pedidoData,
       idUsuario: userId,
+      origen: 'ONLINE',
       metodoPago: 'Wompi',
       estadoPago: 'Pendiente',
       estadoAprobacion: 'PENDIENTE',
@@ -93,7 +177,6 @@ class WompiService {
           try { return JSON.parse(pedidoData.observaciones); } catch (e) { return { nota: pedidoData.observaciones }; }
         })() : (pedidoData.observaciones || {})),
         wompiReference: referencia,
-        montoEnCentavos,
         moneda,
         metodoPago: 'Wompi',
         estadoPago: 'Pendiente',
@@ -102,6 +185,24 @@ class WompiService {
     };
 
     const ventaCreada = await VentaService.create(datosConWompi);
+
+    // El monto a cobrar es el total calculado y persistido por el servidor
+    const totalServidor = Number(ventaCreada.total || totalCliente);
+    const montoEnCentavos = Math.round(totalServidor * 100);
+    const firmaIntegridad = this.generarFirmaIntegridad(referencia, montoEnCentavos, moneda);
+
+    try {
+      const ventaRow = await Venta.findByPk(ventaCreada.idVenta || ventaCreada.id);
+      if (ventaRow) {
+        let obs = {};
+        try { obs = JSON.parse(ventaRow.observaciones || '{}'); } catch (e) { obs = {}; }
+        obs.montoEnCentavos = montoEnCentavos;
+        ventaRow.observaciones = JSON.stringify(obs);
+        await ventaRow.save();
+      }
+    } catch (e) {
+      console.warn('No se pudo guardar el monto Wompi en la venta:', e.message);
+    }
 
     return {
       success: true,
@@ -158,16 +259,14 @@ class WompiService {
     const estadoWompi = tx.status; // 'APPROVED', 'DECLINED', 'VOIDED', 'ERROR', 'PENDING'
     const metodoPagoTipo = tx.payment_method_type || 'Wompi';
 
-    // Buscar la venta en BD por la referencia almacenada en observaciones
-    const ventas = await Venta.findAll({ order: [['idVenta', 'DESC']], limit: 50 });
-    let ventaEncontrada = null;
-
-    for (const v of ventas) {
-      if (v.observaciones && v.observaciones.includes(referencia)) {
-        ventaEncontrada = v;
-        break;
-      }
-    }
+    // Buscar la venta en BD por la referencia almacenada en observaciones (sin límite de registros)
+    const { Op } = require('sequelize');
+    const ventaEncontrada = referencia
+      ? await Venta.findOne({
+          where: { observaciones: { [Op.like]: `%${referencia}%` } },
+          order: [['idVenta', 'DESC']]
+        })
+      : null;
 
     if (ventaEncontrada) {
       let obsObj = {};
@@ -177,38 +276,51 @@ class WompiService {
         obsObj = {};
       }
 
+      // Verificar que el monto pagado corresponda al registrado en la venta
+      const montoEsperado = Number(obsObj.montoEnCentavos || Math.round(Number(ventaEncontrada.total || 0) * 100));
+      const montoPagado = Number(tx.amount_in_cents || 0);
+      const montoCoincide = !montoPagado || !montoEsperado || Math.abs(montoPagado - montoEsperado) <= 100;
+
       obsObj.wompiTransactionId = tx.id;
       obsObj.wompiStatus = estadoWompi;
       obsObj.paymentMethodType = metodoPagoTipo;
       obsObj.wompiPaymentMethod = tx.payment_method;
 
-      if (estadoWompi === 'APPROVED') {
+      if (estadoWompi === 'APPROVED' && montoCoincide) {
+        const yaAprobada = ventaEncontrada.estadoAprobacion === 'APROBADO';
         obsObj.estadoPago = 'Pagado';
         obsObj.metodoPago = `Wompi (${metodoPagoTipo})`;
         obsObj.estadoAprobacion = 'APROBADO';
+        if (!yaAprobada) {
+          obsObj.horaEstado = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+          obsObj.fechaAprobacionPago = new Date().toISOString();
+        }
 
         await ventaEncontrada.update({
-          estadoEntrega: 'PREPARANDO',
+          estadoEntrega: yaAprobada ? ventaEncontrada.estadoEntrega : 'PENDIENTE',
           estadoAprobacion: 'APROBADO',
           observaciones: JSON.stringify(obsObj)
         });
 
-        // Registrar compra de fidelidad tras confirmación de pago en Wompi
-        if (ventaEncontrada.idCliente && Number(ventaEncontrada.idCliente) !== 26) {
-          const ClienteService = require('./clienteService');
-          ClienteService.registrarCompraFidelidad(ventaEncontrada.idCliente).catch(err =>
-            console.warn('Error registrando fidelidad tras pago Wompi:', err.message)
-          );
-        }
+        // Registrar compra de fidelidad tras confirmación de pago en Wompi (idempotente)
+        await VentaService.registrarFidelidadUnaVez(ventaEncontrada.idVenta);
+      } else if (estadoWompi === 'APPROVED' && !montoCoincide) {
+        obsObj.estadoPago = 'En revisión';
+        obsObj.alertaMonto = `Monto pagado (${montoPagado}) distinto al esperado (${montoEsperado})`;
+        await ventaEncontrada.update({ observaciones: JSON.stringify(obsObj) });
       } else if (estadoWompi === 'DECLINED' || estadoWompi === 'ERROR' || estadoWompi === 'VOIDED') {
         obsObj.estadoPago = 'Rechazado';
         obsObj.estadoAprobacion = 'RECHAZADO';
+        const yaCancelada = ventaEncontrada.estadoEntrega === 'CANCELADO';
 
-        await ventaEncontrada.update({
-          estadoEntrega: 'CANCELADO',
-          estadoAprobacion: 'RECHAZADO',
-          observaciones: JSON.stringify(obsObj)
-        });
+        await ventaEncontrada.update({ observaciones: JSON.stringify(obsObj) });
+
+        // Cancelar la venta y reintegrar el inventario descontado (solo una vez)
+        if (!yaCancelada) {
+          await VentaService.updateEstado(ventaEncontrada.idVenta, 'CANCELADO').catch(err =>
+            console.warn('Error reintegrando inventario por pago rechazado:', err.message)
+          );
+        }
       }
 
       return {
