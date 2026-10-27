@@ -186,6 +186,11 @@ app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
 app.use('/api/resenas', require('./src/presentation/routes/resenaRoutes'));
 app.use('/api/wompi', require('./src/presentation/routes/wompiRoutes'));
 
+// Health Check Endpoint para Render y monitoreo
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
   res.redirect('/api-docs');
