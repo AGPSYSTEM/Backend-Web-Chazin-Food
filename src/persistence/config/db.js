@@ -1,5 +1,15 @@
 const { Sequelize } = require('sequelize');
 
+const isCloudHost = Boolean(
+  process.env.DB_HOST && (
+    process.env.DB_HOST.includes('tidbcloud.com') ||
+    process.env.DB_HOST.includes('aivencloud.com') ||
+    process.env.DB_HOST.includes('render.com') ||
+    process.env.DB_HOST.includes('railway')
+  )
+);
+const enableSSL = process.env.DB_SSL === 'true' || process.env.DB_SSL === '1' || isCloudHost;
+
 const sequelize = new Sequelize(
   process.env.DB_NAME || 'chazinfood',
   process.env.DB_USER || 'root',
@@ -9,8 +19,13 @@ const sequelize = new Sequelize(
     port: Number(process.env.DB_PORT) || 3306,
     dialect: 'mysql',
     dialectOptions: {
-      // increase connect timeout to help when DB is slow to respond
-      connectTimeout: 10000
+      connectTimeout: 20000,
+      ...(enableSSL ? {
+        ssl: {
+          minVersion: 'TLSv1.2',
+          rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
+        }
+      } : {})
     },
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {

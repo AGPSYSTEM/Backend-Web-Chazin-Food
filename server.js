@@ -97,7 +97,8 @@ app.use(cors({
     // Permitir peticiones sin origen (Postman, Swagger, health checks o servidor a servidor)
     if (!origin) return callback(null, true);
     const isLocalDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
-    if (allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && isLocalDev)) {
+    const isVercel = /\.vercel\.app$/i.test(origin);
+    if (allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && isLocalDev) || isVercel) {
       return callback(null, true);
     }
     return callback(new Error(`Origen CORS no autorizado: ${origin}`), false);
