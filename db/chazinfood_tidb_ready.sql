@@ -37,7 +37,6 @@ SET time_zone = "+00:00";
 -- Estructura de tabla para la tabla `categoriainsumo`
 --
 
-DROP VIEW IF EXISTS `categoriainsumo`;
 DROP TABLE IF EXISTS `categoriainsumo`;
 CREATE TABLE `categoriainsumo` (
   `idCategoriaInsumo` int(11) NOT NULL AUTO_INCREMENT,
@@ -70,7 +69,6 @@ INSERT INTO `categoriainsumo` (`idCategoriaInsumo`, `nombre`, `descripcion`, `es
 -- Estructura de tabla para la tabla `categoriaproducto`
 --
 
-DROP VIEW IF EXISTS `categoriaproducto`;
 DROP TABLE IF EXISTS `categoriaproducto`;
 CREATE TABLE `categoriaproducto` (
   `idCategoriaProducto` int(11) NOT NULL AUTO_INCREMENT,
@@ -162,7 +160,6 @@ INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`,
 -- Estructura de tabla para la tabla `cliente`
 --
 
-DROP VIEW IF EXISTS `cliente`;
 DROP TABLE IF EXISTS `cliente`;
 CREATE TABLE `cliente` (
   `idCliente` int(11) NOT NULL AUTO_INCREMENT,
@@ -202,7 +199,6 @@ INSERT INTO `cliente` (`idCliente`, `direccion`, `idUsuario`) VALUES
 -- Estructura de tabla para la tabla `compra`
 --
 
-DROP VIEW IF EXISTS `compra`;
 DROP TABLE IF EXISTS `compra`;
 CREATE TABLE `compra` (
   `idCompra` int(11) NOT NULL AUTO_INCREMENT,
@@ -230,7 +226,6 @@ INSERT INTO `compra` (`idCompra`, `idProveedor`, `fechaCompra`, `total`, `estado
 -- Estructura de tabla para la tabla `descuento`
 --
 
-DROP VIEW IF EXISTS `descuento`;
 DROP TABLE IF EXISTS `descuento`;
 CREATE TABLE `descuento` (
   `idDescuento` int(11) NOT NULL AUTO_INCREMENT,
@@ -259,7 +254,6 @@ INSERT INTO `descuento` (`idDescuento`, `idEvento`, `nombreDescuento`, `tipoDesc
 -- Estructura de tabla para la tabla `detallecomprainsumo`
 --
 
-DROP VIEW IF EXISTS `detallecomprainsumo`;
 DROP TABLE IF EXISTS `detallecomprainsumo`;
 CREATE TABLE `detallecomprainsumo` (
   `idDetalleCompra` int(11) NOT NULL AUTO_INCREMENT,
@@ -294,7 +288,6 @@ INSERT INTO `detallecomprainsumo` (`idDetalleCompra`, `idCompra`, `idInsumo`, `c
 -- Estructura de tabla para la tabla `detallefichainsumo`
 --
 
-DROP VIEW IF EXISTS `detallefichainsumo`;
 DROP TABLE IF EXISTS `detallefichainsumo`;
 CREATE TABLE `detallefichainsumo` (
   `idDetalleFicha` int(11) NOT NULL AUTO_INCREMENT,
@@ -463,7 +456,6 @@ INSERT INTO `detallefichainsumo` (`idDetalleFicha`, `idFichaTecnica`, `idInsumo`
 -- Estructura de tabla para la tabla `detalleinsumopreparadoinsumo`
 --
 
-DROP VIEW IF EXISTS `detalleinsumopreparadoinsumo`;
 DROP TABLE IF EXISTS `detalleinsumopreparadoinsumo`;
 CREATE TABLE `detalleinsumopreparadoinsumo` (
   `idDetalle` int(11) NOT NULL AUTO_INCREMENT,
@@ -495,7 +487,6 @@ INSERT INTO `detalleinsumopreparadoinsumo` (`idDetalle`, `idPreparado`, `idInsum
 -- Estructura de tabla para la tabla `detalleventaadicion`
 --
 
-DROP VIEW IF EXISTS `detalleventaadicion`;
 DROP TABLE IF EXISTS `detalleventaadicion`;
 CREATE TABLE `detalleventaadicion` (
   `idDetalleVentaAdicion` int(11) NOT NULL AUTO_INCREMENT,
@@ -522,7 +513,6 @@ INSERT INTO `detalleventaadicion` (`idDetalleVentaAdicion`, `idDetalleVenta`, `i
 -- Estructura de tabla para la tabla `detalleventaproducto`
 --
 
-DROP VIEW IF EXISTS `detalleventaproducto`;
 DROP TABLE IF EXISTS `detalleventaproducto`;
 CREATE TABLE `detalleventaproducto` (
   `idDetalleVenta` int(11) NOT NULL AUTO_INCREMENT,
@@ -555,7 +545,6 @@ INSERT INTO `detalleventaproducto` (`idDetalleVenta`, `idVenta`, `idVariante`, `
 -- Estructura de tabla para la tabla `devolucion`
 --
 
-DROP VIEW IF EXISTS `devolucion`;
 DROP TABLE IF EXISTS `devolucion`;
 CREATE TABLE `devolucion` (
   `idDevolucion` int(11) NOT NULL AUTO_INCREMENT,
@@ -575,7 +564,6 @@ CREATE TABLE `devolucion` (
 -- Estructura de tabla para la tabla `evento`
 --
 
-DROP VIEW IF EXISTS `evento`;
 DROP TABLE IF EXISTS `evento`;
 CREATE TABLE `evento` (
   `idEvento` int(11) NOT NULL AUTO_INCREMENT,
@@ -616,7 +604,6 @@ INSERT INTO `evento` (`idEvento`, `nombreEvento`, `descripcion`, `fechaInicio`, 
 -- Estructura de tabla para la tabla `fichatecnica`
 --
 
-DROP VIEW IF EXISTS `fichatecnica`;
 DROP TABLE IF EXISTS `fichatecnica`;
 CREATE TABLE `fichatecnica` (
   `idFichaTecnica` int(11) NOT NULL AUTO_INCREMENT,
@@ -695,7 +682,6 @@ INSERT INTO `fichatecnica` (`idFichaTecnica`, `idVariante`, `descripcion`, `fech
 -- Estructura de tabla para la tabla `insumo`
 --
 
-DROP VIEW IF EXISTS `insumo`;
 DROP TABLE IF EXISTS `insumo`;
 CREATE TABLE `insumo` (
   `idInsumo` int(11) NOT NULL AUTO_INCREMENT,
@@ -777,7 +763,6 @@ INSERT INTO `insumo` (`idInsumo`, `idCategoriaInsumo`, `nombre`, `unidadMedida`,
 -- Estructura de tabla para la tabla `insumopreparado`
 --
 
-DROP VIEW IF EXISTS `insumopreparado`;
 DROP TABLE IF EXISTS `insumopreparado`;
 CREATE TABLE `insumopreparado` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -812,7 +797,6 @@ INSERT INTO `insumopreparado` (`id`, `nombre`, `descripcion`, `precioVenta`, `un
 -- Estructura de tabla para la tabla `pago`
 --
 
-DROP VIEW IF EXISTS `pago`;
 DROP TABLE IF EXISTS `pago`;
 CREATE TABLE `pago` (
   `idPago` int(11) NOT NULL AUTO_INCREMENT,
@@ -832,7 +816,6 @@ CREATE TABLE `pago` (
 -- Estructura de tabla para la tabla `pedido`
 --
 
-DROP VIEW IF EXISTS `pedido`;
 DROP TABLE IF EXISTS `pedido`;
 CREATE TABLE `pedido` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -852,7 +835,6 @@ CREATE TABLE `pedido` (
 -- Estructura de tabla para la tabla `permiso`
 --
 
-DROP VIEW IF EXISTS `permiso`;
 DROP TABLE IF EXISTS `permiso`;
 CREATE TABLE `permiso` (
   `idPermiso` int(11) NOT NULL AUTO_INCREMENT,
@@ -892,7 +874,6 @@ INSERT INTO `permiso` (`idPermiso`, `nombrePermiso`) VALUES
 -- Estructura de tabla para la tabla `producto`
 --
 
-DROP VIEW IF EXISTS `producto`;
 DROP TABLE IF EXISTS `producto`;
 CREATE TABLE `producto` (
   `idProducto` int(11) NOT NULL AUTO_INCREMENT,
@@ -961,7 +942,6 @@ INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripc
 -- Estructura de tabla para la tabla `proveedor`
 --
 
-DROP VIEW IF EXISTS `proveedor`;
 DROP TABLE IF EXISTS `proveedor`;
 CREATE TABLE `proveedor` (
   `idProveedor` int(11) NOT NULL AUTO_INCREMENT,
@@ -998,7 +978,6 @@ INSERT INTO `proveedor` (`idProveedor`, `idTipoProveedor`, `idTipoDocumento`, `n
 -- Estructura de tabla para la tabla `resena`
 --
 
-DROP VIEW IF EXISTS `resena`;
 DROP TABLE IF EXISTS `resena`;
 CREATE TABLE `resena` (
   `idResena` int(11) NOT NULL AUTO_INCREMENT,
@@ -1029,7 +1008,6 @@ INSERT INTO `resena` (`idResena`, `idProducto`, `idUsuario`, `puntuacion`, `come
 -- Estructura de tabla para la tabla `rol`
 --
 
-DROP VIEW IF EXISTS `rol`;
 DROP TABLE IF EXISTS `rol`;
 CREATE TABLE `rol` (
   `idRol` int(11) NOT NULL AUTO_INCREMENT,
@@ -1057,7 +1035,6 @@ INSERT INTO `rol` (`idRol`, `nombre`, `descripcion`, `estado`) VALUES
 -- Estructura de tabla para la tabla `rolpermiso`
 --
 
-DROP VIEW IF EXISTS `rolpermiso`;
 DROP TABLE IF EXISTS `rolpermiso`;
 CREATE TABLE `rolpermiso` (
   `idRolPermiso` int(11) NOT NULL AUTO_INCREMENT,
@@ -1112,7 +1089,6 @@ INSERT INTO `rolpermiso` (`idRolPermiso`, `idRol`, `idPermiso`) VALUES
 -- Estructura de tabla para la tabla `tipodocumento`
 --
 
-DROP VIEW IF EXISTS `tipodocumento`;
 DROP TABLE IF EXISTS `tipodocumento`;
 CREATE TABLE `tipodocumento` (
   `idTipoDocumento` int(11) NOT NULL AUTO_INCREMENT,
@@ -1137,7 +1113,6 @@ INSERT INTO `tipodocumento` (`idTipoDocumento`, `nombre`) VALUES
 -- Estructura de tabla para la tabla `tipoproveedor`
 --
 
-DROP VIEW IF EXISTS `tipoproveedor`;
 DROP TABLE IF EXISTS `tipoproveedor`;
 CREATE TABLE `tipoproveedor` (
   `idTipoProveedor` int(11) NOT NULL AUTO_INCREMENT,
@@ -1161,7 +1136,6 @@ INSERT INTO `tipoproveedor` (`idTipoProveedor`, `nombre`) VALUES
 -- Estructura de tabla para la tabla `trazabilidad`
 --
 
-DROP VIEW IF EXISTS `trazabilidad`;
 DROP TABLE IF EXISTS `trazabilidad`;
 CREATE TABLE `trazabilidad` (
   `idTrazabilidad` int(11) NOT NULL AUTO_INCREMENT,
@@ -1287,7 +1261,6 @@ INSERT INTO `trazabilidad` (`idTrazabilidad`, `tipo`, `entidadNombre`, `detalle`
 -- Estructura de tabla para la tabla `usuario`
 --
 
-DROP VIEW IF EXISTS `usuario`;
 DROP TABLE IF EXISTS `usuario`;
 CREATE TABLE `usuario` (
   `idUsuario` int(11) NOT NULL AUTO_INCREMENT,
@@ -1400,7 +1373,6 @@ INSERT INTO `usuario` (`idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `num
 -- Estructura de tabla para la tabla `variante`
 --
 
-DROP VIEW IF EXISTS `variante`;
 DROP TABLE IF EXISTS `variante`;
 CREATE TABLE `variante` (
   `idVariante` int(11) NOT NULL AUTO_INCREMENT,
@@ -1471,7 +1443,6 @@ INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`
 -- Estructura de tabla para la tabla `venta`
 --
 
-DROP VIEW IF EXISTS `venta`;
 DROP TABLE IF EXISTS `venta`;
 CREATE TABLE `venta` (
   `idVenta` int(11) NOT NULL AUTO_INCREMENT,
@@ -1518,7 +1489,6 @@ INSERT INTO `venta` (`idVenta`, `idCliente`, `idUsuario`, `idDescuento`, `fechaV
 -- Estructura para la vista `vwinventario`
 --
 DROP VIEW IF EXISTS `vwinventario`;
-DROP TABLE IF EXISTS `vwinventario`;
 
 CREATE    VIEW `vwinventario`  AS SELECT `i`.`idInsumo` AS `idInsumo`, `i`.`nombre` AS `nombre`, `c`.`nombre` AS `Categoria`, `i`.`stock` AS `stock`, `i`.`stockMinimo` AS `stockMinimo`, `i`.`unidadMedida` AS `unidadMedida`, `i`.`fechaVencimiento` AS `fechaVencimiento` FROM (`insumo` `i` join `categoriainsumo` `c` on(`c`.`idCategoriaInsumo` = `i`.`idCategoriaInsumo`)) ;
 
@@ -1528,7 +1498,6 @@ CREATE    VIEW `vwinventario`  AS SELECT `i`.`idInsumo` AS `idInsumo`, `i`.`nomb
 -- Estructura para la vista `vwproductos`
 --
 DROP VIEW IF EXISTS `vwproductos`;
-DROP TABLE IF EXISTS `vwproductos`;
 
 CREATE    VIEW `vwproductos`  AS SELECT `p`.`idProducto` AS `idProducto`, `p`.`nombre` AS `nombre`, `cp`.`nombre` AS `Categoria`, `v`.`nombre` AS `Variante`, `v`.`precio` AS `precio` FROM ((`producto` `p` join `categoriaproducto` `cp` on(`cp`.`idCategoriaProducto` = `p`.`idCategoriaProducto`)) join `variante` `v` on(`v`.`idProducto` = `p`.`idProducto`)) ;
 
@@ -1538,7 +1507,6 @@ CREATE    VIEW `vwproductos`  AS SELECT `p`.`idProducto` AS `idProducto`, `p`.`n
 -- Estructura para la vista `vwventas`
 --
 DROP VIEW IF EXISTS `vwventas`;
-DROP TABLE IF EXISTS `vwventas`;
 
 CREATE    VIEW `vwventas`  AS SELECT `v`.`idVenta` AS `idVenta`, concat(`u`.`nombre`,' ',`u`.`apellidos`) AS `Cliente`, `v`.`fechaVenta` AS `fechaVenta`, `v`.`subtotal` AS `subtotal`, `v`.`descuentoAplicado` AS `descuentoAplicado`, `v`.`total` AS `total`, `v`.`estadoEntrega` AS `estadoEntrega` FROM ((`venta` `v` join `cliente` `c` on(`c`.`idCliente` = `v`.`idCliente`)) join `usuario` `u` on(`u`.`idUsuario` = `c`.`idUsuario`)) ;
 
