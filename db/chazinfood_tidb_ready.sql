@@ -1,7 +1,10 @@
 -- ==========================================
--- Chazin Food DB Dump - 100% Compatible con TiDB Cloud
+-- Chazin Food DB Dump - 100% Compatible con TiDB Cloud Serverless
 -- ==========================================
 USE chazinfood;
+SET FOREIGN_KEY_CHECKS = 0;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+SET time_zone = "+00:00";
 
 -- phpMyAdmin SQL Dump
 -- version 5.2.1
@@ -34,11 +37,14 @@ SET time_zone = "+00:00";
 -- Estructura de tabla para la tabla `categoriainsumo`
 --
 
+DROP TABLE IF EXISTS `categoriainsumo`;
 CREATE TABLE `categoriainsumo` (
-  `idCategoriaInsumo` int(11) NOT NULL,
+  `idCategoriaInsumo` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(255) NOT NULL,
   `descripcion` varchar(255) DEFAULT NULL,
-  `estado` tinyint(4) DEFAULT 1
+  `estado` tinyint(4) DEFAULT 1,
+  PRIMARY KEY (`idCategoriaInsumo`),
+  UNIQUE KEY `UK_CategoriaInsumo` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -63,12 +69,75 @@ INSERT INTO `categoriainsumo` (`idCategoriaInsumo`, `nombre`, `descripcion`, `es
 -- Estructura de tabla para la tabla `categoriaproducto`
 --
 
+DROP TABLE IF EXISTS `categoriaproducto`;
 CREATE TABLE `categoriaproducto` (
-  `idCategoriaProducto` int(11) NOT NULL,
+  `idCategoriaProducto` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(100) NOT NULL,
   `descripcion` varchar(255) DEFAULT NULL,
   `estado` tinyint(4) DEFAULT 1,
-  `icon` varchar(255) DEFAULT NULL
+  `icon` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idCategoriaProducto`),
+  UNIQUE KEY `UK_CategoriaProducto` (`nombre`),
+  UNIQUE KEY `nombre` (`nombre`),
+  UNIQUE KEY `nombre_2` (`nombre`),
+  UNIQUE KEY `nombre_3` (`nombre`),
+  UNIQUE KEY `nombre_4` (`nombre`),
+  UNIQUE KEY `nombre_5` (`nombre`),
+  UNIQUE KEY `nombre_6` (`nombre`),
+  UNIQUE KEY `nombre_7` (`nombre`),
+  UNIQUE KEY `nombre_8` (`nombre`),
+  UNIQUE KEY `nombre_9` (`nombre`),
+  UNIQUE KEY `nombre_10` (`nombre`),
+  UNIQUE KEY `nombre_11` (`nombre`),
+  UNIQUE KEY `nombre_12` (`nombre`),
+  UNIQUE KEY `nombre_13` (`nombre`),
+  UNIQUE KEY `nombre_14` (`nombre`),
+  UNIQUE KEY `nombre_15` (`nombre`),
+  UNIQUE KEY `nombre_16` (`nombre`),
+  UNIQUE KEY `nombre_17` (`nombre`),
+  UNIQUE KEY `nombre_18` (`nombre`),
+  UNIQUE KEY `nombre_19` (`nombre`),
+  UNIQUE KEY `nombre_20` (`nombre`),
+  UNIQUE KEY `nombre_21` (`nombre`),
+  UNIQUE KEY `nombre_22` (`nombre`),
+  UNIQUE KEY `nombre_23` (`nombre`),
+  UNIQUE KEY `nombre_24` (`nombre`),
+  UNIQUE KEY `nombre_25` (`nombre`),
+  UNIQUE KEY `nombre_26` (`nombre`),
+  UNIQUE KEY `nombre_27` (`nombre`),
+  UNIQUE KEY `nombre_28` (`nombre`),
+  UNIQUE KEY `nombre_29` (`nombre`),
+  UNIQUE KEY `nombre_30` (`nombre`),
+  UNIQUE KEY `nombre_31` (`nombre`),
+  UNIQUE KEY `nombre_32` (`nombre`),
+  UNIQUE KEY `nombre_33` (`nombre`),
+  UNIQUE KEY `nombre_34` (`nombre`),
+  UNIQUE KEY `nombre_35` (`nombre`),
+  UNIQUE KEY `nombre_36` (`nombre`),
+  UNIQUE KEY `nombre_37` (`nombre`),
+  UNIQUE KEY `nombre_38` (`nombre`),
+  UNIQUE KEY `nombre_39` (`nombre`),
+  UNIQUE KEY `nombre_40` (`nombre`),
+  UNIQUE KEY `nombre_41` (`nombre`),
+  UNIQUE KEY `nombre_42` (`nombre`),
+  UNIQUE KEY `nombre_43` (`nombre`),
+  UNIQUE KEY `nombre_44` (`nombre`),
+  UNIQUE KEY `nombre_45` (`nombre`),
+  UNIQUE KEY `nombre_46` (`nombre`),
+  UNIQUE KEY `nombre_47` (`nombre`),
+  UNIQUE KEY `nombre_48` (`nombre`),
+  UNIQUE KEY `nombre_49` (`nombre`),
+  UNIQUE KEY `nombre_50` (`nombre`),
+  UNIQUE KEY `nombre_51` (`nombre`),
+  UNIQUE KEY `nombre_52` (`nombre`),
+  UNIQUE KEY `nombre_53` (`nombre`),
+  UNIQUE KEY `nombre_54` (`nombre`),
+  UNIQUE KEY `nombre_55` (`nombre`),
+  UNIQUE KEY `nombre_56` (`nombre`),
+  UNIQUE KEY `nombre_57` (`nombre`),
+  UNIQUE KEY `nombre_58` (`nombre`),
+  UNIQUE KEY `nombre_59` (`nombre`),
+  UNIQUE KEY `nombre_60` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -91,10 +160,14 @@ INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`,
 -- Estructura de tabla para la tabla `cliente`
 --
 
+DROP TABLE IF EXISTS `cliente`;
 CREATE TABLE `cliente` (
-  `idCliente` int(11) NOT NULL,
+  `idCliente` int(11) NOT NULL AUTO_INCREMENT,
   `direccion` varchar(255) DEFAULT NULL,
-  `idUsuario` int(11) DEFAULT NULL
+  `idUsuario` int(11) DEFAULT NULL,
+  PRIMARY KEY (`idCliente`),
+  UNIQUE KEY `UK_Cliente_Usuario` (`idUsuario`),
+  KEY `IDX_ClienteUsuario` (`idUsuario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -126,12 +199,15 @@ INSERT INTO `cliente` (`idCliente`, `direccion`, `idUsuario`) VALUES
 -- Estructura de tabla para la tabla `compra`
 --
 
+DROP TABLE IF EXISTS `compra`;
 CREATE TABLE `compra` (
-  `idCompra` int(11) NOT NULL,
+  `idCompra` int(11) NOT NULL AUTO_INCREMENT,
   `idProveedor` int(11) NOT NULL,
   `fechaCompra` datetime DEFAULT NULL,
   `total` decimal(12,2) NOT NULL,
-  `estado` enum('PENDIENTE','RECIBIDA','CANCELADA') DEFAULT 'RECIBIDA'
+  `estado` enum('PENDIENTE','RECIBIDA','CANCELADA') DEFAULT 'RECIBIDA',
+  PRIMARY KEY (`idCompra`),
+  KEY `IDX_CompraProveedor` (`idProveedor`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -150,14 +226,17 @@ INSERT INTO `compra` (`idCompra`, `idProveedor`, `fechaCompra`, `total`, `estado
 -- Estructura de tabla para la tabla `descuento`
 --
 
+DROP TABLE IF EXISTS `descuento`;
 CREATE TABLE `descuento` (
-  `idDescuento` int(11) NOT NULL,
+  `idDescuento` int(11) NOT NULL AUTO_INCREMENT,
   `idEvento` int(11) NOT NULL,
   `nombreDescuento` varchar(120) NOT NULL,
   `tipoDescuento` enum('PORCENTAJE','VALOR FIJO') NOT NULL,
   `porcentaje` decimal(5,2) DEFAULT NULL,
   `valorFijo` decimal(10,2) DEFAULT NULL,
-  `estado` tinyint(4) DEFAULT 1
+  `estado` tinyint(4) DEFAULT 1,
+  PRIMARY KEY (`idDescuento`),
+  KEY `IDX_DescuentoEvento` (`idEvento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -175,13 +254,17 @@ INSERT INTO `descuento` (`idDescuento`, `idEvento`, `nombreDescuento`, `tipoDesc
 -- Estructura de tabla para la tabla `detallecomprainsumo`
 --
 
+DROP TABLE IF EXISTS `detallecomprainsumo`;
 CREATE TABLE `detallecomprainsumo` (
-  `idDetalleCompra` int(11) NOT NULL,
+  `idDetalleCompra` int(11) NOT NULL AUTO_INCREMENT,
   `idCompra` int(11) NOT NULL,
   `idInsumo` int(11) NOT NULL,
   `cantidad` decimal(10,2) NOT NULL,
   `precioUnitario` decimal(10,2) NOT NULL,
-  `subtotal` decimal(12,2) NOT NULL
+  `subtotal` decimal(12,2) NOT NULL,
+  PRIMARY KEY (`idDetalleCompra`),
+  KEY `IDX_DetalleCompra` (`idCompra`),
+  KEY `IDX_DetalleCompraInsumo` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -205,12 +288,16 @@ INSERT INTO `detallecomprainsumo` (`idDetalleCompra`, `idCompra`, `idInsumo`, `c
 -- Estructura de tabla para la tabla `detallefichainsumo`
 --
 
+DROP TABLE IF EXISTS `detallefichainsumo`;
 CREATE TABLE `detallefichainsumo` (
-  `idDetalleFicha` int(11) NOT NULL,
+  `idDetalleFicha` int(11) NOT NULL AUTO_INCREMENT,
   `idFichaTecnica` int(11) NOT NULL,
   `idInsumo` int(11) NOT NULL,
   `cantidad` decimal(10,2) NOT NULL,
-  `unidadMedida` varchar(30) DEFAULT NULL
+  `unidadMedida` varchar(30) DEFAULT NULL,
+  PRIMARY KEY (`idDetalleFicha`),
+  KEY `IDX_DetalleFichaTecnica` (`idFichaTecnica`),
+  KEY `IDX_DetalleFichaInsumo` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -369,13 +456,17 @@ INSERT INTO `detallefichainsumo` (`idDetalleFicha`, `idFichaTecnica`, `idInsumo`
 -- Estructura de tabla para la tabla `detalleinsumopreparadoinsumo`
 --
 
+DROP TABLE IF EXISTS `detalleinsumopreparadoinsumo`;
 CREATE TABLE `detalleinsumopreparadoinsumo` (
-  `idDetalle` int(11) NOT NULL,
+  `idDetalle` int(11) NOT NULL AUTO_INCREMENT,
   `idPreparado` int(11) NOT NULL,
   `idInsumo` int(11) NOT NULL,
   `cantidad` decimal(10,2) DEFAULT NULL,
   `unidadMedida` varchar(255) DEFAULT NULL,
-  `precioUnitario` decimal(10,2) DEFAULT NULL
+  `precioUnitario` decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY (`idDetalle`),
+  KEY `fk_detalle_preparado` (`idPreparado`),
+  KEY `fk_detalle_insumo_normal` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -396,13 +487,17 @@ INSERT INTO `detalleinsumopreparadoinsumo` (`idDetalle`, `idPreparado`, `idInsum
 -- Estructura de tabla para la tabla `detalleventaadicion`
 --
 
+DROP TABLE IF EXISTS `detalleventaadicion`;
 CREATE TABLE `detalleventaadicion` (
-  `idDetalleVentaAdicion` int(11) NOT NULL,
+  `idDetalleVentaAdicion` int(11) NOT NULL AUTO_INCREMENT,
   `idDetalleVenta` int(11) NOT NULL,
   `idAdicion` int(11) NOT NULL,
   `cantidad` int(11) DEFAULT 1,
   `precio` decimal(10,2) NOT NULL,
-  `subtotal` decimal(12,2) NOT NULL
+  `subtotal` decimal(12,2) NOT NULL,
+  PRIMARY KEY (`idDetalleVentaAdicion`),
+  KEY `IDX_DetalleVentaAdicion` (`idDetalleVenta`),
+  KEY `IDX_Adicion` (`idAdicion`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -418,14 +513,18 @@ INSERT INTO `detalleventaadicion` (`idDetalleVentaAdicion`, `idDetalleVenta`, `i
 -- Estructura de tabla para la tabla `detalleventaproducto`
 --
 
+DROP TABLE IF EXISTS `detalleventaproducto`;
 CREATE TABLE `detalleventaproducto` (
-  `idDetalleVenta` int(11) NOT NULL,
+  `idDetalleVenta` int(11) NOT NULL AUTO_INCREMENT,
   `idVenta` int(11) NOT NULL,
   `idVariante` int(11) NOT NULL,
   `cantidad` int(11) NOT NULL DEFAULT 1,
   `precioUnitario` decimal(10,2) NOT NULL,
   `subtotal` decimal(12,2) NOT NULL,
-  `observaciones` varchar(255) DEFAULT NULL
+  `observaciones` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idDetalleVenta`),
+  KEY `IDX_DetalleVenta` (`idVenta`),
+  KEY `IDX_DetalleVentaVariante` (`idVariante`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -446,14 +545,17 @@ INSERT INTO `detalleventaproducto` (`idDetalleVenta`, `idVenta`, `idVariante`, `
 -- Estructura de tabla para la tabla `devolucion`
 --
 
+DROP TABLE IF EXISTS `devolucion`;
 CREATE TABLE `devolucion` (
-  `idDevolucion` int(11) NOT NULL,
+  `idDevolucion` int(11) NOT NULL AUTO_INCREMENT,
   `idVenta` int(11) NOT NULL,
   `motivo` varchar(255) NOT NULL,
   `descripcion` text DEFAULT NULL,
   `valorDevuelto` decimal(12,2) DEFAULT NULL,
   `fecha` datetime DEFAULT NULL,
-  `estado` enum('PENDIENTE','ACEPTADA','RECHAZADA') DEFAULT 'PENDIENTE'
+  `estado` enum('PENDIENTE','ACEPTADA','RECHAZADA') DEFAULT 'PENDIENTE',
+  PRIMARY KEY (`idDevolucion`),
+  KEY `IDX_DevolucionVenta` (`idVenta`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -462,8 +564,9 @@ CREATE TABLE `devolucion` (
 -- Estructura de tabla para la tabla `evento`
 --
 
+DROP TABLE IF EXISTS `evento`;
 CREATE TABLE `evento` (
-  `idEvento` int(11) NOT NULL,
+  `idEvento` int(11) NOT NULL AUTO_INCREMENT,
   `nombreEvento` varchar(120) NOT NULL,
   `descripcion` text DEFAULT NULL,
   `fechaInicio` date DEFAULT NULL,
@@ -476,7 +579,9 @@ CREATE TABLE `evento` (
   `accionInsumo` varchar(20) DEFAULT NULL,
   `insumosAsociados` text DEFAULT NULL,
   `productosAsociados` text DEFAULT NULL,
-  `icono` varchar(50) DEFAULT NULL
+  `icono` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`idEvento`),
+  KEY `idProducto` (`idProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -499,8 +604,9 @@ INSERT INTO `evento` (`idEvento`, `nombreEvento`, `descripcion`, `fechaInicio`, 
 -- Estructura de tabla para la tabla `fichatecnica`
 --
 
+DROP TABLE IF EXISTS `fichatecnica`;
 CREATE TABLE `fichatecnica` (
-  `idFichaTecnica` int(11) NOT NULL,
+  `idFichaTecnica` int(11) NOT NULL AUTO_INCREMENT,
   `idVariante` int(11) DEFAULT NULL,
   `descripcion` text DEFAULT NULL,
   `fechaCreacion` datetime DEFAULT NULL,
@@ -516,7 +622,11 @@ CREATE TABLE `fichatecnica` (
   `condicionesAlmacenamiento` text DEFAULT NULL,
   `vidaUtil` varchar(100) DEFAULT NULL,
   `observaciones` text DEFAULT NULL,
-  `estado` tinyint(4) DEFAULT 1
+  `estado` tinyint(4) DEFAULT 1,
+  PRIMARY KEY (`idFichaTecnica`),
+  KEY `IDX_FichaTecnicaVariante` (`idVariante`),
+  KEY `idProducto` (`idProducto`),
+  KEY `idInsumo` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -572,8 +682,9 @@ INSERT INTO `fichatecnica` (`idFichaTecnica`, `idVariante`, `descripcion`, `fech
 -- Estructura de tabla para la tabla `insumo`
 --
 
+DROP TABLE IF EXISTS `insumo`;
 CREATE TABLE `insumo` (
-  `idInsumo` int(11) NOT NULL,
+  `idInsumo` int(11) NOT NULL AUTO_INCREMENT,
   `idCategoriaInsumo` int(11) NOT NULL,
   `nombre` varchar(255) NOT NULL,
   `unidadMedida` varchar(255) DEFAULT NULL,
@@ -588,7 +699,10 @@ CREATE TABLE `insumo` (
   `eliminado` tinyint(4) NOT NULL DEFAULT 0,
   `precioUnitario` decimal(10,2) DEFAULT 0.00,
   `idProveedor` int(11) DEFAULT NULL,
-  `descripcion` varchar(255) DEFAULT NULL
+  `descripcion` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idInsumo`),
+  KEY `IDX_InsumoCategoria` (`idCategoriaInsumo`),
+  KEY `idProveedor` (`idProveedor`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -649,8 +763,9 @@ INSERT INTO `insumo` (`idInsumo`, `idCategoriaInsumo`, `nombre`, `unidadMedida`,
 -- Estructura de tabla para la tabla `insumopreparado`
 --
 
+DROP TABLE IF EXISTS `insumopreparado`;
 CREATE TABLE `insumopreparado` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(255) NOT NULL,
   `descripcion` varchar(255) DEFAULT NULL,
   `precioVenta` decimal(10,2) DEFAULT 0.00,
@@ -660,7 +775,8 @@ CREATE TABLE `insumopreparado` (
   `eliminado` tinyint(4) NOT NULL DEFAULT 0,
   `rendimiento` decimal(10,2) DEFAULT 1.00,
   `unidadRendimiento` varchar(255) DEFAULT 'und',
-  `costoTotal` decimal(10,2) DEFAULT 0.00
+  `costoTotal` decimal(10,2) DEFAULT 0.00,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -681,14 +797,17 @@ INSERT INTO `insumopreparado` (`id`, `nombre`, `descripcion`, `precioVenta`, `un
 -- Estructura de tabla para la tabla `pago`
 --
 
+DROP TABLE IF EXISTS `pago`;
 CREATE TABLE `pago` (
-  `idPago` int(11) NOT NULL,
+  `idPago` int(11) NOT NULL AUTO_INCREMENT,
   `idVenta` int(11) NOT NULL,
   `metodoPago` enum('EFECTIVO','TARJETA','NEQUI','DAVIPLATA','TRANSFERENCIA') NOT NULL,
   `referenciaExterna` varchar(120) DEFAULT NULL,
   `monto` decimal(12,2) NOT NULL,
   `fechaPago` datetime DEFAULT NULL,
-  `estado` enum('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'APROBADO'
+  `estado` enum('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'APROBADO',
+  PRIMARY KEY (`idPago`),
+  KEY `IDX_PagoVenta` (`idVenta`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -697,14 +816,17 @@ CREATE TABLE `pago` (
 -- Estructura de tabla para la tabla `pedido`
 --
 
+DROP TABLE IF EXISTS `pedido`;
 CREATE TABLE `pedido` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `clienteId` int(11) DEFAULT NULL,
   `items` text DEFAULT NULL,
   `total` decimal(10,2) NOT NULL,
   `estado` varchar(255) DEFAULT 'pendiente',
   `metodoPago` varchar(255) DEFAULT 'efectivo',
-  `fechaCreacion` datetime DEFAULT NULL
+  `fechaCreacion` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `clienteId` (`clienteId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -713,9 +835,12 @@ CREATE TABLE `pedido` (
 -- Estructura de tabla para la tabla `permiso`
 --
 
+DROP TABLE IF EXISTS `permiso`;
 CREATE TABLE `permiso` (
-  `idPermiso` int(11) NOT NULL,
-  `nombrePermiso` varchar(255) NOT NULL
+  `idPermiso` int(11) NOT NULL AUTO_INCREMENT,
+  `nombrePermiso` varchar(255) NOT NULL,
+  PRIMARY KEY (`idPermiso`),
+  UNIQUE KEY `UK_Permiso` (`nombrePermiso`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -749,8 +874,9 @@ INSERT INTO `permiso` (`idPermiso`, `nombrePermiso`) VALUES
 -- Estructura de tabla para la tabla `producto`
 --
 
+DROP TABLE IF EXISTS `producto`;
 CREATE TABLE `producto` (
-  `idProducto` int(11) NOT NULL,
+  `idProducto` int(11) NOT NULL AUTO_INCREMENT,
   `idCategoriaProducto` int(11) NOT NULL,
   `nombre` varchar(120) NOT NULL,
   `descripcion` text DEFAULT NULL,
@@ -759,7 +885,9 @@ CREATE TABLE `producto` (
   `precio` decimal(10,2) DEFAULT 0.00,
   `categoria` varchar(100) DEFAULT NULL,
   `adiciones` text DEFAULT NULL,
-  `configuracionCombo` text DEFAULT NULL
+  `configuracionCombo` text DEFAULT NULL,
+  PRIMARY KEY (`idProducto`),
+  KEY `IDX_ProductoCategoria` (`idCategoriaProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -814,8 +942,9 @@ INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripc
 -- Estructura de tabla para la tabla `proveedor`
 --
 
+DROP TABLE IF EXISTS `proveedor`;
 CREATE TABLE `proveedor` (
-  `idProveedor` int(11) NOT NULL,
+  `idProveedor` int(11) NOT NULL AUTO_INCREMENT,
   `idTipoProveedor` int(11) NOT NULL,
   `idTipoDocumento` int(11) NOT NULL,
   `nombre` varchar(255) NOT NULL,
@@ -824,7 +953,10 @@ CREATE TABLE `proveedor` (
   `correo` varchar(255) DEFAULT NULL,
   `direccion` varchar(255) DEFAULT NULL,
   `estado` tinyint(4) DEFAULT 1,
-  `nombreContacto` varchar(255) DEFAULT NULL
+  `nombreContacto` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idProveedor`),
+  KEY `IDX_ProveedorTipo` (`idTipoProveedor`),
+  KEY `IDX_ProveedorDocumento` (`idTipoDocumento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -846,14 +978,18 @@ INSERT INTO `proveedor` (`idProveedor`, `idTipoProveedor`, `idTipoDocumento`, `n
 -- Estructura de tabla para la tabla `resena`
 --
 
+DROP TABLE IF EXISTS `resena`;
 CREATE TABLE `resena` (
-  `idResena` int(11) NOT NULL,
+  `idResena` int(11) NOT NULL AUTO_INCREMENT,
   `idProducto` int(11) NOT NULL,
   `idUsuario` int(11) NOT NULL,
   `puntuacion` tinyint(4) NOT NULL DEFAULT 5,
   `comentario` text DEFAULT NULL,
   `fechaResena` datetime DEFAULT current_timestamp(),
-  `estado` tinyint(4) DEFAULT 1
+  `estado` tinyint(4) DEFAULT 1,
+  PRIMARY KEY (`idResena`),
+  KEY `idx_resena_producto` (`idProducto`),
+  KEY `idx_resena_usuario` (`idUsuario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -872,11 +1008,14 @@ INSERT INTO `resena` (`idResena`, `idProducto`, `idUsuario`, `puntuacion`, `come
 -- Estructura de tabla para la tabla `rol`
 --
 
+DROP TABLE IF EXISTS `rol`;
 CREATE TABLE `rol` (
-  `idRol` int(11) NOT NULL,
+  `idRol` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(255) NOT NULL,
   `descripcion` varchar(255) DEFAULT NULL,
-  `estado` tinyint(4) DEFAULT 1
+  `estado` tinyint(4) DEFAULT 1,
+  PRIMARY KEY (`idRol`),
+  UNIQUE KEY `UK_Rol_Nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -896,10 +1035,15 @@ INSERT INTO `rol` (`idRol`, `nombre`, `descripcion`, `estado`) VALUES
 -- Estructura de tabla para la tabla `rolpermiso`
 --
 
+DROP TABLE IF EXISTS `rolpermiso`;
 CREATE TABLE `rolpermiso` (
-  `idRolPermiso` int(11) NOT NULL,
+  `idRolPermiso` int(11) NOT NULL AUTO_INCREMENT,
   `idRol` int(11) NOT NULL,
-  `idPermiso` int(11) NOT NULL
+  `idPermiso` int(11) NOT NULL,
+  PRIMARY KEY (`idRolPermiso`),
+  UNIQUE KEY `UK_Rol_Permiso` (`idRol`,`idPermiso`),
+  KEY `IDX_RolPermisoRol` (`idRol`),
+  KEY `IDX_RolPermisoPermiso` (`idPermiso`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -945,9 +1089,12 @@ INSERT INTO `rolpermiso` (`idRolPermiso`, `idRol`, `idPermiso`) VALUES
 -- Estructura de tabla para la tabla `tipodocumento`
 --
 
+DROP TABLE IF EXISTS `tipodocumento`;
 CREATE TABLE `tipodocumento` (
-  `idTipoDocumento` int(11) NOT NULL,
-  `nombre` varchar(255) NOT NULL
+  `idTipoDocumento` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(255) NOT NULL,
+  PRIMARY KEY (`idTipoDocumento`),
+  UNIQUE KEY `UK_TipoDocumento` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -966,9 +1113,12 @@ INSERT INTO `tipodocumento` (`idTipoDocumento`, `nombre`) VALUES
 -- Estructura de tabla para la tabla `tipoproveedor`
 --
 
+DROP TABLE IF EXISTS `tipoproveedor`;
 CREATE TABLE `tipoproveedor` (
-  `idTipoProveedor` int(11) NOT NULL,
-  `nombre` varchar(255) NOT NULL
+  `idTipoProveedor` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(255) NOT NULL,
+  PRIMARY KEY (`idTipoProveedor`),
+  UNIQUE KEY `UK_TipoProveedor` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -986,8 +1136,9 @@ INSERT INTO `tipoproveedor` (`idTipoProveedor`, `nombre`) VALUES
 -- Estructura de tabla para la tabla `trazabilidad`
 --
 
+DROP TABLE IF EXISTS `trazabilidad`;
 CREATE TABLE `trazabilidad` (
-  `idTrazabilidad` int(11) NOT NULL,
+  `idTrazabilidad` int(11) NOT NULL AUTO_INCREMENT,
   `tipo` varchar(50) DEFAULT NULL,
   `entidadNombre` varchar(150) DEFAULT NULL,
   `detalle` varchar(255) DEFAULT NULL,
@@ -997,7 +1148,10 @@ CREATE TABLE `trazabilidad` (
   `tipoMovimiento` varchar(50) DEFAULT NULL,
   `cantidad` decimal(10,2) DEFAULT NULL,
   `motivo` varchar(255) DEFAULT NULL,
-  `usuarioId` int(11) DEFAULT NULL
+  `usuarioId` int(11) DEFAULT NULL,
+  PRIMARY KEY (`idTrazabilidad`),
+  KEY `idInsumo` (`idInsumo`),
+  KEY `usuarioId` (`usuarioId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1107,8 +1261,9 @@ INSERT INTO `trazabilidad` (`idTrazabilidad`, `tipo`, `entidadNombre`, `detalle`
 -- Estructura de tabla para la tabla `usuario`
 --
 
+DROP TABLE IF EXISTS `usuario`;
 CREATE TABLE `usuario` (
-  `idUsuario` int(11) NOT NULL,
+  `idUsuario` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(255) NOT NULL,
   `apellidos` varchar(255) DEFAULT NULL,
   `tipoDocumento` varchar(255) DEFAULT NULL,
@@ -1118,7 +1273,71 @@ CREATE TABLE `usuario` (
   `contrasena` varchar(255) NOT NULL,
   `estado` varchar(255) DEFAULT 'ACTIVO',
   `fechaRegistro` datetime DEFAULT NULL,
-  `idRol` int(11) NOT NULL
+  `idRol` int(11) NOT NULL,
+  PRIMARY KEY (`idUsuario`),
+  UNIQUE KEY `UK_Usuario_Email` (`email`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `email_2` (`email`),
+  UNIQUE KEY `email_3` (`email`),
+  UNIQUE KEY `email_4` (`email`),
+  UNIQUE KEY `email_5` (`email`),
+  UNIQUE KEY `email_6` (`email`),
+  UNIQUE KEY `email_7` (`email`),
+  UNIQUE KEY `email_8` (`email`),
+  UNIQUE KEY `email_9` (`email`),
+  UNIQUE KEY `email_10` (`email`),
+  UNIQUE KEY `email_11` (`email`),
+  UNIQUE KEY `email_12` (`email`),
+  UNIQUE KEY `email_13` (`email`),
+  UNIQUE KEY `email_14` (`email`),
+  UNIQUE KEY `email_15` (`email`),
+  UNIQUE KEY `email_16` (`email`),
+  UNIQUE KEY `email_17` (`email`),
+  UNIQUE KEY `email_18` (`email`),
+  UNIQUE KEY `email_19` (`email`),
+  UNIQUE KEY `email_20` (`email`),
+  UNIQUE KEY `email_21` (`email`),
+  UNIQUE KEY `email_22` (`email`),
+  UNIQUE KEY `email_23` (`email`),
+  UNIQUE KEY `email_24` (`email`),
+  UNIQUE KEY `email_25` (`email`),
+  UNIQUE KEY `email_26` (`email`),
+  UNIQUE KEY `email_27` (`email`),
+  UNIQUE KEY `email_28` (`email`),
+  UNIQUE KEY `email_29` (`email`),
+  UNIQUE KEY `email_30` (`email`),
+  UNIQUE KEY `email_31` (`email`),
+  UNIQUE KEY `email_32` (`email`),
+  UNIQUE KEY `email_33` (`email`),
+  UNIQUE KEY `email_34` (`email`),
+  UNIQUE KEY `email_35` (`email`),
+  UNIQUE KEY `email_36` (`email`),
+  UNIQUE KEY `email_37` (`email`),
+  UNIQUE KEY `email_38` (`email`),
+  UNIQUE KEY `email_39` (`email`),
+  UNIQUE KEY `email_40` (`email`),
+  UNIQUE KEY `email_41` (`email`),
+  UNIQUE KEY `email_42` (`email`),
+  UNIQUE KEY `email_43` (`email`),
+  UNIQUE KEY `email_44` (`email`),
+  UNIQUE KEY `email_45` (`email`),
+  UNIQUE KEY `email_46` (`email`),
+  UNIQUE KEY `email_47` (`email`),
+  UNIQUE KEY `email_48` (`email`),
+  UNIQUE KEY `email_49` (`email`),
+  UNIQUE KEY `email_50` (`email`),
+  UNIQUE KEY `email_51` (`email`),
+  UNIQUE KEY `email_52` (`email`),
+  UNIQUE KEY `email_53` (`email`),
+  UNIQUE KEY `email_54` (`email`),
+  UNIQUE KEY `email_55` (`email`),
+  UNIQUE KEY `email_56` (`email`),
+  UNIQUE KEY `email_57` (`email`),
+  UNIQUE KEY `email_58` (`email`),
+  UNIQUE KEY `email_59` (`email`),
+  UNIQUE KEY `email_60` (`email`),
+  UNIQUE KEY `email_61` (`email`),
+  KEY `IDX_UsuarioRol` (`idRol`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1154,13 +1373,16 @@ INSERT INTO `usuario` (`idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `num
 -- Estructura de tabla para la tabla `variante`
 --
 
+DROP TABLE IF EXISTS `variante`;
 CREATE TABLE `variante` (
-  `idVariante` int(11) NOT NULL,
+  `idVariante` int(11) NOT NULL AUTO_INCREMENT,
   `idProducto` int(11) NOT NULL,
   `nombre` varchar(80) NOT NULL,
   `precio` decimal(10,2) NOT NULL,
   `estado` tinyint(4) DEFAULT 1,
-  `imagen` varchar(255) DEFAULT NULL
+  `imagen` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idVariante`),
+  KEY `IDX_VarianteProducto` (`idProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1221,8 +1443,9 @@ INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`
 -- Estructura de tabla para la tabla `venta`
 --
 
+DROP TABLE IF EXISTS `venta`;
 CREATE TABLE `venta` (
-  `idVenta` int(11) NOT NULL,
+  `idVenta` int(11) NOT NULL AUTO_INCREMENT,
   `idCliente` int(11) NOT NULL,
   `idUsuario` int(11) NOT NULL,
   `idDescuento` int(11) DEFAULT NULL,
@@ -1233,7 +1456,11 @@ CREATE TABLE `venta` (
   `total` decimal(12,2) NOT NULL,
   `estadoEntrega` enum('PENDIENTE','PREPARANDO','LISTO','EN_CAMINO','ENTREGADO','CANCELADO') DEFAULT 'PENDIENTE',
   `observaciones` text DEFAULT NULL,
-  `estadoAprobacion` enum('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'PENDIENTE'
+  `estadoAprobacion` enum('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'PENDIENTE',
+  PRIMARY KEY (`idVenta`),
+  KEY `IDX_VentaCliente` (`idCliente`),
+  KEY `IDX_VentaUsuario` (`idUsuario`),
+  KEY `IDX_VentaDescuento` (`idDescuento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1321,528 +1548,8 @@ DROP TABLE IF EXISTS `vwventas`;
 CREATE    VIEW `vwventas`  AS SELECT `v`.`idVenta` AS `idVenta`, concat(`u`.`nombre`,' ',`u`.`apellidos`) AS `Cliente`, `v`.`fechaVenta` AS `fechaVenta`, `v`.`subtotal` AS `subtotal`, `v`.`descuentoAplicado` AS `descuentoAplicado`, `v`.`total` AS `total`, `v`.`estadoEntrega` AS `estadoEntrega` FROM ((`venta` `v` join `cliente` `c` on(`c`.`idCliente` = `v`.`idCliente`)) join `usuario` `u` on(`u`.`idUsuario` = `c`.`idUsuario`)) ;
 
 --
--- Índices para tablas volcadas
---
 
---
--- Indices de la tabla `categoriainsumo`
---
-ALTER TABLE `categoriainsumo`
-  ADD PRIMARY KEY (`idCategoriaInsumo`),
-  ADD UNIQUE KEY `UK_CategoriaInsumo` (`nombre`);
 
---
--- Indices de la tabla `categoriaproducto`
---
-ALTER TABLE `categoriaproducto`
-  ADD PRIMARY KEY (`idCategoriaProducto`),
-  ADD UNIQUE KEY `UK_CategoriaProducto` (`nombre`),
-  ADD UNIQUE KEY `nombre` (`nombre`),
-  ADD UNIQUE KEY `nombre_2` (`nombre`),
-  ADD UNIQUE KEY `nombre_3` (`nombre`),
-  ADD UNIQUE KEY `nombre_4` (`nombre`),
-  ADD UNIQUE KEY `nombre_5` (`nombre`),
-  ADD UNIQUE KEY `nombre_6` (`nombre`),
-  ADD UNIQUE KEY `nombre_7` (`nombre`),
-  ADD UNIQUE KEY `nombre_8` (`nombre`),
-  ADD UNIQUE KEY `nombre_9` (`nombre`),
-  ADD UNIQUE KEY `nombre_10` (`nombre`),
-  ADD UNIQUE KEY `nombre_11` (`nombre`),
-  ADD UNIQUE KEY `nombre_12` (`nombre`),
-  ADD UNIQUE KEY `nombre_13` (`nombre`),
-  ADD UNIQUE KEY `nombre_14` (`nombre`),
-  ADD UNIQUE KEY `nombre_15` (`nombre`),
-  ADD UNIQUE KEY `nombre_16` (`nombre`),
-  ADD UNIQUE KEY `nombre_17` (`nombre`),
-  ADD UNIQUE KEY `nombre_18` (`nombre`),
-  ADD UNIQUE KEY `nombre_19` (`nombre`),
-  ADD UNIQUE KEY `nombre_20` (`nombre`),
-  ADD UNIQUE KEY `nombre_21` (`nombre`),
-  ADD UNIQUE KEY `nombre_22` (`nombre`),
-  ADD UNIQUE KEY `nombre_23` (`nombre`),
-  ADD UNIQUE KEY `nombre_24` (`nombre`),
-  ADD UNIQUE KEY `nombre_25` (`nombre`),
-  ADD UNIQUE KEY `nombre_26` (`nombre`),
-  ADD UNIQUE KEY `nombre_27` (`nombre`),
-  ADD UNIQUE KEY `nombre_28` (`nombre`),
-  ADD UNIQUE KEY `nombre_29` (`nombre`),
-  ADD UNIQUE KEY `nombre_30` (`nombre`),
-  ADD UNIQUE KEY `nombre_31` (`nombre`),
-  ADD UNIQUE KEY `nombre_32` (`nombre`),
-  ADD UNIQUE KEY `nombre_33` (`nombre`),
-  ADD UNIQUE KEY `nombre_34` (`nombre`),
-  ADD UNIQUE KEY `nombre_35` (`nombre`),
-  ADD UNIQUE KEY `nombre_36` (`nombre`),
-  ADD UNIQUE KEY `nombre_37` (`nombre`),
-  ADD UNIQUE KEY `nombre_38` (`nombre`),
-  ADD UNIQUE KEY `nombre_39` (`nombre`),
-  ADD UNIQUE KEY `nombre_40` (`nombre`),
-  ADD UNIQUE KEY `nombre_41` (`nombre`),
-  ADD UNIQUE KEY `nombre_42` (`nombre`),
-  ADD UNIQUE KEY `nombre_43` (`nombre`),
-  ADD UNIQUE KEY `nombre_44` (`nombre`),
-  ADD UNIQUE KEY `nombre_45` (`nombre`),
-  ADD UNIQUE KEY `nombre_46` (`nombre`),
-  ADD UNIQUE KEY `nombre_47` (`nombre`),
-  ADD UNIQUE KEY `nombre_48` (`nombre`),
-  ADD UNIQUE KEY `nombre_49` (`nombre`),
-  ADD UNIQUE KEY `nombre_50` (`nombre`),
-  ADD UNIQUE KEY `nombre_51` (`nombre`),
-  ADD UNIQUE KEY `nombre_52` (`nombre`),
-  ADD UNIQUE KEY `nombre_53` (`nombre`),
-  ADD UNIQUE KEY `nombre_54` (`nombre`),
-  ADD UNIQUE KEY `nombre_55` (`nombre`),
-  ADD UNIQUE KEY `nombre_56` (`nombre`),
-  ADD UNIQUE KEY `nombre_57` (`nombre`),
-  ADD UNIQUE KEY `nombre_58` (`nombre`),
-  ADD UNIQUE KEY `nombre_59` (`nombre`),
-  ADD UNIQUE KEY `nombre_60` (`nombre`);
-
---
--- Indices de la tabla `cliente`
---
-ALTER TABLE `cliente`
-  ADD PRIMARY KEY (`idCliente`),
-  ADD UNIQUE KEY `UK_Cliente_Usuario` (`idUsuario`),
-  ADD KEY `IDX_ClienteUsuario` (`idUsuario`);
-
---
--- Indices de la tabla `compra`
---
-ALTER TABLE `compra`
-  ADD PRIMARY KEY (`idCompra`),
-  ADD KEY `IDX_CompraProveedor` (`idProveedor`);
-
---
--- Indices de la tabla `descuento`
---
-ALTER TABLE `descuento`
-  ADD PRIMARY KEY (`idDescuento`),
-  ADD KEY `IDX_DescuentoEvento` (`idEvento`);
-
---
--- Indices de la tabla `detallecomprainsumo`
---
-ALTER TABLE `detallecomprainsumo`
-  ADD PRIMARY KEY (`idDetalleCompra`),
-  ADD KEY `IDX_DetalleCompra` (`idCompra`),
-  ADD KEY `IDX_DetalleCompraInsumo` (`idInsumo`);
-
---
--- Indices de la tabla `detallefichainsumo`
---
-ALTER TABLE `detallefichainsumo`
-  ADD PRIMARY KEY (`idDetalleFicha`),
-  ADD KEY `IDX_DetalleFichaTecnica` (`idFichaTecnica`),
-  ADD KEY `IDX_DetalleFichaInsumo` (`idInsumo`);
-
---
--- Indices de la tabla `detalleinsumopreparadoinsumo`
---
-ALTER TABLE `detalleinsumopreparadoinsumo`
-  ADD PRIMARY KEY (`idDetalle`),
-  ADD KEY `fk_detalle_preparado` (`idPreparado`),
-  ADD KEY `fk_detalle_insumo_normal` (`idInsumo`);
-
---
--- Indices de la tabla `detalleventaadicion`
---
-ALTER TABLE `detalleventaadicion`
-  ADD PRIMARY KEY (`idDetalleVentaAdicion`),
-  ADD KEY `IDX_DetalleVentaAdicion` (`idDetalleVenta`),
-  ADD KEY `IDX_Adicion` (`idAdicion`);
-
---
--- Indices de la tabla `detalleventaproducto`
---
-ALTER TABLE `detalleventaproducto`
-  ADD PRIMARY KEY (`idDetalleVenta`),
-  ADD KEY `IDX_DetalleVenta` (`idVenta`),
-  ADD KEY `IDX_DetalleVentaVariante` (`idVariante`);
-
---
--- Indices de la tabla `devolucion`
---
-ALTER TABLE `devolucion`
-  ADD PRIMARY KEY (`idDevolucion`),
-  ADD KEY `IDX_DevolucionVenta` (`idVenta`);
-
---
--- Indices de la tabla `evento`
---
-ALTER TABLE `evento`
-  ADD PRIMARY KEY (`idEvento`),
-  ADD KEY `idProducto` (`idProducto`);
-
---
--- Indices de la tabla `fichatecnica`
---
-ALTER TABLE `fichatecnica`
-  ADD PRIMARY KEY (`idFichaTecnica`),
-  ADD KEY `IDX_FichaTecnicaVariante` (`idVariante`),
-  ADD KEY `idProducto` (`idProducto`),
-  ADD KEY `idInsumo` (`idInsumo`);
-
---
--- Indices de la tabla `insumo`
---
-ALTER TABLE `insumo`
-  ADD PRIMARY KEY (`idInsumo`),
-  ADD KEY `IDX_InsumoCategoria` (`idCategoriaInsumo`),
-  ADD KEY `idProveedor` (`idProveedor`);
-
---
--- Indices de la tabla `insumopreparado`
---
-ALTER TABLE `insumopreparado`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `pago`
---
-ALTER TABLE `pago`
-  ADD PRIMARY KEY (`idPago`),
-  ADD KEY `IDX_PagoVenta` (`idVenta`);
-
---
--- Indices de la tabla `pedido`
---
-ALTER TABLE `pedido`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `clienteId` (`clienteId`);
-
---
--- Indices de la tabla `permiso`
---
-ALTER TABLE `permiso`
-  ADD PRIMARY KEY (`idPermiso`),
-  ADD UNIQUE KEY `UK_Permiso` (`nombrePermiso`);
-
---
--- Indices de la tabla `producto`
---
-ALTER TABLE `producto`
-  ADD PRIMARY KEY (`idProducto`),
-  ADD KEY `IDX_ProductoCategoria` (`idCategoriaProducto`);
-
---
--- Indices de la tabla `proveedor`
---
-ALTER TABLE `proveedor`
-  ADD PRIMARY KEY (`idProveedor`),
-  ADD KEY `IDX_ProveedorTipo` (`idTipoProveedor`),
-  ADD KEY `IDX_ProveedorDocumento` (`idTipoDocumento`);
-
---
--- Indices de la tabla `resena`
---
-ALTER TABLE `resena`
-  ADD PRIMARY KEY (`idResena`),
-  ADD KEY `idx_resena_producto` (`idProducto`),
-  ADD KEY `idx_resena_usuario` (`idUsuario`);
-
---
--- Indices de la tabla `rol`
---
-ALTER TABLE `rol`
-  ADD PRIMARY KEY (`idRol`),
-  ADD UNIQUE KEY `UK_Rol_Nombre` (`nombre`);
-
---
--- Indices de la tabla `rolpermiso`
---
-ALTER TABLE `rolpermiso`
-  ADD PRIMARY KEY (`idRolPermiso`),
-  ADD UNIQUE KEY `UK_Rol_Permiso` (`idRol`,`idPermiso`),
-  ADD KEY `IDX_RolPermisoRol` (`idRol`),
-  ADD KEY `IDX_RolPermisoPermiso` (`idPermiso`);
-
---
--- Indices de la tabla `tipodocumento`
---
-ALTER TABLE `tipodocumento`
-  ADD PRIMARY KEY (`idTipoDocumento`),
-  ADD UNIQUE KEY `UK_TipoDocumento` (`nombre`);
-
---
--- Indices de la tabla `tipoproveedor`
---
-ALTER TABLE `tipoproveedor`
-  ADD PRIMARY KEY (`idTipoProveedor`),
-  ADD UNIQUE KEY `UK_TipoProveedor` (`nombre`);
-
---
--- Indices de la tabla `trazabilidad`
---
-ALTER TABLE `trazabilidad`
-  ADD PRIMARY KEY (`idTrazabilidad`),
-  ADD KEY `idInsumo` (`idInsumo`),
-  ADD KEY `usuarioId` (`usuarioId`);
-
---
--- Indices de la tabla `usuario`
---
-ALTER TABLE `usuario`
-  ADD PRIMARY KEY (`idUsuario`),
-  ADD UNIQUE KEY `UK_Usuario_Email` (`email`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD UNIQUE KEY `email_2` (`email`),
-  ADD UNIQUE KEY `email_3` (`email`),
-  ADD UNIQUE KEY `email_4` (`email`),
-  ADD UNIQUE KEY `email_5` (`email`),
-  ADD UNIQUE KEY `email_6` (`email`),
-  ADD UNIQUE KEY `email_7` (`email`),
-  ADD UNIQUE KEY `email_8` (`email`),
-  ADD UNIQUE KEY `email_9` (`email`),
-  ADD UNIQUE KEY `email_10` (`email`),
-  ADD UNIQUE KEY `email_11` (`email`),
-  ADD UNIQUE KEY `email_12` (`email`),
-  ADD UNIQUE KEY `email_13` (`email`),
-  ADD UNIQUE KEY `email_14` (`email`),
-  ADD UNIQUE KEY `email_15` (`email`),
-  ADD UNIQUE KEY `email_16` (`email`),
-  ADD UNIQUE KEY `email_17` (`email`),
-  ADD UNIQUE KEY `email_18` (`email`),
-  ADD UNIQUE KEY `email_19` (`email`),
-  ADD UNIQUE KEY `email_20` (`email`),
-  ADD UNIQUE KEY `email_21` (`email`),
-  ADD UNIQUE KEY `email_22` (`email`),
-  ADD UNIQUE KEY `email_23` (`email`),
-  ADD UNIQUE KEY `email_24` (`email`),
-  ADD UNIQUE KEY `email_25` (`email`),
-  ADD UNIQUE KEY `email_26` (`email`),
-  ADD UNIQUE KEY `email_27` (`email`),
-  ADD UNIQUE KEY `email_28` (`email`),
-  ADD UNIQUE KEY `email_29` (`email`),
-  ADD UNIQUE KEY `email_30` (`email`),
-  ADD UNIQUE KEY `email_31` (`email`),
-  ADD UNIQUE KEY `email_32` (`email`),
-  ADD UNIQUE KEY `email_33` (`email`),
-  ADD UNIQUE KEY `email_34` (`email`),
-  ADD UNIQUE KEY `email_35` (`email`),
-  ADD UNIQUE KEY `email_36` (`email`),
-  ADD UNIQUE KEY `email_37` (`email`),
-  ADD UNIQUE KEY `email_38` (`email`),
-  ADD UNIQUE KEY `email_39` (`email`),
-  ADD UNIQUE KEY `email_40` (`email`),
-  ADD UNIQUE KEY `email_41` (`email`),
-  ADD UNIQUE KEY `email_42` (`email`),
-  ADD UNIQUE KEY `email_43` (`email`),
-  ADD UNIQUE KEY `email_44` (`email`),
-  ADD UNIQUE KEY `email_45` (`email`),
-  ADD UNIQUE KEY `email_46` (`email`),
-  ADD UNIQUE KEY `email_47` (`email`),
-  ADD UNIQUE KEY `email_48` (`email`),
-  ADD UNIQUE KEY `email_49` (`email`),
-  ADD UNIQUE KEY `email_50` (`email`),
-  ADD UNIQUE KEY `email_51` (`email`),
-  ADD UNIQUE KEY `email_52` (`email`),
-  ADD UNIQUE KEY `email_53` (`email`),
-  ADD UNIQUE KEY `email_54` (`email`),
-  ADD UNIQUE KEY `email_55` (`email`),
-  ADD UNIQUE KEY `email_56` (`email`),
-  ADD UNIQUE KEY `email_57` (`email`),
-  ADD UNIQUE KEY `email_58` (`email`),
-  ADD UNIQUE KEY `email_59` (`email`),
-  ADD UNIQUE KEY `email_60` (`email`),
-  ADD UNIQUE KEY `email_61` (`email`),
-  ADD KEY `IDX_UsuarioRol` (`idRol`);
-
---
--- Indices de la tabla `variante`
---
-ALTER TABLE `variante`
-  ADD PRIMARY KEY (`idVariante`),
-  ADD KEY `IDX_VarianteProducto` (`idProducto`);
-
---
--- Indices de la tabla `venta`
---
-ALTER TABLE `venta`
-  ADD PRIMARY KEY (`idVenta`),
-  ADD KEY `IDX_VentaCliente` (`idCliente`),
-  ADD KEY `IDX_VentaUsuario` (`idUsuario`),
-  ADD KEY `IDX_VentaDescuento` (`idDescuento`);
-
---
--- AUTO_INCREMENT de las tablas volcadas
---
-
---
--- AUTO_INCREMENT de la tabla `categoriainsumo`
---
-ALTER TABLE `categoriainsumo`
-  MODIFY `idCategoriaInsumo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
-
---
--- AUTO_INCREMENT de la tabla `categoriaproducto`
---
-ALTER TABLE `categoriaproducto`
-  MODIFY `idCategoriaProducto` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
-
---
--- AUTO_INCREMENT de la tabla `cliente`
---
-ALTER TABLE `cliente`
-  MODIFY `idCliente` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
-
---
--- AUTO_INCREMENT de la tabla `compra`
---
-ALTER TABLE `compra`
-  MODIFY `idCompra` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `descuento`
---
-ALTER TABLE `descuento`
-  MODIFY `idDescuento` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT de la tabla `detallecomprainsumo`
---
-ALTER TABLE `detallecomprainsumo`
-  MODIFY `idDetalleCompra` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `detallefichainsumo`
---
-ALTER TABLE `detallefichainsumo`
-  MODIFY `idDetalleFicha` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=281;
-
---
--- AUTO_INCREMENT de la tabla `detalleinsumopreparadoinsumo`
---
-ALTER TABLE `detalleinsumopreparadoinsumo`
-  MODIFY `idDetalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
-
---
--- AUTO_INCREMENT de la tabla `detalleventaadicion`
---
-ALTER TABLE `detalleventaadicion`
-  MODIFY `idDetalleVentaAdicion` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
-
---
--- AUTO_INCREMENT de la tabla `detalleventaproducto`
---
-ALTER TABLE `detalleventaproducto`
-  MODIFY `idDetalleVenta` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=132;
-
---
--- AUTO_INCREMENT de la tabla `devolucion`
---
-ALTER TABLE `devolucion`
-  MODIFY `idDevolucion` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `evento`
---
-ALTER TABLE `evento`
-  MODIFY `idEvento` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
-
---
--- AUTO_INCREMENT de la tabla `fichatecnica`
---
-ALTER TABLE `fichatecnica`
-  MODIFY `idFichaTecnica` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
-
---
--- AUTO_INCREMENT de la tabla `insumo`
---
-ALTER TABLE `insumo`
-  MODIFY `idInsumo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
-
---
--- AUTO_INCREMENT de la tabla `insumopreparado`
---
-ALTER TABLE `insumopreparado`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
-
---
--- AUTO_INCREMENT de la tabla `pago`
---
-ALTER TABLE `pago`
-  MODIFY `idPago` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `pedido`
---
-ALTER TABLE `pedido`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `permiso`
---
-ALTER TABLE `permiso`
-  MODIFY `idPermiso` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
-
---
--- AUTO_INCREMENT de la tabla `producto`
---
-ALTER TABLE `producto`
-  MODIFY `idProducto` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
-
---
--- AUTO_INCREMENT de la tabla `proveedor`
---
-ALTER TABLE `proveedor`
-  MODIFY `idProveedor` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
-
---
--- AUTO_INCREMENT de la tabla `resena`
---
-ALTER TABLE `resena`
-  MODIFY `idResena` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT de la tabla `rol`
---
-ALTER TABLE `rol`
-  MODIFY `idRol` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT de la tabla `rolpermiso`
---
-ALTER TABLE `rolpermiso`
-  MODIFY `idRolPermiso` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
-
---
--- AUTO_INCREMENT de la tabla `tipodocumento`
---
-ALTER TABLE `tipodocumento`
-  MODIFY `idTipoDocumento` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `tipoproveedor`
---
-ALTER TABLE `tipoproveedor`
-  MODIFY `idTipoProveedor` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT de la tabla `trazabilidad`
---
-ALTER TABLE `trazabilidad`
-  MODIFY `idTrazabilidad` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=135;
-
---
--- AUTO_INCREMENT de la tabla `usuario`
---
-ALTER TABLE `usuario`
-  MODIFY `idUsuario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
-
---
--- AUTO_INCREMENT de la tabla `variante`
---
-ALTER TABLE `variante`
-  MODIFY `idVariante` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
-
---
--- AUTO_INCREMENT de la tabla `venta`
---
-ALTER TABLE `venta`
-  MODIFY `idVenta` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=122;
-
---
 -- Restricciones para tablas volcadas
 --
 
@@ -1990,3 +1697,7 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+SET FOREIGN_KEY_CHECKS = 1;
+COMMIT;
