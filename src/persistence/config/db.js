@@ -1,22 +1,33 @@
 const { Sequelize } = require('sequelize');
 
+const sanitizeEnv = (val, fallback = '') => {
+  if (val === undefined || val === null) return fallback;
+  return String(val).trim().replace(/^['"]|['"]$/g, '');
+};
+
+const dbHost = sanitizeEnv(process.env.DB_HOST, 'localhost');
+const dbUser = sanitizeEnv(process.env.DB_USER, 'root');
+const dbPassword = sanitizeEnv(process.env.DB_PASSWORD, '');
+const dbName = sanitizeEnv(process.env.DB_NAME, 'chazinfood');
+const dbPort = Number(sanitizeEnv(process.env.DB_PORT, '3306')) || 3306;
+
 const isCloudHost = Boolean(
-  process.env.DB_HOST && (
-    process.env.DB_HOST.includes('tidbcloud.com') ||
-    process.env.DB_HOST.includes('aivencloud.com') ||
-    process.env.DB_HOST.includes('render.com') ||
-    process.env.DB_HOST.includes('railway')
+  dbHost && (
+    dbHost.includes('tidbcloud.com') ||
+    dbHost.includes('aivencloud.com') ||
+    dbHost.includes('render.com') ||
+    dbHost.includes('railway')
   )
 );
 const enableSSL = process.env.DB_SSL === 'true' || process.env.DB_SSL === '1' || isCloudHost;
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'chazinfood',
-  process.env.DB_USER || 'root',
-  process.env.DB_PASSWORD ?? '',
+  dbName,
+  dbUser,
+  dbPassword,
   {
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT) || 3306,
+    host: dbHost,
+    port: dbPort,
     dialect: 'mysql',
     dialectOptions: {
       connectTimeout: 20000,
@@ -43,12 +54,10 @@ const sequelize = new Sequelize(
 
 const connectDB = async () => {
   try {
-    // Log connection parameters (without password) to help debugging
-    console.log(`Intentando conectar a MySQL en ${process.env.DB_HOST || 'localhost'}:${Number(process.env.DB_PORT) || 3306} (DB: ${process.env.DB_NAME || 'chazinfood'}, USER: ${process.env.DB_USER || 'root'})`);
   const maxRetries = 10;
   const retryDelayMs = 3000;
 
-  console.log(`Intentando conectar a MySQL en ${process.env.DB_HOST || 'localhost'}:${Number(process.env.DB_PORT) || 3306} (DB: ${process.env.DB_NAME || 'chazinfood'}, USER: ${process.env.DB_USER || 'root'})`);
+  console.log(`Intentando conectar a MySQL en ${dbHost}:${dbPort} (DB: ${dbName}, USER: ${dbUser})`);
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
