@@ -702,10 +702,13 @@ async function ensureCompraLotesYCancelacionSchema() {
 async function ensureActaRevisionSchema() {
   const sequelize = connectDB.sequelize;
   try {
-    // 1. Eliminar trigger duplicado de entrada de inventario
+    // 1. Eliminar trigger duplicado de entrada de inventario (en motores MySQL estándar)
     await sequelize.query('DROP TRIGGER IF EXISTS `trg_EntradaInventario`');
   } catch (err) {
-    console.warn('[DB Migration] ⚠️ No se pudo eliminar trg_EntradaInventario:', err.message);
+    // TiDB Cloud Serverless no soporta triggers por diseño distribuido (el stock se gestiona transaccionalmente en CompraService)
+    if (!err.message.includes('TRIGGER') && !err.message.includes('syntax')) {
+      console.warn('[DB Migration] ⚠️ No se pudo eliminar trg_EntradaInventario:', err.message);
+    }
   }
 
   try {
