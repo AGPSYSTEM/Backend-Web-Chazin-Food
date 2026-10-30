@@ -1,42 +1,19 @@
 -- ==========================================
 -- Chazin Food DB Dump - 100% Compatible con TiDB Cloud Serverless
+-- Generado: 2026-10-30T13:56:48.907Z
 -- ==========================================
 USE chazinfood;
 SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 
--- phpMyAdmin SQL Dump
--- version 5.2.1
--- https://www.phpmyadmin.net/
---
--- Servidor: 127.0.0.1
--- Tiempo de generación: 21-09-2026 a las 23:08:23
--- Versión del servidor: 10.4.32-MariaDB
--- Versión de PHP: 8.2.12
-
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
-SET time_zone = "+00:00";
-
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-
---
--- Base de datos: `chazinfood`
---
-
-
+DROP VIEW IF EXISTS `vwinventario`;
+DROP VIEW IF EXISTS `vwproductos`;
+DROP VIEW IF EXISTS `vwventas`;
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `categoriainsumo`
---
-
+-- Tabla: `categoriainsumo`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `categoriainsumo`;
 CREATE TABLE `categoriainsumo` (
   `idCategoriaInsumo` int(11) NOT NULL AUTO_INCREMENT,
@@ -47,28 +24,20 @@ CREATE TABLE `categoriainsumo` (
   UNIQUE KEY `UK_CategoriaInsumo` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `categoriainsumo`
---
-
 INSERT INTO `categoriainsumo` (`idCategoriaInsumo`, `nombre`, `descripcion`, `estado`) VALUES
 (1, 'Panadería y Masas', 'Panes artesanales y bases', 1),
 (2, 'Lácteos y Quesos', 'Quesos cheddar, mozzarella y mantequillas', 1),
-(3, 'Vegetales y Frescos', 'Lechuga, tomate, cebolla y papas', 1),
+(3, 'Verduras y Vegetales Frescos', 'Lechuga, tomate, cebolla, papas, aguacate y verduras frescas', 1),
 (4, 'Salsas y Aderezos', 'Salsas de la casa, mayonesa y aderezos', 1),
 (5, 'Bebidas Embotelladas', 'Gaseosas y aguas', 1),
-(6, 'Verduras Especiales', NULL, 1),
-(7, 'Salsas y Condimentos', NULL, 1),
-(8, 'Carnes', 'Res, Cerdo, Frias', 1),
-(9, 'Cárnicos y Proteínas', 'Carnes de res, pollo, salchichas y tocinetas', 1),
-(10, 'testeo', 'test', 1);
+(6, 'Salsas y Condimentos', NULL, 0),
+(7, 'Carnes', 'Res, Cerdo, Frias', 0),
+(8, 'Cárnicos y Proteínas', 'Carnes de res, pollo, salchichas y tocinetas', 1);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `categoriaproducto`
---
-
+-- Tabla: `categoriaproducto`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `categoriaproducto`;
 CREATE TABLE `categoriaproducto` (
   `idCategoriaProducto` int(11) NOT NULL AUTO_INCREMENT,
@@ -140,10 +109,7 @@ CREATE TABLE `categoriaproducto` (
   UNIQUE KEY `nombre_60` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `categoriaproducto`
---
-
 INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `icon`) VALUES
 (0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', 0, NULL),
 (1, 'Perros Calientes', 'Perros calientes americanos y especiales con queso gratinado', 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788993441/c9pne5jrmjv5po93xhhl.jpg'),
@@ -151,81 +117,71 @@ INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`,
 (3, 'Hamburguesas', 'Hamburguesas artesanales de res y pollo', 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788993393/bjyqxmdsjyywi3vfkal2.jpg'),
 (4, 'Bebidas', 'Gaseosas, jugos y bebidas refrescantes', 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788993322/hy2izk0bysbya4mcdd9m.webp'),
 (5, 'Salchipapas Gourmet', 'Papas a la francesa con variedad de carnes y salsas', 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788990540/umhitukfpjefhmuovzjf.avif'),
-(6, 'Acompañamientos', 'Papas francesas, rústicas en casco, espirales y especialidades para acompañar', 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789007803/rozvcptnxp9gg6wbxtgt.jpg'),
-(7, 'testeo', 'testeo', 1, '');
+(6, 'Acompañamientos', 'Papas francesas, rústicas en casco, espirales y especialidades para acompañar', 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789007803/rozvcptnxp9gg6wbxtgt.jpg');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `cliente`
---
-
+-- Tabla: `cliente`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `cliente`;
 CREATE TABLE `cliente` (
   `idCliente` int(11) NOT NULL AUTO_INCREMENT,
-  `direccion` varchar(255) DEFAULT NULL,
+  `direccion` text DEFAULT NULL,
   `idUsuario` int(11) DEFAULT NULL,
+  `estado` tinyint(4) NOT NULL DEFAULT 1,
   PRIMARY KEY (`idCliente`),
   UNIQUE KEY `UK_Cliente_Usuario` (`idUsuario`),
   KEY `IDX_ClienteUsuario` (`idUsuario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `cliente`
---
-
-INSERT INTO `cliente` (`idCliente`, `direccion`, `idUsuario`) VALUES
-(1, '{\"direccion\":\"Avenida Siempre Viva 742\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 12),
-(2, '{\"direccion\":\"Cl. 21 #80 21, Belén, Medellín\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 10),
-(3, '{\"direccion\":\"Calle Falsa 123\",\"tipo\":\"VIP\",\"ciclo\":1,\"inicio\":\"2026-09-14T11:48:36.094Z\",\"vence\":\"2026-10-14T11:48:36.094Z\"}', 6),
-(4, '{\"direccion\":\"Calle 10 # 5-20\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 7),
-(5, '{\"direccion\":\"Avenida 33 # 80-10\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 9),
-(6, '{\"direccion\":\"Calle 45a #36a - 35\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 2),
-(7, '{\"direccion\":\"Callev35a #58b- 56\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 3),
-(8, '{\"direccion\":\"Calle 50a #45b - 60\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 11),
-(10, '{\"direccion\":\"Calle 34B #112C - 54\",\"tipo\":\"VIP\",\"ciclo\":1,\"inicio\":\"2026-09-08T22:22:53.969Z\",\"vence\":\"2026-10-08T22:22:53.969Z\"}', 1),
-(11, '{\"direccion\":\"Calle 50\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 13),
-(13, '{\"direccion\":\"Carrera QA # 100 - 20, Medellín\",\"tipo\":\"Nuevo\",\"ciclo\":0,\"inicio\":\"2026-08-22T18:12:20.603Z\",\"vence\":null}', 19),
-(14, '{\"direccion\":\"calle siempre activa 90 \",\"tipo\":\"Nuevo\",\"ciclo\":0}', 20),
-(15, '{\"direccion\":\"CL 76 C C R  910 B 37\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 21),
-(16, '{\"direccion\":\"Calle RR 23 CL 80\",\"tipo\":\"Nuevo\",\"ciclo\":0}', 22),
-(21, '', 23),
-(22, '', 14),
-(26, '{\"direccion\":\"\",\"tipo\":\"Regular\",\"ciclo\":2,\"inicio\":\"2026-09-01T12:05:14.094Z\",\"vence\":\"2026-10-01T12:05:14.094Z\"}', NULL);
+INSERT INTO `cliente` (`idCliente`, `direccion`, `idUsuario`, `estado`) VALUES
+(2, '{\"direccion\":\"Calle Falsa 123\",\"tipo\":\"VIP\",\"ciclo\":1,\"inicio\":\"2026-09-24T04:47:41.244Z\",\"vence\":\"2026-10-24T04:47:41.244Z\"}', 6, 1),
+(8, '{\"direccion\":\"Calle 34B #112C - 54\",\"tipo\":\"VIP\",\"ciclo\":1,\"inicio\":\"2026-10-22T15:57:50.701Z\",\"vence\":\"2026-11-21T15:57:50.701Z\"}', 1, 1),
+(16, '{\"nombre\":\"Cliente\",\"apellidos\":\"Mostrador\",\"tipo\":\"Mostrador\",\"descuentoPorcentaje\":0,\"estado\":\"Activo\"}', NULL, 1),
+(17, '{\"direccion\":\"Calle Mas que real\",\"tipo\":\"Nuevo\",\"ciclo\":2,\"inicio\":\"2026-09-23T11:34:05.588Z\",\"vence\":null}', 25, 1),
+(20, '{\"direccion\":\"calle E verything R\",\"tipo\":\"Nuevo\",\"descuentoPorcentaje\":0,\"nombre\":\"sofyan\",\"apellidos\":\"amrabat\",\"telefono\":\"3338977654\",\"ciclo\":0}', 26, 1),
+(21, '{\"direccion\":\"Calle pripa\",\"tipo\":\"Nuevo\",\"ciclo\":1,\"inicio\":\"2026-10-06T12:26:46.761Z\",\"vence\":null}', 27, 1),
+(22, '{\"direccion\":\"Calle 12 # 34-56\",\"tipo\":\"Nuevo\",\"ciclo\":1,\"inicio\":\"2026-10-18T17:44:06.052Z\",\"vence\":null}', 28, 1),
+(26, '{\"direccion\":\"\",\"tipo\":\"Nuevo\",\"descuentoPorcentaje\":0,\"nombre\":\"Nuevo Cliente\",\"apellidos\":\"\",\"telefono\":\"\",\"ciclo\":0,\"foto\":null}', 32, 1),
+(27, '{\"direccion\":\"\",\"tipo\":\"Nuevo\",\"descuentoPorcentaje\":0,\"nombre\":\"Pedro\",\"apellidos\":\"Jajaja\",\"telefono\":\"\",\"ciclo\":0,\"foto\":\"https://lh3.googleusercontent.com/a/ACg8ocIGFU4ouBL7lt9zWlG2aIR76fZA30Sw3ndhDlD1cxSYpYbyMA=s96-c\"}', 33, 1),
+(28, '{\"direccion\":\"\",\"tipo\":\"Nuevo\",\"descuentoPorcentaje\":0,\"nombre\":\"Samuel Gutiérrez franco\",\"apellidos\":\"\",\"telefono\":\"\",\"ciclo\":0,\"foto\":\"https://lh3.googleusercontent.com/a/ACg8ocKmapNwCVpwyd7XnVj1loQQ9a43jOPDmTcBpztbkZAtZms3lti_=s96-c\"}', 34, 1);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `compra`
---
-
+-- Tabla: `compra`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `compra`;
 CREATE TABLE `compra` (
   `idCompra` int(11) NOT NULL AUTO_INCREMENT,
-  `idProveedor` int(11) NOT NULL,
+  `idProveedor` int(11) DEFAULT NULL,
+  `numeroFactura` varchar(100) DEFAULT NULL,
+  `fechaFactura` date DEFAULT NULL,
   `fechaCompra` datetime DEFAULT NULL,
   `total` decimal(12,2) NOT NULL,
-  `estado` enum('PENDIENTE','RECIBIDA','CANCELADA') DEFAULT 'RECIBIDA',
+  `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `iva` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `incluyeIva` tinyint(1) NOT NULL DEFAULT 0,
+  `estado` varchar(30) NOT NULL DEFAULT 'RECIBIDA',
+  `motivoCancelacion` varchar(500) DEFAULT NULL,
+  `detallesCancelacion` text DEFAULT NULL,
+  `usuarioCancelacionId` int(11) DEFAULT NULL,
+  `fechaCancelacion` datetime DEFAULT NULL,
   PRIMARY KEY (`idCompra`),
   KEY `IDX_CompraProveedor` (`idProveedor`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `compra`
---
-
-INSERT INTO `compra` (`idCompra`, `idProveedor`, `fechaCompra`, `total`, `estado`) VALUES
-(1, 1, '2026-08-10 00:00:00', 1.00, 'PENDIENTE'),
-(2, 1, '2026-08-25 00:00:00', 100000.00, 'PENDIENTE'),
-(3, 7, '2026-09-17 00:00:00', 200000.00, 'RECIBIDA'),
-(4, 7, '2026-09-17 00:00:00', 200000.00, 'PENDIENTE');
+INSERT INTO `compra` (`idCompra`, `idProveedor`, `numeroFactura`, `fechaFactura`, `fechaCompra`, `total`, `subtotal`, `iva`, `incluyeIva`, `estado`, `motivoCancelacion`, `detallesCancelacion`, `usuarioCancelacionId`, `fechaCancelacion`) VALUES
+(1, 1, NULL, NULL, '2026-08-10 00:00:00', 1.00, 0.00, 0.00, 0, 'RECIBIDA', NULL, NULL, NULL, NULL),
+(2, 1, NULL, NULL, '2026-08-25 00:00:00', 100000.00, 0.00, 0.00, 0, 'RECIBIDA', NULL, NULL, NULL, NULL),
+(3, 7, NULL, NULL, '2026-09-17 00:00:00', 200000.00, 0.00, 0.00, 0, 'RECIBIDA', NULL, NULL, NULL, NULL),
+(4, 7, NULL, NULL, '2026-09-17 00:00:00', 200000.00, 0.00, 0.00, 0, 'RECIBIDA', NULL, NULL, NULL, NULL),
+(5, 3, NULL, NULL, '2026-10-02 00:00:00', 2752900.00, 0.00, 0.00, 0, 'RECIBIDA', NULL, NULL, NULL, NULL),
+(8, NULL, NULL, NULL, '2026-09-24 00:00:00', 120000.00, 0.00, 0.00, 0, 'CANCELADA', 'Orden de compra duplicada', '[{\"idInsumo\":2,\"nombre\":\"salsa rosada\",\"unidadMedida\":\"paq\",\"cantidadCancelada\":12,\"subtotal\":120000,\"lotes\":[]}]', 4, '2026-09-24 12:32:13'),
+(9, NULL, NULL, NULL, '2026-10-08 00:00:00', 230000.00, 0.00, 0.00, 0, 'RECIBIDA', NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `descuento`
---
-
+-- Tabla: `descuento`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `descuento`;
 CREATE TABLE `descuento` (
   `idDescuento` int(11) NOT NULL AUTO_INCREMENT,
@@ -239,21 +195,31 @@ CREATE TABLE `descuento` (
   KEY `IDX_DescuentoEvento` (`idEvento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `descuento`
---
-
 INSERT INTO `descuento` (`idDescuento`, `idEvento`, `nombreDescuento`, `tipoDescuento`, `porcentaje`, `valorFijo`, `estado`) VALUES
 (1, 2, '2x1 Jueves Burger', 'PORCENTAJE', 50.00, NULL, 1),
 (2, 3, '15% Descuento Finde', 'PORCENTAJE', 15.00, NULL, 1),
 (3, 4, 'Combo Pareja Promo', 'VALOR FIJO', NULL, 4000.00, 1);
 
 -- --------------------------------------------------------
+-- Tabla: `detallecombo`
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `detallecombo`;
+CREATE TABLE `detallecombo` (
+  `idDetalleCombo` int(11) NOT NULL AUTO_INCREMENT,
+  `idCombo` int(11) NOT NULL,
+  `idProducto` int(11) NOT NULL,
+  `cantidad` int(11) NOT NULL DEFAULT 1,
+  `esOpcional` tinyint(1) NOT NULL DEFAULT 0,
+  `grupoSeleccion` varchar(80) DEFAULT NULL,
+  PRIMARY KEY (`idDetalleCombo`),
+  KEY `idx_combo_id` (`idCombo`),
+  KEY `idx_combo_prod` (`idProducto`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Estructura de tabla para la tabla `detallecomprainsumo`
---
-
+-- --------------------------------------------------------
+-- Tabla: `detallecomprainsumo`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `detallecomprainsumo`;
 CREATE TABLE `detallecomprainsumo` (
   `idDetalleCompra` int(11) NOT NULL AUTO_INCREMENT,
@@ -262,32 +228,34 @@ CREATE TABLE `detallecomprainsumo` (
   `cantidad` decimal(10,2) NOT NULL,
   `precioUnitario` decimal(10,2) NOT NULL,
   `subtotal` decimal(12,2) NOT NULL,
+  `lotes` text DEFAULT NULL,
+  `numeroLote` varchar(100) DEFAULT NULL,
+  `fechaVencimiento` date DEFAULT NULL,
   PRIMARY KEY (`idDetalleCompra`),
   KEY `IDX_DetalleCompra` (`idCompra`),
   KEY `IDX_DetalleCompraInsumo` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `detallecomprainsumo`
---
-
-INSERT INTO `detallecomprainsumo` (`idDetalleCompra`, `idCompra`, `idInsumo`, `cantidad`, `precioUnitario`, `subtotal`) VALUES
-(1, 1, 3, 10.00, 0.10, 1.00),
-(2, 2, 1, 100.00, 1000.00, 100000.00),
-(3, 3, 46, 100.00, 2000.00, 200000.00),
-(4, 4, 46, 100.00, 2000.00, 200000.00);
-
---
--- Disparadores `detallecomprainsumo`
---
-
+INSERT INTO `detallecomprainsumo` (`idDetalleCompra`, `idCompra`, `idInsumo`, `cantidad`, `precioUnitario`, `subtotal`, `lotes`, `numeroLote`, `fechaVencimiento`) VALUES
+(1, 1, 3, 10.00, 0.10, 1.00, NULL, NULL, NULL),
+(2, 2, 1, 100.00, 1000.00, 100000.00, NULL, NULL, NULL),
+(3, 3, 46, 100.00, 2000.00, 200000.00, NULL, NULL, NULL),
+(4, 4, 46, 100.00, 2000.00, 200000.00, NULL, NULL, NULL),
+(5, 5, 8, 10.00, 2790.00, 27900.00, NULL, NULL, NULL),
+(6, 5, 2, 10.00, 10000.00, 100000.00, NULL, NULL, NULL),
+(7, 5, 9, 10.00, 32000.00, 320000.00, NULL, NULL, NULL),
+(8, 5, 10, 10.00, 200000.00, 2000000.00, NULL, NULL, NULL),
+(9, 5, 13, 10.00, 1100.00, 11000.00, NULL, NULL, NULL),
+(10, 5, 12, 10.00, 1400.00, 14000.00, NULL, NULL, NULL),
+(11, 5, 14, 10.00, 28000.00, 280000.00, NULL, NULL, NULL),
+(14, 8, 2, 12.00, 10000.00, 120000.00, NULL, NULL, NULL),
+(15, 9, 44, 10.00, 5000.00, 50000.00, '[{\"numeroLote\":\"E-001\",\"cantidad\":10,\"fechaVencimiento\":\"2026-10-23\"}]', 'E-001', '2026-10-23'),
+(16, 9, 39, 15.00, 12000.00, 180000.00, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `detallefichainsumo`
---
-
+-- Tabla: `detallefichainsumo`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `detallefichainsumo`;
 CREATE TABLE `detallefichainsumo` (
   `idDetalleFicha` int(11) NOT NULL AUTO_INCREMENT,
@@ -300,10 +268,7 @@ CREATE TABLE `detallefichainsumo` (
   KEY `IDX_DetalleFichaInsumo` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `detallefichainsumo`
---
-
 INSERT INTO `detallefichainsumo` (`idDetalleFicha`, `idFichaTecnica`, `idInsumo`, `cantidad`, `unidadMedida`) VALUES
 (127, 4, 12, 1.00, 'und'),
 (128, 4, 14, 0.15, 'kg'),
@@ -335,21 +300,8 @@ INSERT INTO `detallefichainsumo` (`idDetalleFicha`, `idFichaTecnica`, `idInsumo`
 (154, 9, 17, 1.00, 'und'),
 (155, 9, 18, 0.04, 'kg'),
 (156, 9, 20, 0.06, 'kg'),
-(157, 10, 12, 2.00, 'und'),
-(158, 10, 14, 0.30, 'kg'),
-(159, 10, 19, 2.00, 'und'),
-(160, 10, 18, 0.06, 'kg'),
-(161, 10, 21, 0.20, 'kg'),
-(162, 10, 29, 2.00, 'und'),
-(163, 11, 29, 1.00, 'und'),
-(164, 12, 30, 1.00, 'und'),
 (167, 13, 31, 1.00, 'und'),
-(168, 14, 33, 1.00, 'und'),
-(169, 15, 35, 1.00, 'und'),
-(170, 16, 36, 1.00, 'und'),
-(171, 17, 37, 1.00, 'und'),
 (172, 18, 21, 0.15, 'kg'),
-(173, 19, 32, 1.00, 'und'),
 (174, 20, 21, 0.22, 'kg'),
 (175, 21, 21, 0.15, 'kg'),
 (176, 22, 38, 0.24, 'kg'),
@@ -448,14 +400,27 @@ INSERT INTO `detallefichainsumo` (`idDetalleFicha`, `idFichaTecnica`, `idInsumo`
 (277, 40, 45, 0.03, 'kg'),
 (278, 40, 22, 0.02, 'kg'),
 (279, 40, 23, 0.03, 'kg'),
-(280, 41, 46, 500.00, 'gr');
+(291, 11, 29, 1.00, 'und'),
+(292, 14, 33, 1.00, 'und'),
+(293, 15, 35, 1.00, 'und'),
+(295, 12, 30, 1.00, 'und'),
+(296, 16, 36, 1.00, 'und'),
+(297, 17, 37, 1.00, 'und'),
+(300, 49, 47, 1.00, 'und'),
+(303, 50, 48, 1.00, 'und'),
+(312, 51, 9, 1.00, 'Kg'),
+(313, 51, 12, 1.00, 'und'),
+(320, 10, 12, 2.00, 'und'),
+(321, 10, 14, 0.30, 'kg'),
+(322, 10, 19, 2.00, 'und'),
+(323, 10, 18, 0.06, 'kg'),
+(324, 10, 21, 0.20, 'kg'),
+(325, 10, 29, 2.00, 'und'),
+(329, 19, 32, 1.00, 'und');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `detalleinsumopreparadoinsumo`
---
-
+-- Tabla: `detalleinsumopreparadoinsumo`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `detalleinsumopreparadoinsumo`;
 CREATE TABLE `detalleinsumopreparadoinsumo` (
   `idDetalle` int(11) NOT NULL AUTO_INCREMENT,
@@ -469,24 +434,20 @@ CREATE TABLE `detalleinsumopreparadoinsumo` (
   KEY `fk_detalle_insumo_normal` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `detalleinsumopreparadoinsumo`
---
-
 INSERT INTO `detalleinsumopreparadoinsumo` (`idDetalle`, `idPreparado`, `idInsumo`, `cantidad`, `unidadMedida`, `precioUnitario`) VALUES
 (37, 1, 2, 1.00, 'paq', 800.00),
 (60, 7, 28, 0.60, 'kg', 13800.00),
 (61, 7, 26, 0.25, 'kg', 12500.00),
 (62, 7, 27, 0.15, 'kg', 11500.00),
 (63, 8, 24, 1.00, 'kg', 3900.00),
-(64, 9, 14, 1.50, 'kg', 28000.00);
+(64, 9, 14, 1.50, 'kg', 28000.00),
+(76, 18, 9, 1.00, 'Kg', 0.00),
+(77, 18, 12, 1.00, 'und', 0.00);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `detalleventaadicion`
---
-
+-- Tabla: `detalleventaadicion`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `detalleventaadicion`;
 CREATE TABLE `detalleventaadicion` (
   `idDetalleVentaAdicion` int(11) NOT NULL AUTO_INCREMENT,
@@ -500,19 +461,24 @@ CREATE TABLE `detalleventaadicion` (
   KEY `IDX_Adicion` (`idAdicion`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `detalleventaadicion`
---
-
 INSERT INTO `detalleventaadicion` (`idDetalleVentaAdicion`, `idDetalleVenta`, `idAdicion`, `cantidad`, `precio`, `subtotal`) VALUES
-(8, 127, 18, 1, 3500.00, 3500.00);
+(8, 127, 18, 1, 3500.00, 3500.00),
+(9, 134, 18, 1, 3500.00, 3500.00),
+(10, 171, 19, 1, 2500.00, 2500.00),
+(11, 171, 18, 1, 3500.00, 3500.00),
+(12, 172, 17, 1, 2000.00, 2000.00),
+(13, 175, 18, 1, 3500.00, 3500.00),
+(14, 176, 18, 1, 3500.00, 3500.00),
+(15, 187, 18, 1, 3500.00, 3500.00),
+(16, 188, 18, 1, 3500.00, 3500.00),
+(17, 199, 18, 1, 3500.00, 3500.00),
+(18, 200, 18, 1, 3500.00, 3500.00),
+(19, 221, 18, 1, 3500.00, 3500.00);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `detalleventaproducto`
---
-
+-- Tabla: `detalleventaproducto`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `detalleventaproducto`;
 CREATE TABLE `detalleventaproducto` (
   `idDetalleVenta` int(11) NOT NULL AUTO_INCREMENT,
@@ -527,24 +493,106 @@ CREATE TABLE `detalleventaproducto` (
   KEY `IDX_DetalleVentaVariante` (`idVariante`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `detalleventaproducto`
---
-
 INSERT INTO `detalleventaproducto` (`idDetalleVenta`, `idVenta`, `idVariante`, `cantidad`, `precioUnitario`, `subtotal`, `observaciones`) VALUES
 (126, 117, 10, 1, 18000.00, 18000.00, 'Hamburguesa Clásica Chazin'),
 (127, 118, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
-(128, 119, 56, 1, 20000.00, 20000.00, 'tester'),
-(129, 119, 56, 1, 20000.00, 20000.00, 'tester'),
-(130, 120, 56, 1, 20000.00, 20000.00, 'tester'),
-(131, 121, 56, 3, 20000.00, 60000.00, 'tester');
+(132, 122, 15, 1, 23000.00, 23000.00, 'Salchipapa Salvaje Gourmet'),
+(133, 123, 33, 1, 15500.00, 15500.00, 'Papas con Chili Mediana'),
+(134, 124, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(135, 125, 10, 1, 18000.00, 18000.00, 'Clásica 150g'),
+(136, 126, 39, 1, 22000.00, 22000.00, 'Individual BBQ Bacon 150g'),
+(137, 126, 28, 4, 23500.00, 94000.00, 'Mexicana Clásica'),
+(138, 126, 58, 1, 4500.00, 4500.00, 'Gaseosa Coca-Cola 400ml'),
+(139, 127, 10, 1, 18000.00, 18000.00, 'Hamburguesa Clásica Chazin (Jueves 2x1 de Burger Artesanal)'),
+(140, 127, 11, 1, 20000.00, 20000.00, 'Hamburguesa Doble Carne & Tocineta (20% OFF en Doble Carne & Tocineta)'),
+(141, 127, 12, 1, 17500.00, 17500.00, 'Hamburguesa Pollo Crispy Gourmet (Promo Relámpago: Pollo Crispy Gourmet)'),
+(142, 127, 13, 1, 11900.00, 11900.00, 'Perro Caliente Especial Americano (Super Fin de Semana Chazin (15% OFF))'),
+(143, 127, 14, 1, 17000.00, 17000.00, 'Perro Suizo Chazin (Festival de Toppings: Perro Suizo + Doble Tocineta Gratis)'),
+(144, 127, 15, 1, 19550.00, 19550.00, 'Salchipapa Salvaje Gourmet (Super Fin de Semana Chazin (15% OFF))'),
+(145, 127, 16, 1, 34000.00, 34000.00, 'Combo Pareja Chazin (Combo Pareja Festivo)'),
+(146, 127, 58, 1, 4500.00, 4500.00, 'Coca-Cola Original (400 ml)'),
+(147, 127, 59, 1, 8500.00, 8500.00, 'Gaseosa Manzana Postobón (400 ml)'),
+(148, 127, 10, 1, 3000.00, 3000.00, 'Agua Cristal sin Gas 600ml'),
+(149, 127, 11, 1, 4000.00, 4000.00, 'Pepsi Regular (400 ml)'),
+(150, 127, 12, 1, 4000.00, 4000.00, 'Gaseosa Colombiana Postobón (400 ml)'),
+(151, 127, 74, 1, 8500.00, 8500.00, ' (400 ml)'),
+(152, 127, 76, 1, 8500.00, 8500.00, ' (400 ml)'),
+(153, 127, 26, 1, 5000.00, 5000.00, 'Porción Individual 150g'),
+(154, 127, 58, 1, 4500.00, 4500.00, 'Coca-Cola Sin Azúcar / Light (400 ml)'),
+(155, 127, 28, 1, 10500.00, 10500.00, 'Porción Individual'),
+(156, 127, 29, 1, 8500.00, 8500.00, 'Porción Individual'),
+(157, 127, 30, 1, 10500.00, 10500.00, 'Porción Individual'),
+(158, 127, 31, 1, 8500.00, 8500.00, 'Porción Individual'),
+(159, 127, 32, 1, 13500.00, 13500.00, 'Porción Individual'),
+(160, 127, 33, 2, 15500.00, 31000.00, 'Porción Individual'),
+(161, 127, 34, 1, 17500.00, 17500.00, 'Porción Individual'),
+(162, 127, 34, 1, 17500.00, 17500.00, 'Porción Individual'),
+(163, 127, 35, 1, 15500.00, 15500.00, 'Porción Individual'),
+(164, 128, 11, 1, 20000.00, 20000.00, 'Doble Carne 300g'),
+(165, 129, 11, 1, 20000.00, 20000.00, 'Doble Carne 300g'),
+(166, 130, 44, 1, 16000.00, 16000.00, 'Perro Mexicano Clásico'),
+(167, 130, 58, 1, 4500.00, 4500.00, 'Gaseosa Coca-Cola 400ml'),
+(168, 131, 12, 1, 17500.00, 17500.00, 'Hamburguesa Pollo Crispy Gourmet (Promo Relámpago: Pollo Crispy Gourmet)'),
+(169, 132, 10, 1, 18000.00, 18000.00, 'Hamburguesa Clásica Chazin (Jueves 2x1 de Burger Artesanal)'),
+(170, 133, 37, 1, 24000.00, 24000.00, 'Hamburguesa Burger Fest Trufada (Chazin Burger Fest 2026 - Edicion Limitada)'),
+(171, 133, 29, 2, 23000.00, 58000.00, 'Individual Campesina (+Queso Cheddar en Lonchas, Tocineta Ahumada en Tiras)'),
+(172, 133, 39, 2, 22000.00, 48000.00, 'Individual BBQ Bacon 150g (+Salchicha Suiza Ahumada)'),
+(173, 134, 10, 1, 18000.00, 18000.00, 'Hamburguesa Clásica Chazin (Jueves 2x1 de Burger Artesanal)'),
+(174, 135, 10, 1, 18000.00, 18000.00, '🔥 ¡PROMO 2x1!: Preparar 2 unidades (1 pagada + 1 gratis)'),
+(175, 136, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(176, 137, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(177, 138, 10, 1, 15000.00, 15000.00, NULL),
+(178, 139, 10, 1, 15000.00, 15000.00, NULL),
+(179, 140, 10, 1, 15000.00, 15000.00, NULL),
+(180, 141, 10, 1, 15000.00, 15000.00, NULL),
+(181, 142, 10, 1, 15000.00, 15000.00, NULL),
+(182, 143, 10, 1, 15000.00, 15000.00, NULL),
+(183, 144, 10, 1, 15000.00, 15000.00, NULL),
+(184, 145, 10, 1, 15000.00, 15000.00, NULL),
+(185, 146, 10, 2, 15000.00, 30000.00, NULL),
+(186, 146, 14, 5, 3000.00, 15000.00, NULL),
+(187, 147, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(188, 148, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(189, 149, 10, 1, 15000.00, 15000.00, NULL),
+(190, 150, 10, 1, 15000.00, 15000.00, NULL),
+(191, 151, 10, 1, 15000.00, 15000.00, NULL),
+(192, 152, 10, 1, 15000.00, 15000.00, NULL),
+(193, 153, 10, 1, 15000.00, 15000.00, NULL),
+(194, 154, 10, 1, 15000.00, 15000.00, NULL),
+(195, 155, 10, 1, 15000.00, 15000.00, NULL),
+(196, 156, 10, 1, 15000.00, 15000.00, NULL),
+(197, 157, 10, 2, 15000.00, 30000.00, NULL),
+(198, 157, 14, 5, 3000.00, 15000.00, NULL),
+(199, 158, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(200, 159, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(201, 160, 10, 1, 15000.00, 15000.00, NULL),
+(202, 161, 10, 1, 15000.00, 15000.00, NULL),
+(203, 162, 10, 1, 15000.00, 15000.00, NULL),
+(204, 163, 10, 1, 15000.00, 15000.00, NULL),
+(205, 164, 10, 1, 15000.00, 15000.00, NULL),
+(206, 165, 10, 1, 15000.00, 15000.00, NULL),
+(207, 166, 10, 1, 15000.00, 15000.00, NULL),
+(208, 167, 10, 1, 15000.00, 15000.00, NULL),
+(209, 168, 10, 2, 15000.00, 30000.00, NULL),
+(210, 168, 14, 5, 3000.00, 15000.00, NULL),
+(211, 169, 10, 1, 15000.00, 15000.00, NULL),
+(212, 170, 10, 1, 15000.00, 15000.00, NULL),
+(213, 171, 10, 1, 15000.00, 15000.00, NULL),
+(214, 172, 10, 1, 15000.00, 15000.00, NULL),
+(215, 173, 10, 1, 15000.00, 15000.00, NULL),
+(216, 174, 10, 1, 15000.00, 15000.00, NULL),
+(217, 175, 10, 1, 15000.00, 15000.00, NULL),
+(218, 176, 10, 1, 15000.00, 15000.00, NULL),
+(219, 177, 10, 2, 15000.00, 30000.00, NULL),
+(220, 177, 14, 5, 3000.00, 15000.00, NULL),
+(221, 178, 10, 2, 18000.00, 36000.00, 'Hamburguesa Clásica Chazin'),
+(222, 179, 10, 1, 100.00, 100.00, NULL),
+(223, 180, 10, 1, 100.00, 100.00, NULL);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `devolucion`
---
-
+-- Tabla: `devolucion`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `devolucion`;
 CREATE TABLE `devolucion` (
   `idDevolucion` int(11) NOT NULL AUTO_INCREMENT,
@@ -559,11 +607,8 @@ CREATE TABLE `devolucion` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `evento`
---
-
+-- Tabla: `evento`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `evento`;
 CREATE TABLE `evento` (
   `idEvento` int(11) NOT NULL AUTO_INCREMENT,
@@ -580,30 +625,25 @@ CREATE TABLE `evento` (
   `insumosAsociados` text DEFAULT NULL,
   `productosAsociados` text DEFAULT NULL,
   `icono` varchar(50) DEFAULT NULL,
+  `imagen` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`idEvento`),
   KEY `idProducto` (`idProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `evento`
---
-
-INSERT INTO `evento` (`idEvento`, `nombreEvento`, `descripcion`, `fechaInicio`, `fechaFin`, `estado`, `idProducto`, `tipoEvento`, `descuento`, `nuevoPrecio`, `accionInsumo`, `insumosAsociados`, `productosAsociados`, `icono`) VALUES
-(2, 'Jueves 2x1 de Burger Artesanal', 'Paga 1 y lleva 2 Hamburguesas Clásicas todos los jueves del mes con salsas de la casa.', '2026-09-01', '2026-10-31', 1, 1, 'PROMOCION_2X1', 50.00, 18000.00, NULL, NULL, NULL, NULL),
-(3, 'Super Fin de Semana Chazin (15% OFF)', '15% de descuento en todos los combos y hamburguesas por compras en línea superiores a $30.000 COP.', '2026-09-01', '2026-10-31', 1, NULL, 'DESCUENTO_GENERAL', 15.00, NULL, NULL, NULL, '[{\"idProducto\":1,\"nombre\":\"Hamburguesa Clásica Chazin\",\"descuento\":15},{\"idProducto\":4,\"nombre\":\"Perro Caliente Especial Americano\",\"descuento\":15},{\"idProducto\":6,\"nombre\":\"Salchipapa Salvaje Gourmet\",\"descuento\":15}]', NULL),
-(4, 'Combo Pareja Festivo', 'Combo Pareja Chazin a precio especial de $34.000 (Ahorro de $4.000) por temporada.', '2026-09-01', '2026-10-31', 1, 7, 'COMBO_ESPECIAL', 10.52, 34000.00, NULL, NULL, NULL, NULL),
-(5, '🔥 Chazin Burger Fest 2026 - Edición Limitada', 'Participante oficial en el festival gastronómico del año. Receta conmemorativa de tiempo limitado con $4.000 de ahorro directo, pan brioche artesanal y salsa trufada secreta.', '2026-09-01', '2026-10-31', 1, 26, 'EDICION_LIMITADA', 14.28, 24000.00, NULL, NULL, NULL, NULL),
-(6, '⚡ Promo Relámpago: Pollo Crispy Gourmet', 'Disfruta de nuestra crujiente pechuga de pollo apanada artesanal con salsa especial a un precio exclusivo de temporada.', '2026-09-01', '2026-10-31', 1, 3, 'Promoción Precio', 16.67, 17500.00, NULL, NULL, NULL, NULL),
-(7, '💥 20% OFF en Doble Carne & Tocineta', 'Doble porción de carne jugosa 80/20 y doble tocineta ahumada con el 20% de descuento directo.', '2026-09-01', '2026-10-31', 1, 2, 'Descuento', 20.00, 20000.00, NULL, NULL, NULL, NULL),
-(8, '🥓 Festival de Toppings: Perro Suizo + Doble Tocineta Gratis', 'Por tiempo limitado, tu Perro Suizo incluye adición de tocineta ahumada crujiente y queso fundido adicional sin costo extra.', '2026-09-01', '2026-10-31', 1, 5, 'Añadir Insumos', 0.00, 17000.00, 'Agregar', '[{\"idInsumo\":3,\"nombre\":\"Tocineta Ahumada\",\"cantidad\":1,\"unidadMedida\":\"porción\"},{\"idInsumo\":4,\"nombre\":\"Queso Mozzarella Fundido\",\"cantidad\":1,\"unidadMedida\":\"porción\"}]', NULL, NULL),
-(9, 'Chazin Burger Fest 2026 - Edicion Limitada', '[🔥 Edición Festival] [DESTACADO_WEB]', '2026-09-13', '2026-10-15', 1, 37, 'EDICION_LIMITADA', 14.00, 24000.00, NULL, NULL, NULL, NULL);
+INSERT INTO `evento` (`idEvento`, `nombreEvento`, `descripcion`, `fechaInicio`, `fechaFin`, `estado`, `idProducto`, `tipoEvento`, `descuento`, `nuevoPrecio`, `accionInsumo`, `insumosAsociados`, `productosAsociados`, `icono`, `imagen`) VALUES
+(2, 'Jueves 2x1 de Burger Artesanal', 'Paga 1 y lleva 2 Hamburguesas Clásicas todos los jueves del mes con salsas de la casa.', '2026-09-01', '2026-10-31', 1, 1, 'PROMOCION_2X1', 50.00, 18000.00, NULL, NULL, NULL, NULL, NULL),
+(3, 'Super Fin de Semana Chazin (15% OFF)', '15% de descuento en todos los combos y hamburguesas por compras en línea superiores a $30.000 COP.', '2026-09-01', '2026-10-31', 1, 4, 'Descuento', 15.00, NULL, NULL, NULL, '[{\"idProducto\":1,\"nombre\":\"Hamburguesa Clásica Chazin\",\"descuento\":15},{\"idProducto\":4,\"nombre\":\"Perro Caliente Especial Americano\",\"descuento\":15},{\"idProducto\":6,\"nombre\":\"Salchipapa Salvaje Gourmet\",\"descuento\":15}]', 'serving_cloche', NULL),
+(4, 'Combo Pareja Festivo', 'Combo Pareja Chazin a precio especial de $34.000 (Ahorro de $4.000) por temporada.', '2026-09-01', '2026-10-31', 1, 7, 'COMBO_ESPECIAL', 10.52, 34000.00, NULL, NULL, NULL, NULL, NULL),
+(5, '🔥 Chazin Burger Fest 2026 - Edición Limitada', 'Participante oficial en el festival gastronómico del año. Receta conmemorativa de tiempo limitado con $4.000 de ahorro directo, pan brioche artesanal y salsa trufada secreta.', '2026-09-01', '2026-10-31', 1, 26, 'EDICION_LIMITADA', 14.28, 24000.00, NULL, NULL, NULL, NULL, NULL),
+(6, '⚡ Promo Relámpago: Pollo Crispy Gourmet', 'Disfruta de nuestra crujiente pechuga de pollo apanada artesanal con salsa especial a un precio exclusivo de temporada.', '2026-09-01', '2026-10-31', 1, 3, 'Promoción Precio', 16.67, 17500.00, NULL, NULL, NULL, NULL, NULL),
+(7, '20% OFF en Doble Carne & Tocineta', 'Aprovecha un 20% de descuento directo en nuestra legendaria Hamburguesa Doble Carne (300g de res seleccionada) con doble tocineta ahumada crujiente y queso cheddar fundido.', '2026-09-01', '2026-10-31', 1, 2, 'Descuento', 20.00, NULL, NULL, NULL, NULL, 'discount', NULL),
+(8, '🥓 Festival de Toppings: Perro Suizo + Doble Tocineta Gratis', 'Por tiempo limitado, tu Perro Suizo incluye adición de tocineta ahumada crujiente y queso fundido adicional sin costo extra.', '2026-09-01', '2026-10-31', 1, 5, 'Añadir Insumos', 0.00, 17000.00, 'Agregar', '[{\"idInsumo\":3,\"nombre\":\"Tocineta Ahumada\",\"cantidad\":1,\"unidadMedida\":\"porción\"},{\"idInsumo\":4,\"nombre\":\"Queso Mozzarella Fundido\",\"cantidad\":1,\"unidadMedida\":\"porción\"}]', NULL, NULL, NULL),
+(9, 'Chazin Burger Fest 2026 - Edicion Limitada', 'Edición Festival', '2026-09-13', '2026-10-15', 0, 37, 'Edición Especial', 14.00, 24000.00, NULL, NULL, NULL, '🎉', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789364357/ys2eammewmau6wxkjsxm.jpg');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `fichatecnica`
---
-
+-- Tabla: `fichatecnica`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `fichatecnica`;
 CREATE TABLE `fichatecnica` (
   `idFichaTecnica` int(11) NOT NULL AUTO_INCREMENT,
@@ -629,10 +669,7 @@ CREATE TABLE `fichatecnica` (
   KEY `idInsumo` (`idInsumo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `fichatecnica`
---
-
 INSERT INTO `fichatecnica` (`idFichaTecnica`, `idVariante`, `descripcion`, `fechaCreacion`, `idProducto`, `idInsumo`, `tipo`, `procedimiento`, `tiempoPreparacion`, `rendimiento`, `especificaciones`, `caracteristicas`, `informacionNutricional`, `condicionesAlmacenamiento`, `vidaUtil`, `observaciones`, `estado`) VALUES
 (1, 0, 'textura bien maciza y firme con olor penetrante lista para su cocción', '2026-08-18 00:58:08', NULL, 7, 'INSUMO', 'mezcle con el aji que ya esta preparado ', 20, '1 porcion ', 'coordinar bien la mezcla de la carne con el chile carolina reapper', 'textura bien maciza y firme con olor penetrante lista para su cocción', 'calorías 20000', 'temperatura ambiente en el refrigerador ajustar', '15 dias alli donde se almacena', 'altamente irritable he inflamable este chile', 0),
 (2, 0, 'Textura sumamente suave, esponjosa y con alta retención de humedad. Sabor ligeramente dulce con notas características a papa y mantequilla. Color miga amarillo pálido y corteza dorada uniforme. Ausencia de magulladuras, deformaciones o desgarros en la superficie.', '2026-08-31 06:17:50', NULL, 8, 'INSUMO', 'Producto listo para el consumo. Para potenciar sus atributos en hamburguesas, se recomienda cortar por la mitad, aplicar una fina capa de mantequilla o mayonesa en las caras internas y sellar a la plancha o tostadora a fuego medio durante 1 a 2 minutos hasta dorar.', 6, '1 unidad por porción (hamburguesa).', 'Ingredientes principales: Harina de trigo fortificada, puré o fécula de papa, agua, azúcar, grasa vegetal o mantequilla, levadura, sal y mejoradores de masa.Humedad: Alta retención de humedad interna (aproximadamente entre un 32% y un 36%), lo que le otorga su suavidad característica.Dimensiones estándar (por unidad): Diámetro de 9 a 10 cm y altura de 4 a 5 cm (medidas promedio para pan de hamburguesa tipo brioche o americano).Peso promedio por unidad: Entre 60 g y 75 g según la marca comercial.Textura de la miga: Alveolado pequeño y cerrado, diseñado para soportar salsas y jugos de la carne sin desarmarse.Empaque de fábrica: Bolsa de polietileno de alta densidad con amarra plástica o sello de calor termoformado.', 'Textura sumamente suave, esponjosa y con alta retención de humedad. Sabor ligeramente dulce con notas características a papa y mantequilla. Color miga amarillo pálido y corteza dorada uniforme. Ausencia de magulladuras, deformaciones o desgarros en la superficie.', 'Por 100g (Aprox. 2 unidades): Calorías 290 kcal, proteínas 8g, carbohidratos 52g (de los cuales azúcares 6g), grasas totales 5g (saturadas 1.5g), fibra alimentaria 2g, sodio 410mg.', 'Conservar en su empaque original cerrado, en un lugar fresco, seco y protegido de la luz solar directa. Temperatura ambiente ideal entre 15°C y 25°C. Evitar zonas de alta humedad o cercanas a fuentes de calor (estufas/hornos) para prevenir el desarrollo de mohos. Una vez abierto, sellar firmemente el empaque.', '14 a 21 días cerrado a temperatura ambiente. Hasta 3 meses congelado (-18°C) en empaque hermético.', 'Contiene gluten (trigo). Puede contener trazas de ajonjolí, leche, huevo o soya debido a líneas de producción compartidas. Almacenar separado de productos químicos o de olor fuerte.', 1),
@@ -644,15 +681,15 @@ INSERT INTO `fichatecnica` (`idFichaTecnica`, `idVariante`, `descripcion`, `fech
 (8, 14, 'Sabor robusto y especiado de la salchicha suiza ahumada, balance dulce de la cebolla caramelizada y cremosidad del queso fundido.', '2026-09-08 20:37:15', 5, NULL, 'PRODUCTO', '1. Realizar incisiones diagonales superficiales en la salchicha suiza ahumada.\n2. Asar en la plancha a fuego medio-alto rotando para sellar y dorar parejo.\n3. Calentar el pan al vapor y colocar en la base la cebolla caramelizada dulce.\n4. Disponer la salchicha suiza sobre la cebolla, agregar tocineta picada crocante.\n5. Cubrir con 50g de mozzarella y gratinar completamente. Finalizar con salsa tártara artesanal.', 9, '1 porción (340g)', 'Salchicha suiza bien dorada por fuera y jugosa por dentro. Gratinado superior uniforme.', 'Sabor robusto y especiado de la salchicha suiza ahumada, balance dulce de la cebolla caramelizada y cremosidad del queso fundido.', 'Calorías: ~680 kcal | Proteína: 29g | Carbohidratos: 38g | Grasas: 38g', 'Consumo inmediato a temperatura caliente (>60°C). Empaque antigrasa para delivery.', 'Consumo inmediato', 'Contiene derivados cárnicos, lácteos y gluten.', 1),
 (9, 15, 'Papas crujientes por fuera y suaves por dentro, abundancia de embutidos ahumados a la plancha, queso mozzarella fundido elástico y sabor intenso.', '2026-09-08 20:37:15', 6, NULL, 'PRODUCTO', '1. Freír 250g de papas a la francesa en aceite limpio a 180°C por 4-5 minutos hasta lograr crocancia dorada.\n2. Cortar en rodajas 1 salchicha americana y 1 salchicha suiza ahumada, y saltear en la plancha con tocineta picada.\n3. Escurrir bien las papas fritas y disponerlas como cama uniforme en la bandeja o plato hondo.\n4. Distribuir encima la mezcla caliente de salchichas y tocineta crocante.\n5. Cubrir con lluvia generosa de queso mozzarella (60g) y gratinar hasta que funda y dore ligeramente.\n6. Acompañar con salsas Chazin de la casa.', 12, '1 porción generosa (560g)', 'Papas crujientes sin exceso de aceite. Carnes bien doradas en plancha y queso fundido uniforme.', 'Papas crujientes por fuera y suaves por dentro, abundancia de embutidos ahumados a la plancha, queso mozzarella fundido elástico y sabor intenso.', 'Calorías: ~890 kcal | Proteína: 35g | Carbohidratos: 68g | Grasas: 52g', 'Servir caliente recién preparado. En delivery usar recipiente con ventilación para evitar que el vapor ablande las papas.', 'Consumo inmediato (máximo 20 min para mantener crujiente)', 'Alérgenos: Lácteos. Libre de gluten en papas y salchichas estándar.', 1),
 (10, 16, 'Variedad completa gourmet: carnes jugosas selladas a punto, queso derretido, papas crocantes recién fritas y bebidas burbujeantes frías.', '2026-09-08 20:37:15', 7, NULL, 'PRODUCTO', '1. Sellar 2 carnes de res 150g en plancha a 200°C con tocineta y fundir 1 loncha de cheddar en cada una.\n2. Tostar 2 panes brioche y armar las 2 hamburguesas clásicas completas.\n3. Freír 200g de papas a la francesa a 180°C hasta que queden doradas y crocantes.\n4. Servir en bandeja compartida las dos hamburguesas, la porción de papas al centro y entregar con 2 botellas de gaseosa bien frías.', 14, '2 personas (1.6 kg combo)', 'Sincronizar la salida de ambas hamburguesas y las papas fritas para servir simultáneamente calientes junto a las bebidas frías.', 'Variedad completa gourmet: carnes jugosas selladas a punto, queso derretido, papas crocantes recién fritas y bebidas burbujeantes frías.', 'Calorías: ~1800 kcal total combo (900 kcal por persona aprox.)', 'Servir de inmediato en mesa o empaque doble térmico con separador para bebidas frías.', 'Consumo inmediato', 'Contiene gluten, lácteos y cafeína en gaseosas.', 1),
-(11, 17, 'Bebida carbonatada refrescante, color caramelo oscuro brillante, aroma dulce especiado clásico con alta efervescencia.', '2026-09-08 20:37:15', 8, NULL, 'PRODUCTO', '1. Retirar del refrigerador de bebidas manteniendo temperatura controlada entre 2°C y 4°C.\n2. Verificar precinto de seguridad y limpieza del envase.\n3. Servir cerrada o entregar con vaso con hielo según solicitud del cliente.', 1, '1 porción (400ml)', 'Bebida fría entre 2°C y 4°C. Envase PET sellado de fábrica sin abolladuras.', 'Bebida carbonatada refrescante, color caramelo oscuro brillante, aroma dulce especiado clásico con alta efervescencia.', 'Calorías: 170 kcal | Carbohidratos: 42g | Azúcares: 42g | Sodio: 45mg', 'Refrigeración constante entre 2°C y 6°C en lugar seco y protegido de la luz solar directa.', 'Según fecha de vencimiento en envase (6 a 9 meses)', 'Contiene cafeína. No agitar antes de abrir.', 1),
-(12, 18, 'Color rosado translúcido característico, sabor dulce y frutal a manzana roja, gasificación media-alta refrescante.', '2026-09-08 20:37:15', 9, NULL, 'PRODUCTO', '1. Tomar de la nevera a temperatura entre 2°C y 4°C.\n2. Inspeccionar que la tapa y sello estén intactos.\n3. Entregar fría al comensal con pitillo o vaso con hielo según preferencia.', 1, '1 porción (400ml)', 'Fría a 2°C - 4°C, envase original con precinto de seguridad intacto.', 'Color rosado translúcido característico, sabor dulce y frutal a manzana roja, gasificación media-alta refrescante.', 'Calorías: 160 kcal | Carbohidratos: 40g | Azúcares: 40g | Sodio: 35mg', 'Mantener en refrigerador de bebidas a 2°C - 4°C. Proteger del calor y luz directa.', 'Según fecha de vencimiento en envase (6 meses)', 'Bebida azucarada sin alcohol.', 1),
+(11, 58, 'Bebida carbonatada refrescante, color caramelo oscuro brillante, aroma dulce especiado clásico con alta efervescencia.', '2026-09-08 20:37:15', 8, NULL, 'PRODUCTO', '1. Retirar del refrigerador de bebidas manteniendo temperatura controlada entre 2°C y 4°C.\n2. Verificar precinto de seguridad y limpieza del envase.\n3. Servir cerrada o entregar con vaso con hielo según solicitud del cliente.', 1, '1 porción (400ml)', 'Bebida fría entre 2°C y 4°C. Envase PET sellado de fábrica sin abolladuras.', 'Bebida carbonatada refrescante, color caramelo oscuro brillante, aroma dulce especiado clásico con alta efervescencia.', 'Calorías: 170 kcal | Carbohidratos: 42g | Azúcares: 42g | Sodio: 45mg', 'Refrigeración constante entre 2°C y 6°C en lugar seco y protegido de la luz solar directa.', 'Según fecha de vencimiento en envase (6 a 9 meses)', 'Contiene cafeína. No agitar antes de abrir.', 1),
+(12, 59, 'Color rosado translúcido característico, sabor dulce y frutal a manzana roja, gasificación media-alta refrescante.', '2026-09-08 20:37:15', 9, NULL, 'PRODUCTO', '1. Tomar de la nevera a temperatura entre 2°C y 4°C.\n2. Inspeccionar que la tapa y sello estén intactos.\n3. Entregar fría al comensal con pitillo o vaso con hielo según preferencia.', 1, '1 porción (400ml)', 'Fría a 2°C - 4°C, envase original con precinto de seguridad intacto.', 'Color rosado translúcido característico, sabor dulce y frutal a manzana roja, gasificación media-alta refrescante.', 'Calorías: 160 kcal | Carbohidratos: 40g | Azúcares: 40g | Sodio: 35mg', 'Mantener en refrigerador de bebidas a 2°C - 4°C. Proteger del calor y luz directa.', 'Según fecha de vencimiento en envase (6 meses)', 'Bebida azucarada sin alcohol.', 1),
 (13, 19, 'Líquido transparente, incoloro, inodoro y de sabor neutro 100% puro y limpio.', '2026-09-08 20:37:15', 10, NULL, 'PRODUCTO', '1. Verificar sello de la tapa intacto y fecha de vencimiento vigente.\n2. Mantener refrigerada a 4°C o a temperatura ambiente según preferencia del cliente.\n3. Entregar botella limpia con servilleta.', 1, '1 porción (600ml)', 'Temperatura fresca o fría según preferencia del comensal. Sello de seguridad hermético sin vulnerar.', 'Líquido transparente, incoloro, inodoro y de sabor neutro 100% puro y limpio.', 'Calorías: 0 kcal | Grasas: 0g | Azúcares: 0g | Sodio: 0mg', 'Almacenar en lugar fresco, seco, ventilado y libre de olores penetrantes.', '12 meses a partir de fecha de envasado', 'Agua tratada microbiológicamente segura.', 1),
-(14, 21, 'Gaseosa Pepsi personal 400ml en botella PET bien fría, con su inconfundible sabor burbujeante.', '2026-09-10 00:35:40', 11, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 165 kcal | Carbohidratos: 41g | Azúcares: 41g | Sodio: 35mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
-(15, 23, 'La bebida de nuestra tierra: Gaseosa Colombiana Postobón tradicional 400ml refrescante.', '2026-09-10 00:35:40', 12, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 170 kcal | Carbohidratos: 43g | Azúcares: 43g | Sodio: 40mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
-(16, 24, 'Gaseosa Sprite lima-limón 400ml, refrescante sabor cítrico y gasificación intensa.', '2026-09-10 00:35:40', 13, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 155 kcal | Carbohidratos: 38g | Azúcares: 38g | Sodio: 30mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
-(17, 25, 'Gaseosa Cuatro sabor toronja cítrica 400ml, ideal para acompañar tus hamburguesas y perros.', '2026-09-10 00:35:40', 14, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 160 kcal | Carbohidratos: 40g | Azúcares: 40g | Sodio: 35mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
+(14, 63, 'Sabor fresco y auténtico de la marca.', '2026-09-10 00:35:40', 11, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 165 kcal | Carbohidratos: 41g | Azúcares: 41g | Sodio: 35mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
+(15, 66, 'Sabor fresco y auténtico de la marca.', '2026-09-10 00:35:40', 12, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 170 kcal | Carbohidratos: 43g | Azúcares: 43g | Sodio: 40mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
+(16, 74, 'Sabor fresco y auténtico de la marca.', '2026-09-10 00:35:40', 13, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 155 kcal | Carbohidratos: 38g | Azúcares: 38g | Sodio: 30mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
+(17, 76, 'Sabor fresco y auténtico de la marca.', '2026-09-10 00:35:40', 14, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (400ml)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 160 kcal | Carbohidratos: 40g | Azúcares: 40g | Sodio: 35mg', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
 (18, 26, 'Porción generosa de 150g de papas a la francesa corte delgado doradas y crujientes con sal marina.', '2026-09-10 00:35:40', 15, NULL, 'PRODUCTO', '1. Tomar insumo de inventario refrigerado o bodega.\n2. Servir a temperatura adecuada.', 2, '1 porción (150g)', 'Servir en óptimas condiciones.', 'Sabor fresco y auténtico de la marca.', 'Calorías: 380 kcal | Carbohidratos: 48g | Grasas: 18g | Proteína: 4g', 'Mantener refrigerado o a temperatura ambiente según el producto.', 'Consumo inmediato.', 'Producto garantizado de alta calidad.', 1),
-(19, 27, 'Gaseosa Coca-Cola Sin Azúcar 400ml bien fría', '2026-09-10 02:36:47', 16, NULL, 'PRODUCTO', '1. Retirar del refrigerador a temperatura controlada (2°C - 4°C).\n2. Destapar y servir con vaso y servilletas.', 1, '1 botella (400ml)', 'Bebida sin azúcar gasificada en envase sellado.', 'Sabor dulce característico de Coca-Cola sin calorías.', 'Calorías: 0 kcal, Azúcares: 0g, Sodio: 25mg.', 'Mantener refrigerado entre 2°C y 6°C.', '6 meses en envase cerrado.', 'Verificar fecha de caducidad.', 1),
+(19, 78, 'Sabor dulce característico de Coca-Cola sin calorías.', '2026-09-10 02:36:47', 16, NULL, 'PRODUCTO', '1. Retirar del refrigerador a temperatura controlada (2°C - 4°C).\n2. Destapar y servir con vaso y servilletas.', 1, '1 botella (400ml)', 'Bebida sin azúcar gasificada en envase sellado.', 'Sabor dulce característico de Coca-Cola sin calorías.', 'Calorías: 0 kcal, Azúcares: 0g, Sodio: 25mg.', 'Mantener refrigerado entre 2°C y 6°C.', '6 meses en envase cerrado.', 'Verificar fecha de caducidad.', 1),
 (20, 28, 'Las papas más crocantes: porción grande (220g) de papas corte tradicional delgadas, doradas a la perfección y sazonadas con sal marina.', '2026-09-10 02:36:47', 17, NULL, 'PRODUCTO', '1. Retirar insumos de congelación (-18°C).\n2. Freír en aceite vegetal a 175°C durante 3 minutos hasta lograr punto dorado y crocante.\n3. Escurrir aceite durante 25 segundos.\n4. Montar en barqueta biodegradable, añadir salsas/toppings correspondientes y servir caliente.', 3, '1 porción grande (220g)', 'Papas corte 7x7mm doradas y ultra crocantes, temperatura interior >75°C.', 'Exterior crujiente, interior esponjoso con sal marina fina.', 'Calorías: 450 kcal, Carbohidratos: 58g, Grasas: 20g, Proteína: 4g.', 'Mantener insumos congelados a -18°C. Servir recién salido de freidora a más de 75°C.', 'Consumo inmediato caliente (máx 15 minutos).', 'Verificar temperatura de aceite a 175°C antes de ingresar el producto.', 1),
 (21, 29, 'Las papas más crocantes: porción mediana (150g) de papas corte tradicional delgadas doradas, para acompañar lo que más te gusta.', '2026-09-10 02:36:47', 18, NULL, 'PRODUCTO', '1. Retirar insumos de congelación (-18°C).\n2. Freír en aceite vegetal a 175°C durante 3 minutos hasta lograr punto dorado y crocante.\n3. Escurrir aceite durante 25 segundos.\n4. Montar en barqueta biodegradable, añadir salsas/toppings correspondientes y servir caliente.', 3, '1 porción mediana (150g)', 'Papas corte tradicional delgadas doradas a 175°C por 3 minutos.', 'Crocantes, doradas con sal marina homogénea.', 'Calorías: 310 kcal, Carbohidratos: 40g, Grasas: 14g, Proteína: 3g.', 'Mantener insumos congelados a -18°C. Servir recién salido de freidora a más de 75°C.', 'Consumo inmediato caliente (máx 15 minutos).', 'Verificar temperatura de aceite a 175°C antes de ingresar el producto.', 1),
 (22, 30, 'Las papas en cascos más crocantes: porción grande (240g) de papas rústicas con piel, sazonadas con paprika, romero y sal marina.', '2026-09-10 02:36:47', 19, NULL, 'PRODUCTO', '1. Retirar insumos de congelación (-18°C).\n2. Freír en aceite vegetal a 175°C durante 4 minutos hasta lograr punto dorado y crocante.\n3. Escurrir aceite durante 25 segundos.\n4. Montar en barqueta biodegradable, añadir salsas/toppings correspondientes y servir caliente.', 4, '1 porción grande (240g)', 'Cascos de papa con piel dorada crujiente y centro suave.', 'Sabor rústico especiado con corteza crocante.', 'Calorías: 420 kcal, Carbohidratos: 55g, Grasas: 18g, Proteína: 5g.', 'Mantener insumos congelados a -18°C. Servir recién salido de freidora a más de 75°C.', 'Consumo inmediato caliente (máx 15 minutos).', 'Verificar temperatura de aceite a 175°C antes de ingresar el producto.', 1),
@@ -674,28 +711,40 @@ INSERT INTO `fichatecnica` (`idFichaTecnica`, `idVariante`, `descripcion`, `fech
 (38, 52, 'El banquete perfecto para compartir con familia o amigos: 2 Hamburguesas Clásicas Chazin + 2 Perros Calientes Especiales Americanos + 2 Porciones grandes de Papas a la Francesa (400g total) + 4 Gaseosas 400ml.', '2026-09-12 01:43:01', 35, NULL, 'PRODUCTO', '1. Elaborar simultáneamente las 2 Hamburguesas Clásicas y los 2 Perros Especiales.\n2. Freír 400g de papas a la francesa en freidora hasta dorar.\n3. Disponer todo en bandeja familiar o empaque de fiesta con salsas y las 4 bebidas frías.', 16, '4 personas', 'Coordinar cocina para que todas las preparaciones salgan a la misma temperatura.', 'Máximo ahorro y variedad para 4 comensales.', 'Calorías: ~3600 kcal total combo', 'Servir inmediatamente.', 'Consumo inmediato', 'Receta e insumos estandarizados Chazin Food.', 1),
 (39, 53, 'Diseñado para dos: 2 Perros Calientes Especiales Americanos con queso mozzarella fundido y tocineta crocante + Porción doble de Papas Francesas crujientes (250g) + 2 Gaseosas frías 400ml.', '2026-09-12 01:43:01', 36, NULL, 'PRODUCTO', '1. Asar 2 salchichas americanas y calentar los panes.\n2. Montar perros con tocineta picada y queso mozzarella gratinado.\n3. Servir con 250g de papas francesas calientes y 2 bebidas.', 10, '2 personas', 'Servir en conjunto.', 'Dúo delicioso de perros americanos con papas.', 'Calorías: ~1650 kcal total', 'Consumo inmediato.', 'Consumo inmediato', 'Receta e insumos estandarizados Chazin Food.', 1),
 (40, 55, 'Aroma ahumado y trufado intenso, textura crocante en tocineta y cremosidad en cheddar fundido.', '2026-09-14 04:54:05', 37, NULL, 'PRODUCTO', '1. Sellar y caramelizar la carne de res 80/20 a la plancha a 200°C por 3 minutos por lado, sazonando con sal marina y pimienta negra.\n2. Fundir las 2 lonchas de queso cheddar sobre la carne durante el último minuto con campana de vapor.\n3. Dorar la tocineta ahumada hasta lograr un crocante perfecto.\n4. Tostar el pan brioche artesanal con mantequilla clarificada.\n5. Untar salsa tártara trufada, disponer lechuga batavia y tomate fresco.\n6. Montar carne con cheddar, tocineta crocante y bañar con salsa cheddar fundido.', 12, '1 hamburguesa gourmet (430g)', 'Carne 100% res 80/20 certificada, pan brioche artesanal, temperatura de servicio > 74°C.', 'Aroma ahumado y trufado intenso, textura crocante en tocineta y cremosidad en cheddar fundido.', '~780 kcal, Proteínas: 44g, Grasas: 42g, Carbohidratos: 48g', 'Refrigeración de insumos 0°C a 4°C. Servir caliente de inmediato.', 'Consumo inmediato caliente (máx 2 horas en empaque térmico)', 'Edición conmemorativa del Chazin Burger Fest 2026.', 1),
-(41, 56, 'test', '2026-09-16 20:27:32', 38, NULL, 'PRODUCTO', 'test', 40, '1', 'etst', 'test', 'test', 'test', '5h', '', 1);
+(41, 0, 'Color naranja brillante', '2026-09-22 16:41:09', NULL, 10, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(42, 0, 'Color naranja brillante', '2026-09-22 16:43:26', NULL, 11, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(43, 0, 'Color naranja brillante', '2026-09-22 16:43:49', NULL, 12, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(44, 0, 'Color naranja brillante', '2026-09-22 16:47:05', NULL, 13, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(45, 0, 'Color naranja brillante', '2026-09-22 17:45:34', NULL, 14, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(46, 0, 'Color naranja brillante', '2026-09-22 17:46:35', NULL, 15, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(47, 0, 'Color naranja brillante', '2026-09-22 18:06:23', NULL, 16, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(48, 0, 'Color naranja brillante', '2026-09-22 18:20:52', NULL, 17, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(49, 81, 'Líquido gasificado de color violeta característico, aroma frutal dulce a uva, textura efervescente y sabor dulce refrescante.', '2026-09-22 23:21:52', 38, NULL, 'PRODUCTO', '1. Retirar la botella del refrigerador verificando que esté a la temperatura adecuada.\n\n2. Limpiar el envase y comprobar el sello de seguridad de la tapa.\n\n3. Servir sellada junto con vaso con hielo (y pitillo según protocolo de mesa o entrega).', 1, '1 porción ', 'Presentación personal PET 400 ml. Servir entre 2 °C y 4 °C.', 'Líquido gasificado de color violeta característico, aroma frutal dulce a uva, textura efervescente y sabor dulce refrescante.', 'Porción 400 ml: aprox. 160 kcal, 40 g carbohidratos (azúcares), 0 g grasa, 0 g proteína, 35 mg sodio.', 'Almacenar en lugar seco, fresco y protegido de la luz solar. Mantener en vitrina refrigerada entre 2 °C y 6 °C.', 'Según fecha de vencimiento impresa en la tapa/envase (cerrada). Consumo inmediato una vez abierta.', 'No agitar antes de destapar para evitar derrames. Servir siempre bien fría.', 1),
+(50, 86, 'Color naranja brillante traslúcido. Aroma cítrico dulce característico a naranja. Sabor dulce con notas cítricas y acidez equilibrada. Textura líquida carbonatada efervescente.', NULL, 39, NULL, 'PRODUCTO', '1. Retirar la botella del área de refrigeración (4°C a 8°C).\n\n2. Verificar la integridad del sello de seguridad de la tapa y la fecha de vencimiento.\n\n3. Limpiar superficialmente el exterior del envase si es necesario.\n\n4. Servir directamente sellada para consumo inmediato o entregar acompañada de un vaso con hielo y pitillo según preferencia del cliente.', 1, '1 porción', 'Contenido neto: 400 ml. Envase PET sellado herméticamente con tapa rosca. Grado de gasificación: medio-alto. Temperatura de servicio recomendada: 4°C - 8°C.', 'Color naranja brillante traslúcido. Aroma cítrico dulce característico a naranja. Sabor dulce con notas cítricas y acidez equilibrada. Textura líquida carbonatada efervescente.', 'Porción 200 ml (aprox. 2 porciones por envase): Calorías: ~80 kcal, Carbohidratos totales: ~20 g (de los cuales azúcares añadidos: ~19 g), Grasas totales: 0 g, Proteínas: 0 g, Sodio: ~35 mg.', 'Almacenar en lugar fresco, seco y limpio, alejado de la luz solar directa y fuentes de calor. Mantener refrigerado antes de servir para preservar la carbonatación.', 'Consumir antes de la fecha de vencimiento impresa en el envase (aprox. 6 meses sin abrir). Una vez a', 'Bebida lista para el consumo. No contiene alérgenos comunes (sin gluten, sin lactosa). Contiene colorantes artificiales (Tartrazina / Amarillo No. 6). Servir frío.', 1),
+(51, 0, 'Salado, olor fuerte', '2026-10-07 07:35:15', NULL, 18, 'INSUMO_PREPARADO', 'Hervimos 5L de agua', 15, '1 porción', 'Amarillo, Textura Suave', 'Salado, olor fuerte', 'Calorias: 1000g, grasas trans: 50g', 'Refrigerar a 24°C', '5 dias', '', 1),
+(52, 0, 'Color naranja brillante', '2026-10-20 21:18:04', NULL, 19, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(53, 0, 'Color naranja brillante', '2026-10-20 21:25:09', NULL, 20, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1),
+(54, 0, 'Color naranja brillante', '2026-10-20 21:37:27', NULL, 21, 'INSUMO_PREPARADO', 'Integrar con batidor a 60°C por 8 minutos', 8, '15 frascos de 250ml', 'Ph 4.2 - Textura semi-densa', 'Color naranja brillante', 'Bajo en sodio', 'Refrigerar a 4°C', '15 días', '', 1);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `insumo`
---
-
+-- Tabla: `insumo`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `insumo`;
 CREATE TABLE `insumo` (
   `idInsumo` int(11) NOT NULL AUTO_INCREMENT,
-  `idCategoriaInsumo` int(11) NOT NULL,
+  `idCategoriaInsumo` int(11) DEFAULT NULL,
   `nombre` varchar(255) NOT NULL,
   `unidadMedida` varchar(255) DEFAULT NULL,
   `stock` decimal(10,2) DEFAULT 0.00,
   `stockMinimo` decimal(10,2) DEFAULT 0.00,
+  `stockMaximo` decimal(10,2) NOT NULL DEFAULT 100.00,
   `fechaExpedicion` date DEFAULT NULL,
   `fechaVencimiento` date DEFAULT NULL,
   `estado` tinyint(4) DEFAULT 1,
   `esAdicion` tinyint(1) NOT NULL DEFAULT 0,
   `precioAdicion` decimal(10,2) NOT NULL DEFAULT 0.00,
   `imagen` varchar(255) DEFAULT NULL,
+  `incluyeIva` tinyint(1) NOT NULL DEFAULT 0,
   `eliminado` tinyint(4) NOT NULL DEFAULT 0,
   `precioUnitario` decimal(10,2) DEFAULT 0.00,
   `idProveedor` int(11) DEFAULT NULL,
@@ -705,64 +754,60 @@ CREATE TABLE `insumo` (
   KEY `idProveedor` (`idProveedor`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `insumo`
---
-
-INSERT INTO `insumo` (`idInsumo`, `idCategoriaInsumo`, `nombre`, `unidadMedida`, `stock`, `stockMinimo`, `fechaExpedicion`, `fechaVencimiento`, `estado`, `esAdicion`, `precioAdicion`, `imagen`, `eliminado`, `precioUnitario`, `idProveedor`, `descripcion`) VALUES
-(1, 6, 'aguacate', 'und', 0.00, 0.00, NULL, NULL, 0, 0, 0.00, NULL, 1, 0.00, 1, NULL),
-(2, 7, 'salsa rosada', 'paq', 40.00, 5.00, '2026-08-05', '2026-08-07', 0, 0, 0.00, NULL, 0, 10000.00, 4, ''),
-(3, 1, 'samuel', 'Kg', 0.00, 5.00, NULL, NULL, 0, 0, 0.00, NULL, 1, 0.10, 1, ''),
-(4, 2, 'Yeison Food', 'Unidad', 0.00, 5.00, NULL, NULL, 0, 1, 2500.00, NULL, 1, 0.00, 3, 'asdfghjkl'),
-(5, 2, 'Pan de Arina', 'kg', 0.00, 5.00, '2026-08-01', '2026-12-31', 1, 0, 0.00, NULL, 1, 1200.00, 1, 'Harina refinada de trigo multipropósito'),
-(6, 3, 'Alexis', 'Paquete', 0.00, 5.00, '2026-05-26', '2026-08-26', 0, 1, 3500.00, NULL, 1, 500.00, 4, 'dfghjklñ'),
-(7, 9, 'Carne con carolina reapper 150g', 'Unidad', 0.00, 15.00, '2026-08-28', '2026-08-31', 1, 0, 0.00, NULL, 1, 20000.00, 6, ''),
-(8, 2, 'Pan de papa', 'Gr', 60.00, 5.00, '2026-09-21', '2026-09-14', 1, 0, 0.00, NULL, 0, 2790.00, 3, 'Pan de papa gourmet'),
-(9, 8, 'Carne de Res', 'Kg', 45.00, 5.00, '2026-08-31', '2026-09-04', 1, 0, 0.00, NULL, 0, 32000.00, 1, 'Carne de res premium seleccionada para la preparación de hamburguesas del restaurante. Mantener estrictamente refrigerada entre 0°C y 4°C para asegurar su frescura. Manejar bajo sistema de rotación PEPS (Primeras en Entrar, Primeras en Salir).'),
-(10, 3, 'papa', 'Kg', 100.00, 5.00, '2026-07-26', '2025-06-10', 1, 0, 0.00, NULL, 0, 200000.00, 1, ''),
-(11, 3, 'papa2', 'Kg', 0.00, 5.00, '2026-08-30', '2026-09-23', 0, 0, 0.00, NULL, 1, 0.00, 1, ''),
-(12, 1, 'Pan Brioche Artesanal', 'und', 149.00, 20.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 1400.00, 1, 'Pan brioche con mantequilla y ajonjolí'),
-(13, 1, 'Pan Perro Americano', 'und', 100.00, 15.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 1100.00, 1, 'Pan artesanal para perro caliente'),
-(14, 9, 'Carne de Res Molida 80/20', 'kg', 44.85, 8.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 28000.00, 1, 'Carne 100% de res para hamburguesas'),
-(15, 9, 'Pechuga de Pollo Fresca', 'kg', 30.00, 6.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 19000.00, 1, 'Filetes de pechuga fresca desmechada o crispy'),
-(16, 9, 'Salchicha Americana Premium', 'und', 120.00, 20.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 1800.00, 1, 'Salchicha tipo americana para perros calientes'),
-(17, 9, 'Salchicha Suiza Ahumada', 'und', 80.00, 15.00, NULL, NULL, 1, 1, 2000.00, 'meat', 0, 2600.00, 1, 'Salchicha suiza artesanal ahumada'),
-(18, 9, 'Tocineta Ahumada en Tiras', 'kg', 19.97, 4.00, NULL, NULL, 1, 1, 3500.00, 'https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80', 0, 34000.00, 1, 'Tiras de tocineta ahumada crujiente'),
-(19, 2, 'Queso Cheddar en Lonchas', 'und', 249.00, 30.00, NULL, NULL, 1, 1, 2500.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp', 0, 700.00, 1, 'Lonchas de queso cheddar fundible'),
-(20, 2, 'Queso Mozzarella Rallado', 'kg', 25.00, 5.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 25000.00, 1, 'Queso mozzarella para gratinar'),
-(21, 3, 'Papas a la Francesa Corte Delgado', 'kg', 60.00, 10.00, NULL, NULL, 1, 1, 5000.00, 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80', 0, 9800.00, 1, 'Papas prefritas congeladas corte fino'),
-(22, 3, 'Lechuga Batavia Fresca', 'kg', 17.66, 3.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 4500.00, 1, 'Lechuga fresca crujiente'),
-(23, 3, 'Tomate Chonto Maduro', 'kg', 19.49, 4.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 5200.00, 1, 'Tomates frescos en rodajas'),
-(24, 3, 'Cebolla Cabezona Blanca', 'kg', 22.00, 4.00, NULL, NULL, 1, 1, 2000.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788959741/dsogrxmfoohur2tscbgq.jpg', 0, 3900.00, 1, 'Cebolla fresca para caramelizar y aderezos'),
-(25, 3, 'Jalapeños en Rodajas', 'kg', 10.00, 2.00, NULL, NULL, 1, 1, 2000.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg', 0, 14500.00, 1, 'Jalapeños encurtidos picantes'),
-(26, 4, 'Salsa de Tomate Heinz', 'kg', 15.00, 3.00, NULL, NULL, 1, 1, 1500.00, 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80', 0, 12500.00, 1, 'Salsa de tomate clásica'),
-(27, 4, 'Mostaza Americana', 'kg', 10.00, 2.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 11500.00, 1, 'Mostaza amarilla tradicional'),
-(28, 4, 'Mayonesa Real', 'kg', 16.00, 3.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 13800.00, 1, 'Base de mayonesa cremosa'),
-(29, 5, 'Coca-Cola Original 400ml', 'und', 96.00, 24.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2700.00, 1, 'Gaseosa Coca-Cola botella PET 400ml'),
-(30, 5, 'Manzana Postobón 400ml', 'und', 72.00, 20.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2400.00, 1, 'Gaseosa sabor Manzana Postobón 400ml'),
-(31, 5, 'Agua Cristal sin Gas 500ml', 'und', 60.00, 15.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 1800.00, 1, 'Agua purificada sin gas'),
-(32, 4, 'Coca-Cola Sin Azúcar / Light 400ml', 'und', 60.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2500.00, NULL, 'Coca-Cola Sin Azúcar / Light 400ml para venta directa'),
-(33, 4, 'Pepsi Regular 400ml', 'und', 70.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2500.00, NULL, 'Pepsi Regular 400ml para venta directa'),
-(34, 4, 'Pepsi Light / Black 400ml', 'und', 45.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2500.00, NULL, 'Pepsi Light / Black 400ml para venta directa'),
-(35, 4, 'Gaseosa Colombiana Postobón 400ml', 'und', 65.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2500.00, NULL, 'Gaseosa Colombiana Postobón 400ml para venta directa'),
-(36, 4, 'Gaseosa Sprite 400ml', 'und', 55.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2500.00, NULL, 'Gaseosa Sprite 400ml para venta directa'),
-(37, 4, 'Gaseosa Cuatro Toronja 400ml', 'und', 50.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 2500.00, NULL, 'Gaseosa Cuatro Toronja 400ml para venta directa'),
-(38, 4, 'Papas Rústicas en Casco con Piel', 'kg', 50.00, 10.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 4500.00, NULL, 'Papas Rústicas en Casco con Piel para preparación de acompañamientos Chazin Food'),
-(39, 4, 'Chili con Carne de Res Artesanal', 'kg', 25.00, 5.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 12000.00, NULL, 'Chili con Carne de Res Artesanal para preparación de acompañamientos Chazin Food'),
-(40, 4, 'Guacamole Fresco Artesanal', 'kg', 20.00, 5.00, NULL, NULL, 1, 1, 2500.00, 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80', 0, 10000.00, NULL, 'Guacamole Fresco Artesanal para preparación de acompañamientos Chazin Food'),
-(41, 4, 'Suero Costeño Cremoso Artesanal', 'kg', 20.00, 5.00, NULL, NULL, 1, 1, 1500.00, 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80', 0, 6500.00, NULL, 'Suero Costeño Cremoso Artesanal para preparación de acompañamientos Chazin Food'),
-(42, 4, 'Papas Especiales para Espiral', 'kg', 35.00, 8.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 5500.00, NULL, 'Papas Especiales para Espiral para preparación de acompañamientos Chazin Food'),
-(43, 4, 'Salsa de Queso Cheddar Fundido', 'kg', 30.00, 6.00, NULL, NULL, 1, 1, 2500.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp', 0, 14000.00, NULL, 'Salsa de Queso Cheddar Fundido para preparación de acompañamientos Chazin Food'),
-(44, 4, 'Salsa BBQ Ahumada Artesanal', 'kg', 15.00, 4.00, NULL, NULL, 1, 1, 1500.00, 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80', 0, 5000.00, NULL, 'Salsa BBQ Ahumada Artesanal para preparación de acompañamientos Chazin Food'),
-(45, 4, 'Salsa Tártara Casera Especial', 'kg', 15.00, 4.00, NULL, NULL, 1, 1, 1500.00, 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80', 0, 5000.00, NULL, 'Salsa Tártara Casera Especial para preparación de acompañamientos Chazin Food'),
-(46, 10, 'test', 'Kg', 397.00, 50.00, '2026-09-16', '2026-09-30', 1, 0, 0.00, NULL, 0, 2000.00, 7, 'test');
+INSERT INTO `insumo` (`idInsumo`, `idCategoriaInsumo`, `nombre`, `unidadMedida`, `stock`, `stockMinimo`, `stockMaximo`, `fechaExpedicion`, `fechaVencimiento`, `estado`, `esAdicion`, `precioAdicion`, `imagen`, `incluyeIva`, `eliminado`, `precioUnitario`, `idProveedor`, `descripcion`) VALUES
+(1, 3, 'aguacate', 'und', 0.00, 0.00, 100.00, NULL, NULL, 0, 0, 0.00, NULL, 0, 1, 0.00, 1, NULL),
+(2, 4, 'salsa rosada', 'paq', 72.00, 5.00, 100.00, '2026-08-05', '2026-08-07', 1, 1, 1500.00, 'https://img.freepik.com/psd-premium/sauce-rose-dans-recipient-vaisselle-fond-transparent-3d_503253-784.jpg', 0, 0, 10000.00, 4, ''),
+(3, 1, 'samuel', 'Kg', 0.00, 5.00, 100.00, NULL, NULL, 0, 0, 0.00, NULL, 0, 1, 0.10, 1, ''),
+(4, 2, 'Yeison Food', 'Unidad', 0.00, 5.00, 100.00, NULL, NULL, 0, 1, 2500.00, NULL, 0, 1, 0.00, 3, 'asdfghjkl'),
+(5, 1, 'Pan de Arina', 'kg', 0.00, 5.00, 100.00, '2026-08-01', '2026-12-31', 1, 0, 0.00, NULL, 0, 1, 1200.00, 1, 'Harina refinada de trigo multipropósito'),
+(6, 3, 'Alexis', 'Paquete', 0.00, 5.00, 100.00, '2026-05-26', '2026-08-26', 0, 1, 3500.00, NULL, 0, 1, 500.00, 4, 'dfghjklñ'),
+(7, 8, 'Carne con carolina reapper 150g', 'Unidad', 0.00, 15.00, 100.00, '2026-08-28', '2026-08-31', 1, 0, 0.00, NULL, 0, 1, 20000.00, 6, ''),
+(8, 1, 'Pan de papa', 'Gr', 80.00, 5.00, 100.00, '2026-09-21', '2026-09-14', 1, 0, 0.00, NULL, 0, 0, 2790.00, 3, 'Pan de papa gourmet'),
+(9, 8, 'Carne de Res', 'Kg', 65.00, 5.00, 100.00, '2026-08-31', '2026-09-04', 1, 0, 0.00, NULL, 0, 0, 32000.00, 1, 'Carne de res premium seleccionada para la preparación de hamburguesas del restaurante. Mantener estrictamente refrigerada entre 0°C y 4°C para asegurar su frescura. Manejar bajo sistema de rotación PEPS (Primeras en Entrar, Primeras en Salir).'),
+(10, 3, 'papa', 'Kg', 120.00, 5.00, 100.00, '2026-07-26', '2025-06-10', 1, 0, 0.00, NULL, 0, 0, 200000.00, 1, ''),
+(11, 3, 'papa2', 'Kg', 0.00, 5.00, 100.00, '2026-08-30', '2026-09-23', 0, 0, 0.00, NULL, 0, 1, 0.00, 1, ''),
+(12, 1, 'Pan Brioche Artesanal', 'und', 110.00, 20.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 1400.00, 1, 'Pan brioche con mantequilla y ajonjolí'),
+(13, 1, 'Pan Perro Americano', 'und', 97.00, 15.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 1100.00, 1, 'Pan artesanal para perro caliente'),
+(14, 8, 'Carne de Res Molida 80/20', 'kg', 56.27, 8.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 28000.00, 1, 'Carne 100% de res para hamburguesas'),
+(15, 8, 'Pechuga de Pollo Fresca', 'kg', 29.64, 6.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 19000.00, 1, 'Filetes de pechuga fresca desmechada o crispy'),
+(16, 8, 'Salchicha Americana Premium', 'und', 116.00, 20.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 1800.00, 1, 'Salchicha tipo americana para perros calientes'),
+(17, 8, 'Salchicha Suiza Ahumada', 'und', 55.00, 15.00, 100.00, NULL, NULL, 1, 1, 2000.00, 'https://www.ensumesa.com/pix/ingredientes/salchichas-suizas.jpg', 0, 0, 2600.00, 1, 'Salchicha suiza artesanal ahumada'),
+(18, 8, 'Tocineta Ahumada en Tiras', 'kg', 15.45, 4.00, 100.00, NULL, NULL, 1, 1, 3500.00, 'https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80', 0, 0, 34000.00, 1, 'Tiras de tocineta ahumada crujiente'),
+(19, 2, 'Queso Cheddar en Lonchas', 'und', 188.00, 30.00, 100.00, NULL, NULL, 1, 1, 2500.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp', 0, 0, 700.00, 1, 'Lonchas de queso cheddar fundible'),
+(20, 2, 'Queso Mozzarella Rallado', 'kg', 23.71, 5.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 25000.00, 1, 'Queso mozzarella para gratinar'),
+(21, 3, 'Papas a la Francesa Corte Delgado', 'kg', 56.96, 10.00, 100.00, NULL, NULL, 1, 1, 5000.00, 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80', 0, 0, 9800.00, 1, 'Papas prefritas congeladas corte fino'),
+(22, 3, 'Lechuga Batavia Fresca', 'kg', 16.40, 3.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 4500.00, 1, 'Lechuga fresca crujiente'),
+(23, 3, 'Tomate Chonto Maduro', 'kg', 17.60, 4.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 5200.00, 1, 'Tomates frescos en rodajas'),
+(24, 3, 'Cebolla Cabezona Blanca', 'kg', 21.13, 4.00, 100.00, NULL, NULL, 1, 1, 2000.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788959741/dsogrxmfoohur2tscbgq.jpg', 0, 0, 3900.00, 1, 'Cebolla fresca para caramelizar y aderezos'),
+(25, 3, 'Jalapeños en Rodajas', 'kg', 9.98, 2.00, 100.00, NULL, NULL, 1, 1, 2000.00, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg', 0, 0, 14500.00, 1, 'Jalapeños encurtidos picantes'),
+(26, 4, 'Salsa de Tomate Heinz', 'kg', 15.00, 3.00, 100.00, NULL, NULL, 1, 1, 1500.00, 'https://img.magnific.com/fotos-premium/salsa-tomate-fresca-deliciosa-tazon-fuente-blanco-paisaje-decorado-tomates_261158-2163.jpg?semt=ais_hybrid&w=740&q=80', 0, 0, 12500.00, 1, 'Salsa de tomate clásica'),
+(27, 4, 'Mostaza Americana', 'kg', 10.00, 2.00, 100.00, NULL, NULL, 1, 1, 1500.00, 'https://i.blogs.es/8674ce/salsa-de-mostaza/650_1200.jpg', 0, 0, 11500.00, 1, 'Mostaza amarilla tradicional'),
+(28, 4, 'Mayonesa Real', 'kg', 16.00, 3.00, 100.00, NULL, NULL, 1, 1, 1500.00, 'https://www.lasrecetasdelaura.com/wp-content/uploads/2017/05/mayonesa-cuad.jpg', 0, 0, 13800.00, 1, 'Base de mayonesa cremosa'),
+(29, 5, 'Coca-Cola Original 400ml', 'und', 91.00, 24.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2700.00, 1, 'Gaseosa Coca-Cola botella PET 400ml'),
+(30, 5, 'Manzana Postobón 400ml', 'und', 70.00, 20.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2400.00, 1, 'Gaseosa sabor Manzana Postobón 400ml'),
+(31, 5, 'Agua Cristal sin Gas 500ml', 'und', 59.00, 15.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 1800.00, 1, 'Agua purificada sin gas'),
+(32, 5, 'Coca-Cola Sin Azúcar / Light 400ml', 'und', 59.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Coca-Cola Sin Azúcar / Light 400ml para venta directa'),
+(33, 5, 'Pepsi Regular 400ml', 'und', 69.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Pepsi Regular 400ml para venta directa'),
+(34, 5, 'Pepsi Light / Black 400ml', 'und', 45.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Pepsi Light / Black 400ml para venta directa'),
+(35, 5, 'Gaseosa Colombiana Postobón 400ml', 'und', 64.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Gaseosa Colombiana Postobón 400ml para venta directa'),
+(36, 5, 'Gaseosa Sprite 400ml', 'und', 53.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Gaseosa Sprite 400ml para venta directa'),
+(37, 5, 'Gaseosa Cuatro Toronja 400ml', 'und', 49.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Gaseosa Cuatro Toronja 400ml para venta directa'),
+(38, 3, 'Papas Rústicas en Casco con Piel', 'kg', 49.60, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 4500.00, NULL, 'Papas Rústicas en Casco con Piel para preparación de acompañamientos Chazin Food'),
+(39, 8, 'Chili con Carne de Res Artesanal', 'kg', 54.76, 5.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 12000.00, NULL, 'Chili con Carne de Res Artesanal para preparación de acompañamientos Chazin Food'),
+(40, 4, 'Guacamole Fresco Artesanal', 'kg', 19.84, 5.00, 100.00, NULL, NULL, 1, 1, 2500.00, 'https://www.allrecipes.com/thmb/FOHqtfrZVg0WAMdkFE3bnp7SNO4=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/AR-RM-14064-easy-guacamole-ddmfs-3x4-9e4a1eb1bb34421a99db675b53a29e53.jpg', 0, 0, 10000.00, 1, 'Guacamole Fresco Artesanal para preparación de acompañamientos Chazin Food'),
+(41, 4, 'Suero Costeño Cremoso Artesanal', 'kg', 19.96, 5.00, 100.00, NULL, NULL, 1, 1, 1500.00, 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgWatVVl6qluz15bRYYJReKKv3ToT_NMnO2vZcXDByPh4o7b8iXgv5JoKaH-AKgickn_oEVxMPzAyuRvaZmbZVCPRx3810PKcs2pQHAYytIEnKkNyQ4oXgwkyo-jaWzRTFY3wJdcs03S4F6_l3uL3Jom8aXi8omkLxvTqdGQ7AsyMHlVT-FgjZJzem2bKg/s16000', 0, 0, 6500.00, 1, 'Suero Costeño Cremoso Artesanal para preparación de acompañamientos Chazin Food'),
+(42, 3, 'Papas Especiales para Espiral', 'kg', 34.80, 8.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 5500.00, NULL, 'Papas Especiales para Espiral para preparación de acompañamientos Chazin Food'),
+(43, 4, 'Salsa de Queso Cheddar Fundido', 'kg', 29.81, 6.00, 100.00, NULL, NULL, 1, 1, 2500.00, 'https://cdn.elcocinerocasero.com/imagen/receta/1000/2025-02-20-09-43-01/salsa-de-queso-cheddar.jpeg', 0, 0, 14000.00, 1, 'Salsa de Queso Cheddar Fundido para preparación de acompañamientos Chazin Food'),
+(44, 4, 'Salsa BBQ Ahumada Artesanal', 'kg', 21.94, 4.00, 100.00, NULL, NULL, 1, 1, 1500.00, 'https://http2.mlstatic.com/D_NQ_NP_935346-MCO78698224890_092024-O.webp', 0, 0, 5000.00, 1, 'Salsa BBQ Ahumada Artesanal para preparación de acompañamientos Chazin Food'),
+(45, 4, 'Salsa Tártara Casera Especial', 'kg', 15.00, 4.00, 100.00, NULL, NULL, 1, 1, 1500.00, 'https://www.pasionthermomix.co/wp-content/uploads/2022/04/Captura-de-pantalla-2022-04-07-a-las-5.00.34-p.-m.-600x333.png', 0, 0, 5000.00, 1, 'Salsa Tártara Casera Especial para preparación de acompañamientos Chazin Food'),
+(46, NULL, 'test', 'Kg', 397.00, 50.00, 100.00, '2026-09-16', '2026-09-30', 1, 0, 0.00, NULL, 0, 1, 2000.00, 7, 'test'),
+(47, 5, 'Gaseosa Uva Postobón 400ml', 'Unidad', 48.00, 12.00, 100.00, '2026-06-22', '2028-04-30', 1, 0, 0.00, NULL, 0, 0, 2500.00, 1, 'Gaseosa sabor a uva presentación PET y sus variantes 400ml.'),
+(48, 4, 'Gaseosa Naranja Postobón 400ml', 'und', 60.00, 10.00, 100.00, NULL, NULL, 1, 0, 0.00, NULL, 0, 0, 2500.00, NULL, 'Gaseosa Naranja Postobón 400ml para venta directa');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `insumopreparado`
---
-
+-- Tabla: `insumopreparado`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `insumopreparado`;
 CREATE TABLE `insumopreparado` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -779,29 +824,47 @@ CREATE TABLE `insumopreparado` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `insumopreparado`
---
-
 INSERT INTO `insumopreparado` (`id`, `nombre`, `descripcion`, `precioVenta`, `unidadMedida`, `fechaCreacion`, `estado`, `eliminado`, `rendimiento`, `unidadRendimiento`, `costoTotal`) VALUES
 (1, 'salsa de la casa', 'salsa de la casa 100% artesanal', 2000.00, 'porción', '2026-07-17 11:00:45', 1, 1, 1.00, 'und', 0.00),
 (2, 'Salsa Especial de la Casa', 'Receta casera', 7500.00, 'und', '2026-07-23 05:57:07', 1, 1, 1.00, 'und', 3400.00),
 (3, 'Receta Especial Jalapeños', 'Con queso chedart', 10000.00, 'und', '2026-07-23 05:57:52', 0, 1, 1.00, 'und', 3400.00),
-(7, 'Salsa Chazin Especial', 'Salsa exclusiva de la casa a base de mayonesa, mostaza y especias', 0.00, 'lt', '2026-09-08 20:37:15', 1, 0, 1.00, 'lt', 8500.00),
+(7, 'Salsa Chazin Especial', 'Salsa exclusiva de la casa a base de mayonesa, mostaza y especias', 1500.00, 'lt', '2026-09-08 20:37:15', 1, 0, 1.00, 'lt', 8500.00),
 (8, 'Cebolla Caramelizada Chazin', 'Cebolla blanca salteada a fuego lento con mantequilla y azúcar morena', 0.00, 'kg', '2026-09-08 20:37:15', 1, 0, 0.50, 'kg', 4200.00),
-(9, 'Carne Sazonada Artesanal 150g', 'Porciones de 150g de carne molida 80/20 sazonada con sal marina y pimienta', 0.00, 'und', '2026-09-08 20:37:15', 1, 0, 10.00, 'und', 42000.00);
+(9, 'Carne Sazonada Artesanal 150g', 'Porciones de 150g de carne molida 80/20 sazonada con sal marina y pimienta', 0.00, 'und', '2026-09-08 20:37:15', 1, 0, 10.00, 'und', 42000.00),
+(18, 'Queso Pripra', '', 4000.00, 'Unidad', '2026-10-07 12:35:15', 1, 0, 1.00, 'und', 0.00);
 
 -- --------------------------------------------------------
+-- Tabla: `loteinsumo`
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `loteinsumo`;
+CREATE TABLE `loteinsumo` (
+  `idLote` int(11) NOT NULL AUTO_INCREMENT,
+  `idInsumo` int(11) NOT NULL,
+  `idCompra` int(11) DEFAULT NULL,
+  `numeroLote` varchar(100) NOT NULL,
+  `cantidad` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `cantidadDisponible` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `fechaVencimiento` date DEFAULT NULL,
+  `fechaCreacion` datetime DEFAULT current_timestamp(),
+  `estado` varchar(30) DEFAULT 'ACTIVO',
+  PRIMARY KEY (`idLote`),
+  KEY `idx_lote_insumo` (`idInsumo`),
+  KEY `idx_lote_compra` (`idCompra`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Estructura de tabla para la tabla `pago`
---
+-- Volcado de datos para la tabla `loteinsumo`
+INSERT INTO `loteinsumo` (`idLote`, `idInsumo`, `idCompra`, `numeroLote`, `cantidad`, `cantidadDisponible`, `fechaVencimiento`, `fechaCreacion`, `estado`) VALUES
+(2, 44, 9, 'E-001', 10.00, 10.00, '2026-10-23', '2026-10-08 12:18:46', 'ACTIVO');
 
+-- --------------------------------------------------------
+-- Tabla: `pago`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `pago`;
 CREATE TABLE `pago` (
   `idPago` int(11) NOT NULL AUTO_INCREMENT,
   `idVenta` int(11) NOT NULL,
-  `metodoPago` enum('EFECTIVO','TARJETA','NEQUI','DAVIPLATA','TRANSFERENCIA') NOT NULL,
+  `metodoPago` varchar(50) NOT NULL,
   `referenciaExterna` varchar(120) DEFAULT NULL,
   `monto` decimal(12,2) NOT NULL,
   `fechaPago` datetime DEFAULT NULL,
@@ -811,11 +874,8 @@ CREATE TABLE `pago` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `pedido`
---
-
+-- Tabla: `pedido`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `pedido`;
 CREATE TABLE `pedido` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -830,11 +890,8 @@ CREATE TABLE `pedido` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `permiso`
---
-
+-- Tabla: `permiso`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `permiso`;
 CREATE TABLE `permiso` (
   `idPermiso` int(11) NOT NULL AUTO_INCREMENT,
@@ -843,10 +900,7 @@ CREATE TABLE `permiso` (
   UNIQUE KEY `UK_Permiso` (`nombrePermiso`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `permiso`
---
-
 INSERT INTO `permiso` (`idPermiso`, `nombrePermiso`) VALUES
 (3, 'Categoría Insumos'),
 (8, 'Categoría Productos'),
@@ -869,11 +923,8 @@ INSERT INTO `permiso` (`idPermiso`, `nombrePermiso`) VALUES
 (12, 'Ventas');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `producto`
---
-
+-- Tabla: `producto`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `producto`;
 CREATE TABLE `producto` (
   `idProducto` int(11) NOT NULL AUTO_INCREMENT,
@@ -890,10 +941,7 @@ CREATE TABLE `producto` (
   KEY `IDX_ProductoCategoria` (`idCategoriaProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `producto`
---
-
 INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `imagen`, `estado`, `precio`, `categoria`, `adiciones`, `configuracionCombo`) VALUES
 (0, 0, '__SISTEMA_VARIANTE_CERO__', 'Registro técnico para fichas de insumos sin variante', NULL, 0, 0.00, '__SISTEMA_VARIANTE_CERO__', NULL, NULL),
 (1, 3, 'Hamburguesa Clásica Chazin', 'Pan brioche artesanal, carne 100% res 150g, queso cheddar fundido, tocineta ahumada, lechuga fresca, tomate y salsa Chazin.', 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80', 1, 18000.00, 'Hamburguesas', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":6,\"nombre\":\"Porción Cebolla Caramelizada (50g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959741/dsogrxmfoohur2tscbgq.jpg\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', NULL),
@@ -902,16 +950,16 @@ INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripc
 (4, 1, 'Perro Caliente Especial Americano', 'Pan suave con salchicha americana premium, tocineta picada crocante, queso mozzarella fundido, papas chips trituradas y salsas.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788993866/q43cttividgol6mqagkr.jpg', 1, 14000.00, 'Perros Calientes', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"}]', NULL),
 (5, 1, 'Perro Suizo Chazin', 'Salchicha suiza gigante ahumada, cebolla caramelizada dulce, queso mozzarella fundido, tocineta y salsa tártara artesanal.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788993817/ki0whs161s4bsrvstx7d.jpg', 1, 17000.00, 'Perros Calientes', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"}]', NULL),
 (6, 5, 'Salchipapa Salvaje Gourmet', 'Abundante porción de papas a la francesa crujientes, salchicha americana, salchicha suiza ahumada, tocineta picada y lluvia de queso mozzarella.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788989658/kgt9ufaya3iobscme7rq.jpg', 1, 23000.00, 'Salchipapas Gourmet', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL),
-(7, 2, 'Combo Pareja Chazin', 'El favorito para compartir: 2 Hamburguesas Clásicas Chazin + Porción de Papas Grandes + 2 Gaseosas a elección.', 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=600&auto=format&fit=crop&q=80', 1, 38000.00, 'Combos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', '{\"esCombo\":true,\"cantidadBebidas\":2,\"bebidasPermitidas\":[]}'),
-(8, 4, 'Gaseosa Coca-Cola 400ml', 'Gaseosa Coca-Cola original personal 400ml en botella PET bien fría.', 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80', 1, 4500.00, 'Bebidas', NULL, NULL),
-(9, 4, 'Gaseosa Manzana Postobón 400ml', 'Gaseosa Manzana Postobón tradicional 400ml bien fría.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1788966650/qgto4wgmnjpfrns3zl8c.jpg', 1, 4000.00, 'Bebidas', '[]', NULL),
+(7, 2, 'Combo Pareja Chazin', 'El favorito para compartir: 2 Hamburguesas Clásicas Chazin + Porción de Papas Grandes + 2 Gaseosas a elección.', 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=600&auto=format&fit=crop&q=80', 1, 38000.00, 'Combos', '[{\"idAdicion\":3,\"id\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"id\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"id\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":8,\"id\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"id\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"id\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"id\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"id\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', '{\"esCombo\":true,\"cantidadBebidas\":2,\"bebidasPermitidas\":[]}'),
+(8, 4, 'Gaseosa Coca-Cola 400ml', 'Gaseosa Coca-Cola original personal 400ml en botella PET bien fría.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790135864/hynoiytmhuddsnatwcxz.png', 1, 4500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
+(9, 4, 'Gaseosa Manzana Postobón 400ml', 'Gaseosa Manzana Postobón tradicional 400ml bien fría.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790135903/lhmojjdrn1bzp3dsz47f.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
 (10, 4, 'Agua Cristal sin Gas 600ml', 'Agua pura sin gas en botella de 500ml.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789342838/pj5qlfpmxeddkkmjauyw.png', 1, 3000.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
-(11, 4, 'Gaseosa Pepsi 400ml', 'Gaseosa Pepsi personal 400ml en botella PET bien fría, con su inconfundible sabor burbujeante.', 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=600&auto=format&fit=crop&q=80', 1, 4000.00, 'Bebidas', '[]', NULL),
-(12, 4, 'Gaseosa Colombiana Postobón 400ml', 'La bebida de nuestra tierra: Gaseosa Colombiana Postobón tradicional 400ml refrescante.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789001495/qy8wy9igmgb0wppnjavw.png', 1, 4000.00, 'Bebidas', '[]', NULL),
-(13, 4, 'Gaseosa Sprite 400ml', 'Gaseosa Sprite lima-limón 400ml, refrescante sabor cítrico y gasificación intensa.', 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?w=600&auto=format&fit=crop&q=80', 1, 4500.00, 'Bebidas', '[]', NULL),
-(14, 4, 'Gaseosa Quatro Toronja 400ml', 'Gaseosa Quatro sabor toronja cítrica 400ml, ideal para acompañar tus hamburguesas y perros.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789342730/tqchagzkgl2z1jckvyrb.png', 1, 4500.00, 'Bebidas', '[]', NULL),
+(11, 4, 'Gaseosa Pepsi 400ml', 'Gaseosa Pepsi personal 400ml en botella PET bien fría, con su inconfundible sabor burbujeante.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790135953/upv7fsv9osr2f7ap6cbn.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
+(12, 4, 'Gaseosa Colombiana Postobón 400ml', 'La bebida de nuestra tierra: Gaseosa Colombiana Postobón tradicional 400ml refrescante.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789001495/qy8wy9igmgb0wppnjavw.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
+(13, 4, 'Gaseosa Sprite 400ml', 'Gaseosa Sprite lima-limón 400ml, refrescante sabor cítrico y gasificación intensa.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136141/cpxa3npdfd0lyxjizicy.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
+(14, 4, 'Gaseosa Quatro Toronja 400ml', 'Gaseosa Quatro sabor toronja cítrica 400ml, ideal para acompañar tus hamburguesas y perros.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789342730/tqchagzkgl2z1jckvyrb.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
 (15, 6, 'Porción Papas a la Francesa (150g)', 'Porción generosa de 150g de papas a la francesa corte delgado doradas y crujientes con sal marina.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789007797/oqklhyatzijula0tr7kw.jpg', 1, 5000.00, 'Acompañamientos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL),
-(16, 4, 'Gaseosa Coca-Cola Sin Azúcar / Light 400ml', 'Gaseosa Coca-Cola Sin Azúcar / Light personal 400ml en botella PET, todo el sabor original sin azúcar ni calorías.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789342941/rcxdoursw1roe9f8bmpw.png', 1, 4500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
+(16, 4, 'Gaseosa Coca-Cola Sin Azúcar / Light 400ml', 'Gaseosa Coca-Cola Sin Azúcar / Light personal 400ml en botella PET, todo el sabor original sin azúcar ni calorías.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1793062723/givdl1gp71wnqnpw4rue.png', 1, 4500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
 (17, 6, 'Papas Corral Grandes', 'Las papas más crocantes: porción grande (220g) de papas corte tradicional delgadas, doradas a la perfección y sazonadas con sal marina.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789007797/oqklhyatzijula0tr7kw.jpg', 1, 10500.00, 'Acompañamientos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL),
 (18, 6, 'Papas Corral Medianas', 'Las papas más crocantes: porción mediana (150g) de papas corte tradicional delgadas doradas, para acompañar lo que más te gusta.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789007797/oqklhyatzijula0tr7kw.jpg', 1, 8500.00, 'Acompañamientos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL),
 (19, 6, 'Papas en Casco Grandes', 'Las papas en cascos más crocantes: porción grande (240g) de papas rústicas con piel, sazonadas con paprika, romero y sal marina.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789007798/jehlrurcbohsfg4bxd4v.jpg', 1, 10500.00, 'Acompañamientos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL),
@@ -928,20 +976,19 @@ INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripc
 (30, 1, 'Perro Caliente Mexicano', 'Pan tierno de perro americano con salchicha americana premium dorada a la plancha, guacamole fresco artesanal, salsa de queso cheddar fundido, tocineta crujiente picada y rodajas de jalapeños.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789340644/el9c094ykrqjixkm3rmm.jpg', 1, 16000.00, 'Perros Calientes', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"}]', NULL),
 (31, 1, 'Perro Criollo Especial Chazin', 'Pan suave americano con salchicha americana y salchicha suiza ahumada, lluvia de tocineta crocante, queso mozzarella gratinado al soplete y cremoso suero costeño artesanal.', 'https://images.unsplash.com/photo-1619740455993-9e612b1af08a?w=600&auto=format&fit=crop&q=80', 1, 16500.00, 'Perros Calientes', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"}]', NULL),
 (32, 5, 'Salchipapa Criolla Chazin', 'Cama abundante de papas a la francesa corte delgado doradas y crujientes, rodajas de salchicha americana doradita, tocineta crujiente, queso mozzarella gratinado, salsa de queso cheddar fundido y suero costeño.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789341834/mebbvy7zzkrpgu1yggko.jpg', 1, 21000.00, 'Salchipapas Gourmet', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL);
+
 INSERT INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `descripcion`, `imagen`, `estado`, `precio`, `categoria`, `adiciones`, `configuracionCombo`) VALUES
 (33, 5, 'Salchipapa Costeña Chazin', 'Papas a la francesa doraditas con salchicha suiza ahumada en rodajas, generosa capa de suero costeño tradicional, tocineta ahumada picada, queso mozzarella gratinado y salsa tártara de la casa.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789340669/zr8zn2hll1t7ytl1sj6x.jpg', 1, 22500.00, 'Salchipapas Gourmet', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"}]', NULL),
 (34, 2, 'Combo Personal Chazin', 'El combo ideal para disfrutar solo: 1 Hamburguesa Clásica Chazin (150g de carne de res, queso cheddar, tocineta crocante) + Porción individual de Papas a la Francesa (150g) + 1 Gaseosa 400ml bien fría a elección.', 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?w=600&auto=format&fit=crop&q=80', 1, 24500.00, 'Combos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', '{\"esCombo\":true,\"cantidadBebidas\":1,\"bebidasPermitidas\":[]}'),
 (35, 2, 'Combo Familiar Chazin (4 Personas)', 'El banquete perfecto para compartir con familia o amigos: 2 Hamburguesas Clásicas Chazin + 2 Perros Calientes Especiales Americanos + 2 Porciones grandes de Papas a la Francesa (400g total) + 4 Gaseosas 400ml.', 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=600&auto=format&fit=crop&q=80', 1, 68000.00, 'Combos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', '{\"esCombo\":true,\"cantidadBebidas\":4,\"bebidasPermitidas\":[]}'),
 (36, 2, 'Combo Perro Amigos (2 Personas)', 'Diseñado para dos: 2 Perros Calientes Especiales Americanos con queso mozzarella fundido y tocineta crocante + Porción doble de Papas Francesas crujientes (250g) + 2 Gaseosas frías 400ml.', 'https://images.unsplash.com/photo-1541214113241-21578d2d9b62?w=600&auto=format&fit=crop&q=80', 1, 32000.00, 'Combos', '[{\"idAdicion\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', '{\"esCombo\":true,\"cantidadBebidas\":2,\"bebidasPermitidas\":[]}'),
 (37, 3, 'Hamburguesa Burger Fest Trufada', 'Edición especial gastronómica de tiempo limitado.', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789364357/ys2eammewmau6wxkjsxm.jpg', 1, 24000.00, NULL, '[{\"idAdicion\":3,\"id\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"precio\":3500,\"imagen\":\"https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":4,\"id\":4,\"nombre\":\"Extra Queso Cheddar (2 lonchas)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":5,\"id\":5,\"nombre\":\"Porción Papas a la Francesa (150g)\",\"precio\":5000,\"imagen\":\"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":6,\"id\":6,\"nombre\":\"Porción Cebolla Caramelizada (50g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959741/dsogrxmfoohur2tscbgq.jpg\"},{\"idAdicion\":7,\"id\":7,\"nombre\":\"Jalapeños Picantes Extra (40g)\",\"precio\":2000,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788959869/sejgbjeuranc6quitnug.jpg\"},{\"idAdicion\":8,\"id\":8,\"nombre\":\"Salsa Chazin Especial Adicional\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":9,\"id\":9,\"nombre\":\"Salsa BBQ Ahumada Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":10,\"id\":10,\"nombre\":\"Salsa Tártara Casera Especial (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":11,\"id\":11,\"nombre\":\"Suero Costeño Cremoso Artesanal (50g)\",\"precio\":1500,\"imagen\":\"https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=500&auto=format&fit=crop&q=80\"},{\"idAdicion\":12,\"id\":12,\"nombre\":\"Porción Queso Cheddar Fundido (60g)\",\"precio\":2500,\"imagen\":\"https://res.cloudinary.com/dckwtknmq/image/upload/v1788966113/ugcycexl6ja8xriso4ni.webp\"},{\"idAdicion\":13,\"id\":13,\"nombre\":\"Porción Guacamole Fresco Artesanal (60g)\",\"precio\":2500,\"imagen\":\"https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80\"}]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
-(38, 7, 'tester', '', '', 1, 20000.00, 'testeo', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}');
+(38, 4, 'Gaseosa sabor a uva presentación PET 400ml.', 'Bebida gaseosa refrescante sabor a uva en presentación personal PET de 400ml. Servida bien fría. Con sus variantes para compartir ', 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790137310/fxidthj8xu1nuvp0khfo.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}'),
+(39, 4, 'Gaseosa Naranja Postobón 400ml', 'Refrescante gaseosa sabor a naranja tradicional de Postobón. perfecta para compartir conjunto sus variantes ', '/images/drinks/images__Gaseosa_naranja_-removebg-preview.png', 1, 8500.00, 'Bebidas', '[]', '{\"esCombo\":false,\"cantidadBebidas\":0,\"bebidasPermitidas\":[]}');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `proveedor`
---
-
+-- Tabla: `proveedor`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `proveedor`;
 CREATE TABLE `proveedor` (
   `idProveedor` int(11) NOT NULL AUTO_INCREMENT,
@@ -953,31 +1000,26 @@ CREATE TABLE `proveedor` (
   `correo` varchar(255) DEFAULT NULL,
   `direccion` varchar(255) DEFAULT NULL,
   `estado` tinyint(4) DEFAULT 1,
+  `eliminado` tinyint(4) NOT NULL DEFAULT 0,
   `nombreContacto` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`idProveedor`),
   KEY `IDX_ProveedorTipo` (`idTipoProveedor`),
   KEY `IDX_ProveedorDocumento` (`idTipoDocumento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `proveedor`
---
-
-INSERT INTO `proveedor` (`idProveedor`, `idTipoProveedor`, `idTipoDocumento`, `nombre`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `estado`, `nombreContacto`) VALUES
-(1, 1, 1, 'Carnes Premium', '900.234.567-8', '604 234 5678', 'info@carnespremium.com', 'Carrera 43A #12-80, Medellín', 1, 'María García'),
-(2, 1, 1, 'Avícola del Sur', '900.345.678-9', '604 345 6789', 'ventas@avicolasur.com', 'Calle 10 Sur #48-20, Envigado', 1, 'Carlos López'),
-(3, 2, 1, 'Panadería El Trigo', '43.123.456-7', '604 567 8901', 'eltrigo@gmail.com', 'Calle 33 #70-25, Medellín', 1, 'Luis Rodríguez'),
-(4, 1, 1, 'Distribuidora Andina', '900.567.890-1', '604 678 9012', 'ventas@distrandina.com', 'Carrera 65 #8B-91, Medellín', 0, 'Pedro Gómez'),
-(5, 1, 1, 'Dstribuidora Agricola S.A.S', '900.123.456-7', '3506785679', 'contacto@empresa.com', 'Av Central #48 - 40', 0, 'Carlos Mendoza'),
-(6, 2, 3, 'Distribuidora Avícola San Jerónimo', '900123456-7', '3001234567', 'contacto@sanjeronimo.co', 'bla # bla CL ble ble blu blu ', 1, 'Carlos Pérez Pirés'),
-(7, 1, 1, 'testeo', '12312323131', '2312443312', 'tester@gmail.com', 'CR 108 C NORTE # 34 CC ESTE - 45 BARRIO BELENCITO LA TORRE', 1, 'tester');
+INSERT INTO `proveedor` (`idProveedor`, `idTipoProveedor`, `idTipoDocumento`, `nombre`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `estado`, `eliminado`, `nombreContacto`) VALUES
+(1, 1, 1, 'Carnes Premium', '900.234.567-8', '604 234 5678', 'info@carnespremium.com', 'Carrera 43A #12-80, Medellín', 1, 0, 'María García'),
+(2, 1, 1, 'Avícola del Sur', '900.345.678-9', '604 345 6789', 'ventas@avicolasur.com', 'Calle 10 Sur #48-20, Envigado', 1, 0, 'Carlos López'),
+(3, 2, 1, 'Panadería El Trigo', '43.123.456-7', '604 567 8901', 'eltrigo@gmail.com', 'Calle 33 #70-25, Medellín', 1, 0, 'Luis Rodríguez'),
+(4, 1, 1, 'Distribuidora Andina', '900.567.890-1', '604 678 9012', 'ventas@distrandina.com', 'Carrera 65 #8B-91, Medellín', 0, 0, 'Pedro Gómez'),
+(5, 1, 1, 'Dstribuidora Agricola S.A.S', '900.123.456-7', '3506785679', 'contacto@empresa.com', 'Av Central #48 - 40', 0, 0, 'Carlos Mendoza'),
+(6, 2, 3, 'Distribuidora Avícola San Jerónimo', '900123456-7', '3001234567', 'contacto@sanjeronimo.co', 'bla # bla CL ble ble blu blu ', 1, 0, 'Carlos Pérez Pirés'),
+(7, 1, 1, 'testeo', '12312323131', '2312443312', 'tester@gmail.com', 'CR 108 C NORTE # 34 CC ESTE - 45 BARRIO BELENCITO LA TORRE', 0, 0, 'tester');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `resena`
---
-
+-- Tabla: `resena`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `resena`;
 CREATE TABLE `resena` (
   `idResena` int(11) NOT NULL AUTO_INCREMENT,
@@ -990,12 +1032,9 @@ CREATE TABLE `resena` (
   PRIMARY KEY (`idResena`),
   KEY `idx_resena_producto` (`idProducto`),
   KEY `idx_resena_usuario` (`idUsuario`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `resena`
---
-
 INSERT INTO `resena` (`idResena`, `idProducto`, `idUsuario`, `puntuacion`, `comentario`, `fechaResena`, `estado`) VALUES
 (2, 1, 1, 5, 'La carne estaba en su punto perfecto y el pan brioche súper suave y fresco. La tocineta crocante le da un toque fenomenal.', '2026-09-07 19:30:00', 1),
 (3, 1, 2, 5, 'Poder personalizar y quitar la cebolla directamente desde la web fue excelente. La comida llegó calientita y las salsas deliciosas.', '2026-09-08 20:15:00', 1),
@@ -1003,11 +1042,8 @@ INSERT INTO `resena` (`idResena`, `idProducto`, `idUsuario`, `puntuacion`, `come
 (5, 5, 1, 5, 'La salchicha suiza ahumada es de primera calidad y el queso gratinado espectacular. Excelente servicio.', '2026-09-06 14:20:00', 1);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `rol`
---
-
+-- Tabla: `rol`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `rol`;
 CREATE TABLE `rol` (
   `idRol` int(11) NOT NULL AUTO_INCREMENT,
@@ -1018,10 +1054,7 @@ CREATE TABLE `rol` (
   UNIQUE KEY `UK_Rol_Nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `rol`
---
-
 INSERT INTO `rol` (`idRol`, `nombre`, `descripcion`, `estado`) VALUES
 (1, 'Administrador', 'Acceso total', 1),
 (2, 'Cocinero', 'Acceso a producción y fichas técnicas', 1),
@@ -1030,11 +1063,8 @@ INSERT INTO `rol` (`idRol`, `nombre`, `descripcion`, `estado`) VALUES
 (5, 'Cajero Especial', 'Atención a mostrar y cobros', 0);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `rolpermiso`
---
-
+-- Tabla: `rolpermiso`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `rolpermiso`;
 CREATE TABLE `rolpermiso` (
   `idRolPermiso` int(11) NOT NULL AUTO_INCREMENT,
@@ -1046,10 +1076,7 @@ CREATE TABLE `rolpermiso` (
   KEY `IDX_RolPermisoPermiso` (`idPermiso`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `rolpermiso`
---
-
 INSERT INTO `rolpermiso` (`idRolPermiso`, `idRol`, `idPermiso`) VALUES
 (6, 1, 1),
 (4, 1, 2),
@@ -1084,11 +1111,8 @@ INSERT INTO `rolpermiso` (`idRolPermiso`, `idRol`, `idPermiso`) VALUES
 (68, 5, 15);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `tipodocumento`
---
-
+-- Tabla: `tipodocumento`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `tipodocumento`;
 CREATE TABLE `tipodocumento` (
   `idTipoDocumento` int(11) NOT NULL AUTO_INCREMENT,
@@ -1097,22 +1121,18 @@ CREATE TABLE `tipodocumento` (
   UNIQUE KEY `UK_TipoDocumento` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `tipodocumento`
---
-
 INSERT INTO `tipodocumento` (`idTipoDocumento`, `nombre`) VALUES
 (1, 'CC'),
 (2, 'CE'),
 (3, 'NIT'),
-(4, 'Pasaporte');
+(4, 'Pasaporte'),
+(5, 'PPT'),
+(6, 'TI');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `tipoproveedor`
---
-
+-- Tabla: `tipoproveedor`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `tipoproveedor`;
 CREATE TABLE `tipoproveedor` (
   `idTipoProveedor` int(11) NOT NULL AUTO_INCREMENT,
@@ -1121,21 +1141,15 @@ CREATE TABLE `tipoproveedor` (
   UNIQUE KEY `UK_TipoProveedor` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `tipoproveedor`
---
-
 INSERT INTO `tipoproveedor` (`idTipoProveedor`, `nombre`) VALUES
 (2, 'Distribuidor'),
 (3, 'Fabricante'),
 (1, 'Mayorista');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `trazabilidad`
---
-
+-- Tabla: `trazabilidad`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `trazabilidad`;
 CREATE TABLE `trazabilidad` (
   `idTrazabilidad` int(11) NOT NULL AUTO_INCREMENT,
@@ -1154,113 +1168,320 @@ CREATE TABLE `trazabilidad` (
   KEY `usuarioId` (`usuarioId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `trazabilidad`
---
+INSERT INTO `trazabilidad` (`idTrazabilidad`, `tipo`, `entidadNombre`, `detalle`, `leido`, `fecha`, `idInsumo`, `tipoMovimiento`, `cantidad`, `motivo`, `usuarioId`) VALUES
+(346, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #136 (2x Prod #1)', 1, '2026-10-21 02:14:31', 12, 'SALIDA', 2.00, 'Venta #136', 24),
+(347, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #136 (2x Prod #1)', 1, '2026-10-21 02:14:31', 14, 'SALIDA', 0.30, 'Venta #136', 24),
+(348, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #136 (2x Prod #1)', 1, '2026-10-21 02:14:31', 19, 'SALIDA', 2.00, 'Venta #136', 24),
+(349, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #136 (2x Prod #1)', 1, '2026-10-21 02:14:31', 18, 'SALIDA', 0.06, 'Venta #136', 24),
+(350, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #136 (2x Prod #1)', 1, '2026-10-21 02:14:31', 22, 'SALIDA', 0.04, 'Venta #136', 24),
+(351, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #136 (2x Prod #1)', 1, '2026-10-21 02:14:31', 23, 'SALIDA', 0.06, 'Venta #136', 24),
+(352, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #136', 1, '2026-10-21 02:14:32', 18, 'SALIDA', 2.00, 'Venta #136 (Adición)', 24),
+(353, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #137 (2x Prod #1)', 1, '2026-10-21 02:17:31', 12, 'SALIDA', 2.00, 'Venta #137', 24),
+(354, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #137 (2x Prod #1)', 1, '2026-10-21 02:17:31', 14, 'SALIDA', 0.30, 'Venta #137', 24),
+(355, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #137 (2x Prod #1)', 1, '2026-10-21 02:17:31', 19, 'SALIDA', 2.00, 'Venta #137', 24),
+(356, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #137 (2x Prod #1)', 1, '2026-10-21 02:17:31', 18, 'SALIDA', 0.06, 'Venta #137', 24),
+(357, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #137 (2x Prod #1)', 1, '2026-10-21 02:17:31', 22, 'SALIDA', 0.04, 'Venta #137', 24),
+(358, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #137 (2x Prod #1)', 1, '2026-10-21 02:17:31', 23, 'SALIDA', 0.06, 'Venta #137', 24),
+(359, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #137', 1, '2026-10-21 02:17:31', 18, 'SALIDA', 2.00, 'Venta #137 (Adición)', 24),
+(360, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #138 (1x Prod #1)', 1, '2026-10-21 02:17:57', 12, 'SALIDA', 1.00, 'Venta #138', 24),
+(361, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #138 (1x Prod #1)', 1, '2026-10-21 02:17:57', 14, 'SALIDA', 0.15, 'Venta #138', 24),
+(362, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #138 (1x Prod #1)', 1, '2026-10-21 02:17:57', 19, 'SALIDA', 1.00, 'Venta #138', 24),
+(363, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #138 (1x Prod #1)', 1, '2026-10-21 02:17:57', 18, 'SALIDA', 0.03, 'Venta #138', 24),
+(364, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #138 (1x Prod #1)', 1, '2026-10-21 02:17:57', 22, 'SALIDA', 0.02, 'Venta #138', 24),
+(365, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #138 (1x Prod #1)', 1, '2026-10-21 02:17:57', 23, 'SALIDA', 0.03, 'Venta #138', 24),
+(366, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #139 (1x Prod #1)', 1, '2026-10-21 02:17:57', 12, 'SALIDA', 1.00, 'Venta #139', 24),
+(367, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #139 (1x Prod #1)', 1, '2026-10-21 02:17:57', 14, 'SALIDA', 0.15, 'Venta #139', 24),
+(368, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #139 (1x Prod #1)', 1, '2026-10-21 02:17:57', 19, 'SALIDA', 1.00, 'Venta #139', 24),
+(369, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #139 (1x Prod #1)', 1, '2026-10-21 02:17:57', 18, 'SALIDA', 0.03, 'Venta #139', 24),
+(370, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #139 (1x Prod #1)', 1, '2026-10-21 02:17:57', 22, 'SALIDA', 0.02, 'Venta #139', 24),
+(371, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #139 (1x Prod #1)', 1, '2026-10-21 02:17:57', 23, 'SALIDA', 0.03, 'Venta #139', 24),
+(372, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #140 (1x Prod #1)', 1, '2026-10-21 02:17:57', 12, 'SALIDA', 1.00, 'Venta #140', 24),
+(373, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #140 (1x Prod #1)', 1, '2026-10-21 02:17:57', 14, 'SALIDA', 0.15, 'Venta #140', 24),
+(374, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #140 (1x Prod #1)', 1, '2026-10-21 02:17:57', 19, 'SALIDA', 1.00, 'Venta #140', 24),
+(375, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #140 (1x Prod #1)', 1, '2026-10-21 02:17:57', 18, 'SALIDA', 0.03, 'Venta #140', 24),
+(376, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #140 (1x Prod #1)', 1, '2026-10-21 02:17:57', 22, 'SALIDA', 0.02, 'Venta #140', 24),
+(377, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #140 (1x Prod #1)', 1, '2026-10-21 02:17:57', 23, 'SALIDA', 0.03, 'Venta #140', 24),
+(378, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #141 (1x Prod #1)', 1, '2026-10-21 02:17:57', 12, 'SALIDA', 1.00, 'Venta #141', 24),
+(379, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #141 (1x Prod #1)', 1, '2026-10-21 02:17:57', 14, 'SALIDA', 0.15, 'Venta #141', 24),
+(380, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #141 (1x Prod #1)', 1, '2026-10-21 02:17:58', 19, 'SALIDA', 1.00, 'Venta #141', 24),
+(381, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #141 (1x Prod #1)', 1, '2026-10-21 02:17:58', 18, 'SALIDA', 0.03, 'Venta #141', 24),
+(382, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #141 (1x Prod #1)', 1, '2026-10-21 02:17:58', 22, 'SALIDA', 0.02, 'Venta #141', 24),
+(383, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #141 (1x Prod #1)', 1, '2026-10-21 02:17:58', 23, 'SALIDA', 0.03, 'Venta #141', 24),
+(384, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #142 (1x Prod #1)', 1, '2026-10-21 02:17:58', 12, 'SALIDA', 1.00, 'Venta #142', 24),
+(385, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #142 (1x Prod #1)', 1, '2026-10-21 02:17:58', 14, 'SALIDA', 0.15, 'Venta #142', 24),
+(386, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #142 (1x Prod #1)', 1, '2026-10-21 02:17:58', 19, 'SALIDA', 1.00, 'Venta #142', 24),
+(387, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #142 (1x Prod #1)', 1, '2026-10-21 02:17:58', 18, 'SALIDA', 0.03, 'Venta #142', 24),
+(388, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #142 (1x Prod #1)', 1, '2026-10-21 02:17:58', 22, 'SALIDA', 0.02, 'Venta #142', 24),
+(389, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #142 (1x Prod #1)', 1, '2026-10-21 02:17:58', 23, 'SALIDA', 0.03, 'Venta #142', 24),
+(390, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #143 (1x Prod #1)', 1, '2026-10-21 02:17:58', 12, 'SALIDA', 1.00, 'Venta #143', 24),
+(391, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #143 (1x Prod #1)', 1, '2026-10-21 02:17:58', 14, 'SALIDA', 0.15, 'Venta #143', 24),
+(392, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #143 (1x Prod #1)', 1, '2026-10-21 02:17:58', 19, 'SALIDA', 1.00, 'Venta #143', 24),
+(393, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #143 (1x Prod #1)', 1, '2026-10-21 02:17:58', 18, 'SALIDA', 0.03, 'Venta #143', 24),
+(394, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #143 (1x Prod #1)', 1, '2026-10-21 02:17:58', 22, 'SALIDA', 0.02, 'Venta #143', 24),
+(395, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #143 (1x Prod #1)', 1, '2026-10-21 02:17:58', 23, 'SALIDA', 0.03, 'Venta #143', 24),
+(396, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #144 (1x Prod #1)', 1, '2026-10-21 02:17:58', 12, 'SALIDA', 1.00, 'Venta #144', 24),
+(397, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #144 (1x Prod #1)', 1, '2026-10-21 02:17:58', 14, 'SALIDA', 0.15, 'Venta #144', 24),
+(398, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #144 (1x Prod #1)', 1, '2026-10-21 02:17:58', 19, 'SALIDA', 1.00, 'Venta #144', 24),
+(399, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #144 (1x Prod #1)', 1, '2026-10-21 02:17:58', 18, 'SALIDA', 0.03, 'Venta #144', 24),
+(400, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #144 (1x Prod #1)', 1, '2026-10-21 02:17:58', 22, 'SALIDA', 0.02, 'Venta #144', 24),
+(401, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #144 (1x Prod #1)', 1, '2026-10-21 02:17:58', 23, 'SALIDA', 0.03, 'Venta #144', 24),
+(402, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #145 (1x Prod #1)', 1, '2026-10-21 02:17:58', 12, 'SALIDA', 1.00, 'Venta #145', 24),
+(403, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #145 (1x Prod #1)', 1, '2026-10-21 02:17:58', 14, 'SALIDA', 0.15, 'Venta #145', 24),
+(404, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #145 (1x Prod #1)', 1, '2026-10-21 02:17:58', 19, 'SALIDA', 1.00, 'Venta #145', 24),
+(405, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #145 (1x Prod #1)', 1, '2026-10-21 02:17:58', 18, 'SALIDA', 0.03, 'Venta #145', 24),
+(406, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #145 (1x Prod #1)', 1, '2026-10-21 02:17:58', 22, 'SALIDA', 0.02, 'Venta #145', 24),
+(407, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #145 (1x Prod #1)', 1, '2026-10-21 02:17:58', 23, 'SALIDA', 0.03, 'Venta #145', 24),
+(408, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #146 (2x Prod #1)', 1, '2026-10-21 02:17:59', 12, 'SALIDA', 2.00, 'Venta #146', 24),
+(409, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #146 (2x Prod #1)', 1, '2026-10-21 02:17:59', 14, 'SALIDA', 0.30, 'Venta #146', 24),
+(410, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #146 (2x Prod #1)', 1, '2026-10-21 02:17:59', 19, 'SALIDA', 2.00, 'Venta #146', 24),
+(411, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #146 (2x Prod #1)', 1, '2026-10-21 02:17:59', 18, 'SALIDA', 0.06, 'Venta #146', 24),
+(412, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #146 (2x Prod #1)', 1, '2026-10-21 02:17:59', 22, 'SALIDA', 0.04, 'Venta #146', 24),
+(413, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #146 (2x Prod #1)', 1, '2026-10-21 02:17:59', 23, 'SALIDA', 0.06, 'Venta #146', 24),
+(414, 'CONSUMO_VENTA', 'Pan Perro Americano', 'Consumo de 5.00 und por Venta #146 (5x Prod #5)', 1, '2026-10-21 02:17:59', 13, 'SALIDA', 5.00, 'Venta #146', 24),
+(415, 'CONSUMO_VENTA', 'Salchicha Suiza Ahumada', 'Consumo de 5.00 und por Venta #146 (5x Prod #5)', 1, '2026-10-21 02:17:59', 17, 'SALIDA', 5.00, 'Venta #146', 24),
+(416, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.15 kg por Venta #146 (5x Prod #5)', 1, '2026-10-21 02:17:59', 18, 'SALIDA', 0.15, 'Venta #146', 24),
+(417, 'CONSUMO_VENTA', 'Queso Mozzarella Rallado', 'Consumo de 0.25 kg por Venta #146 (5x Prod #5)', 1, '2026-10-21 02:17:59', 20, 'SALIDA', 0.25, 'Venta #146', 24),
+(418, 'CONSUMO_VENTA', 'Cebolla Cabezona Blanca', 'Consumo de 0.15 kg por Venta #146 (5x Prod #5)', 1, '2026-10-21 02:17:59', 24, 'SALIDA', 0.15, 'Venta #146', 24),
+(420, 'Creado', 'Salsa Preparada AutoTest 1792549083986', 'Se creó el insumo preparado: Salsa Preparada AutoTest 1792549083986', 1, '2026-10-21 02:18:04', NULL, NULL, NULL, 'Registro inicial de insumo preparado', NULL),
+(421, 'Eliminado permanente', 'Salsa Preparada AutoTest 1792549083986', 'Se eliminó permanentemente el insumo preparado: Salsa Preparada AutoTest 1792549083986', 1, '2026-10-21 02:18:04', NULL, NULL, NULL, 'Eliminación física definitiva de preparado', NULL),
+(422, 'Eliminado permanente', 'Insumo AutoTest 1792549083953', 'Se eliminó permanentemente el insumo: Insumo AutoTest 1792549083953', 1, '2026-10-21 02:18:04', NULL, NULL, NULL, 'Eliminación física definitiva', NULL),
+(425, 'Creado', 'Salsa Preparada AutoTest 1792549509712', 'Se creó el insumo preparado: Salsa Preparada AutoTest 1792549509712', 1, '2026-10-21 02:25:09', NULL, NULL, NULL, 'Registro inicial de insumo preparado', NULL),
+(426, 'Eliminado permanente', 'Salsa Preparada AutoTest 1792549509712', 'Se eliminó permanentemente el insumo preparado: Salsa Preparada AutoTest 1792549509712', 1, '2026-10-21 02:25:09', NULL, NULL, NULL, 'Eliminación física definitiva de preparado', NULL),
+(427, 'Eliminado permanente', 'Insumo AutoTest Modificado 1792549509685', 'Se eliminó permanentemente el insumo: Insumo AutoTest Modificado 1792549509685', 1, '2026-10-21 02:25:09', NULL, NULL, NULL, 'Eliminación física definitiva', NULL),
+(428, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #147 (2x Prod #1)', 1, '2026-10-21 02:25:18', 12, 'SALIDA', 2.00, 'Venta #147', 24),
+(429, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #147 (2x Prod #1)', 1, '2026-10-21 02:25:18', 14, 'SALIDA', 0.30, 'Venta #147', 24),
+(430, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #147 (2x Prod #1)', 1, '2026-10-21 02:25:18', 19, 'SALIDA', 2.00, 'Venta #147', 24),
+(431, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #147 (2x Prod #1)', 1, '2026-10-21 02:25:18', 18, 'SALIDA', 0.06, 'Venta #147', 24),
+(432, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #147 (2x Prod #1)', 1, '2026-10-21 02:25:18', 22, 'SALIDA', 0.04, 'Venta #147', 24),
+(433, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #147 (2x Prod #1)', 1, '2026-10-21 02:25:18', 23, 'SALIDA', 0.06, 'Venta #147', 24),
+(434, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #147', 1, '2026-10-21 02:25:18', 18, 'SALIDA', 2.00, 'Venta #147 (Adición)', 24),
+(435, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #148 (2x Prod #1)', 1, '2026-10-21 02:37:04', 12, 'SALIDA', 2.00, 'Venta #148', 24),
+(436, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #148 (2x Prod #1)', 1, '2026-10-21 02:37:04', 14, 'SALIDA', 0.30, 'Venta #148', 24),
+(437, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #148 (2x Prod #1)', 1, '2026-10-21 02:37:04', 19, 'SALIDA', 2.00, 'Venta #148', 24),
+(438, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #148 (2x Prod #1)', 1, '2026-10-21 02:37:04', 18, 'SALIDA', 0.06, 'Venta #148', 24),
+(439, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #148 (2x Prod #1)', 1, '2026-10-21 02:37:04', 22, 'SALIDA', 0.04, 'Venta #148', 24),
+(440, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #148 (2x Prod #1)', 1, '2026-10-21 02:37:04', 23, 'SALIDA', 0.06, 'Venta #148', 24),
+(441, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #148', 1, '2026-10-21 02:37:04', 18, 'SALIDA', 2.00, 'Venta #148 (Adición)', 24),
+(444, 'Creado', 'Salsa Preparada AutoTest 1792550247809', 'Se creó el insumo preparado: Salsa Preparada AutoTest 1792550247809', 1, '2026-10-21 02:37:27', NULL, NULL, NULL, 'Registro inicial de insumo preparado', NULL),
+(445, 'Eliminado permanente', 'Salsa Preparada AutoTest 1792550247809', 'Se eliminó permanentemente el insumo preparado: Salsa Preparada AutoTest 1792550247809', 1, '2026-10-21 02:37:27', NULL, NULL, NULL, 'Eliminación física definitiva de preparado', NULL),
+(446, 'Eliminado permanente', 'Insumo AutoTest Modificado 1792550247776', 'Se eliminó permanentemente el insumo: Insumo AutoTest Modificado 1792550247776', 1, '2026-10-21 02:37:27', NULL, NULL, NULL, 'Eliminación física definitiva', NULL),
+(447, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #149 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #149', 24),
+(448, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #149 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #149', 24),
+(449, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #149 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #149', 24),
+(450, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #149 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #149', 24),
+(451, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #149 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #149', 24),
+(452, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #149 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #149', 24),
+(453, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #150 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #150', 24),
+(454, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #150 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #150', 24),
+(455, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #150 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #150', 24),
+(456, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #150 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #150', 24),
+(457, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #150 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #150', 24),
+(458, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #150 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #150', 24),
+(459, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #151 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #151', 24),
+(460, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #151 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #151', 24),
+(461, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #151 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #151', 24),
+(462, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #151 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #151', 24),
+(463, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #151 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #151', 24),
+(464, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #151 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #151', 24),
+(465, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #152 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #152', 24),
+(466, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #152 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #152', 24),
+(467, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #152 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #152', 24),
+(468, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #152 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #152', 24),
+(469, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #152 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #152', 24),
+(470, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #152 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #152', 24),
+(471, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #153 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #153', 24),
+(472, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #153 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #153', 24),
+(473, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #153 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #153', 24),
+(474, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #153 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #153', 24),
+(475, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #153 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #153', 24),
+(476, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #153 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #153', 24),
+(477, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #154 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #154', 24),
+(478, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #154 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #154', 24),
+(479, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #154 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #154', 24),
+(480, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #154 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #154', 24),
+(481, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #154 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #154', 24),
+(482, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #154 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #154', 24),
+(483, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #155 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #155', 24),
+(484, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #155 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #155', 24),
+(485, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #155 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #155', 24),
+(486, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #155 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #155', 24),
+(487, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #155 (1x Prod #1)', 1, '2026-10-21 02:37:34', 22, 'SALIDA', 0.02, 'Venta #155', 24),
+(488, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #155 (1x Prod #1)', 1, '2026-10-21 02:37:34', 23, 'SALIDA', 0.03, 'Venta #155', 24),
+(489, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #156 (1x Prod #1)', 1, '2026-10-21 02:37:34', 12, 'SALIDA', 1.00, 'Venta #156', 24),
+(490, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #156 (1x Prod #1)', 1, '2026-10-21 02:37:34', 14, 'SALIDA', 0.15, 'Venta #156', 24),
+(491, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #156 (1x Prod #1)', 1, '2026-10-21 02:37:34', 19, 'SALIDA', 1.00, 'Venta #156', 24),
+(492, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #156 (1x Prod #1)', 1, '2026-10-21 02:37:34', 18, 'SALIDA', 0.03, 'Venta #156', 24),
+(493, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #156 (1x Prod #1)', 1, '2026-10-21 02:37:35', 22, 'SALIDA', 0.02, 'Venta #156', 24),
+(494, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #156 (1x Prod #1)', 1, '2026-10-21 02:37:35', 23, 'SALIDA', 0.03, 'Venta #156', 24),
+(495, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #157 (2x Prod #1)', 1, '2026-10-21 02:37:35', 12, 'SALIDA', 2.00, 'Venta #157', 24),
+(496, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #157 (2x Prod #1)', 1, '2026-10-21 02:37:35', 14, 'SALIDA', 0.30, 'Venta #157', 24),
+(497, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #157 (2x Prod #1)', 1, '2026-10-21 02:37:35', 19, 'SALIDA', 2.00, 'Venta #157', 24),
+(498, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #157 (2x Prod #1)', 1, '2026-10-21 02:37:35', 18, 'SALIDA', 0.06, 'Venta #157', 24),
+(499, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #157 (2x Prod #1)', 1, '2026-10-21 02:37:35', 22, 'SALIDA', 0.04, 'Venta #157', 24),
+(500, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #157 (2x Prod #1)', 1, '2026-10-21 02:37:35', 23, 'SALIDA', 0.06, 'Venta #157', 24),
+(501, 'CONSUMO_VENTA', 'Pan Perro Americano', 'Consumo de 5.00 und por Venta #157 (5x Prod #5)', 1, '2026-10-21 02:37:35', 13, 'SALIDA', 5.00, 'Venta #157', 24),
+(502, 'CONSUMO_VENTA', 'Salchicha Suiza Ahumada', 'Consumo de 5.00 und por Venta #157 (5x Prod #5)', 1, '2026-10-21 02:37:35', 17, 'SALIDA', 5.00, 'Venta #157', 24),
+(503, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.15 kg por Venta #157 (5x Prod #5)', 1, '2026-10-21 02:37:35', 18, 'SALIDA', 0.15, 'Venta #157', 24),
+(504, 'CONSUMO_VENTA', 'Queso Mozzarella Rallado', 'Consumo de 0.25 kg por Venta #157 (5x Prod #5)', 1, '2026-10-21 02:37:35', 20, 'SALIDA', 0.25, 'Venta #157', 24),
+(505, 'CONSUMO_VENTA', 'Cebolla Cabezona Blanca', 'Consumo de 0.15 kg por Venta #157 (5x Prod #5)', 1, '2026-10-21 02:37:35', 24, 'SALIDA', 0.15, 'Venta #157', 24),
+(506, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #158 (2x Prod #1)', 1, '2026-10-21 02:37:45', 12, 'SALIDA', 2.00, 'Venta #158', 24),
+(507, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #158 (2x Prod #1)', 1, '2026-10-21 02:37:45', 14, 'SALIDA', 0.30, 'Venta #158', 24),
+(508, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #158 (2x Prod #1)', 1, '2026-10-21 02:37:45', 19, 'SALIDA', 2.00, 'Venta #158', 24),
+(509, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #158 (2x Prod #1)', 1, '2026-10-21 02:37:45', 18, 'SALIDA', 0.06, 'Venta #158', 24),
+(510, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #158 (2x Prod #1)', 1, '2026-10-21 02:37:45', 22, 'SALIDA', 0.04, 'Venta #158', 24),
+(511, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #158 (2x Prod #1)', 1, '2026-10-21 02:37:45', 23, 'SALIDA', 0.06, 'Venta #158', 24),
+(512, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #158', 1, '2026-10-21 02:37:45', 18, 'SALIDA', 2.00, 'Venta #158 (Adición)', 24),
+(513, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #159 (2x Prod #1)', 1, '2026-10-22 15:09:36', 12, 'SALIDA', 2.00, 'Venta #159', 24),
+(514, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #159 (2x Prod #1)', 1, '2026-10-22 15:09:36', 14, 'SALIDA', 0.30, 'Venta #159', 24),
+(515, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #159 (2x Prod #1)', 1, '2026-10-22 15:09:36', 19, 'SALIDA', 2.00, 'Venta #159', 24),
+(516, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #159 (2x Prod #1)', 1, '2026-10-22 15:09:36', 18, 'SALIDA', 0.06, 'Venta #159', 24),
+(517, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #159 (2x Prod #1)', 1, '2026-10-22 15:09:36', 22, 'SALIDA', 0.04, 'Venta #159', 24),
+(518, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #159 (2x Prod #1)', 1, '2026-10-22 15:09:36', 23, 'SALIDA', 0.06, 'Venta #159', 24),
+(519, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #159', 1, '2026-10-22 15:09:36', 18, 'SALIDA', 2.00, 'Venta #159 (Adición)', 24),
+(520, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #160 (1x Prod #1)', 1, '2026-10-22 15:33:22', 12, 'SALIDA', 1.00, 'Venta #160', 24),
+(521, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #160 (1x Prod #1)', 1, '2026-10-22 15:33:22', 14, 'SALIDA', 0.15, 'Venta #160', 24),
+(522, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #160 (1x Prod #1)', 1, '2026-10-22 15:33:22', 19, 'SALIDA', 1.00, 'Venta #160', 24),
+(523, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #160 (1x Prod #1)', 1, '2026-10-22 15:33:22', 18, 'SALIDA', 0.03, 'Venta #160', 24),
+(524, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #160 (1x Prod #1)', 1, '2026-10-22 15:33:22', 22, 'SALIDA', 0.02, 'Venta #160', 24),
+(525, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #160 (1x Prod #1)', 1, '2026-10-22 15:33:22', 23, 'SALIDA', 0.03, 'Venta #160', 24),
+(526, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #161 (1x Prod #1)', 1, '2026-10-22 15:33:22', 12, 'SALIDA', 1.00, 'Venta #161', 24),
+(527, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #161 (1x Prod #1)', 1, '2026-10-22 15:33:22', 14, 'SALIDA', 0.15, 'Venta #161', 24),
+(528, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #161 (1x Prod #1)', 1, '2026-10-22 15:33:22', 19, 'SALIDA', 1.00, 'Venta #161', 24),
+(529, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #161 (1x Prod #1)', 1, '2026-10-22 15:33:22', 18, 'SALIDA', 0.03, 'Venta #161', 24),
+(530, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #161 (1x Prod #1)', 1, '2026-10-22 15:33:22', 22, 'SALIDA', 0.02, 'Venta #161', 24),
+(531, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #161 (1x Prod #1)', 1, '2026-10-22 15:33:22', 23, 'SALIDA', 0.03, 'Venta #161', 24),
+(532, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #162 (1x Prod #1)', 1, '2026-10-22 15:33:22', 12, 'SALIDA', 1.00, 'Venta #162', 24),
+(533, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #162 (1x Prod #1)', 1, '2026-10-22 15:33:22', 14, 'SALIDA', 0.15, 'Venta #162', 24),
+(534, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #162 (1x Prod #1)', 1, '2026-10-22 15:33:22', 19, 'SALIDA', 1.00, 'Venta #162', 24),
+(535, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #162 (1x Prod #1)', 1, '2026-10-22 15:33:22', 18, 'SALIDA', 0.03, 'Venta #162', 24),
+(536, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #162 (1x Prod #1)', 1, '2026-10-22 15:33:22', 22, 'SALIDA', 0.02, 'Venta #162', 24),
+(537, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #162 (1x Prod #1)', 1, '2026-10-22 15:33:22', 23, 'SALIDA', 0.03, 'Venta #162', 24),
+(538, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #163 (1x Prod #1)', 1, '2026-10-22 15:33:22', 12, 'SALIDA', 1.00, 'Venta #163', 24),
+(539, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #163 (1x Prod #1)', 1, '2026-10-22 15:33:22', 14, 'SALIDA', 0.15, 'Venta #163', 24),
+(540, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #163 (1x Prod #1)', 1, '2026-10-22 15:33:22', 19, 'SALIDA', 1.00, 'Venta #163', 24),
+(541, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #163 (1x Prod #1)', 1, '2026-10-22 15:33:22', 18, 'SALIDA', 0.03, 'Venta #163', 24),
+(542, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #163 (1x Prod #1)', 1, '2026-10-22 15:33:22', 22, 'SALIDA', 0.02, 'Venta #163', 24),
+(543, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #163 (1x Prod #1)', 1, '2026-10-22 15:33:22', 23, 'SALIDA', 0.03, 'Venta #163', 24),
+(544, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #164 (1x Prod #1)', 1, '2026-10-22 15:33:22', 12, 'SALIDA', 1.00, 'Venta #164', 24),
+(545, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #164 (1x Prod #1)', 1, '2026-10-22 15:33:22', 14, 'SALIDA', 0.15, 'Venta #164', 24),
+(546, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #164 (1x Prod #1)', 1, '2026-10-22 15:33:22', 19, 'SALIDA', 1.00, 'Venta #164', 24),
+(547, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #164 (1x Prod #1)', 1, '2026-10-22 15:33:22', 18, 'SALIDA', 0.03, 'Venta #164', 24),
+(548, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #164 (1x Prod #1)', 1, '2026-10-22 15:33:22', 22, 'SALIDA', 0.02, 'Venta #164', 24),
+(549, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #164 (1x Prod #1)', 1, '2026-10-22 15:33:22', 23, 'SALIDA', 0.03, 'Venta #164', 24),
+(550, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #165 (1x Prod #1)', 1, '2026-10-22 15:33:22', 12, 'SALIDA', 1.00, 'Venta #165', 24),
+(551, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #165 (1x Prod #1)', 1, '2026-10-22 15:33:22', 14, 'SALIDA', 0.15, 'Venta #165', 24),
+(552, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #165 (1x Prod #1)', 1, '2026-10-22 15:33:22', 19, 'SALIDA', 1.00, 'Venta #165', 24),
+(553, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #165 (1x Prod #1)', 1, '2026-10-22 15:33:22', 18, 'SALIDA', 0.03, 'Venta #165', 24),
+(554, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #165 (1x Prod #1)', 1, '2026-10-22 15:33:22', 22, 'SALIDA', 0.02, 'Venta #165', 24),
+(555, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #165 (1x Prod #1)', 1, '2026-10-22 15:33:22', 23, 'SALIDA', 0.03, 'Venta #165', 24),
+(556, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #166 (1x Prod #1)', 1, '2026-10-22 15:33:23', 12, 'SALIDA', 1.00, 'Venta #166', 24),
+(557, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #166 (1x Prod #1)', 1, '2026-10-22 15:33:23', 14, 'SALIDA', 0.15, 'Venta #166', 24),
+(558, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #166 (1x Prod #1)', 1, '2026-10-22 15:33:23', 19, 'SALIDA', 1.00, 'Venta #166', 24),
+(559, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #166 (1x Prod #1)', 1, '2026-10-22 15:33:23', 18, 'SALIDA', 0.03, 'Venta #166', 24),
+(560, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #166 (1x Prod #1)', 1, '2026-10-22 15:33:23', 22, 'SALIDA', 0.02, 'Venta #166', 24),
+(561, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #166 (1x Prod #1)', 1, '2026-10-22 15:33:23', 23, 'SALIDA', 0.03, 'Venta #166', 24),
+(562, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #167 (1x Prod #1)', 1, '2026-10-22 15:33:23', 12, 'SALIDA', 1.00, 'Venta #167', 24),
+(563, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #167 (1x Prod #1)', 1, '2026-10-22 15:33:23', 14, 'SALIDA', 0.15, 'Venta #167', 24),
+(564, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #167 (1x Prod #1)', 1, '2026-10-22 15:33:23', 19, 'SALIDA', 1.00, 'Venta #167', 24),
+(565, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #167 (1x Prod #1)', 1, '2026-10-22 15:33:23', 18, 'SALIDA', 0.03, 'Venta #167', 24),
+(566, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #167 (1x Prod #1)', 1, '2026-10-22 15:33:23', 22, 'SALIDA', 0.02, 'Venta #167', 24),
+(567, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #167 (1x Prod #1)', 1, '2026-10-22 15:33:23', 23, 'SALIDA', 0.03, 'Venta #167', 24),
+(568, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #168 (2x Prod #1)', 1, '2026-10-22 15:33:23', 12, 'SALIDA', 2.00, 'Venta #168', 24),
+(569, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #168 (2x Prod #1)', 1, '2026-10-22 15:33:23', 14, 'SALIDA', 0.30, 'Venta #168', 24),
+(570, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #168 (2x Prod #1)', 1, '2026-10-22 15:33:23', 19, 'SALIDA', 2.00, 'Venta #168', 24),
+(571, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #168 (2x Prod #1)', 1, '2026-10-22 15:33:23', 18, 'SALIDA', 0.06, 'Venta #168', 24),
+(572, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #168 (2x Prod #1)', 1, '2026-10-22 15:33:23', 22, 'SALIDA', 0.04, 'Venta #168', 24),
+(573, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #168 (2x Prod #1)', 1, '2026-10-22 15:33:23', 23, 'SALIDA', 0.06, 'Venta #168', 24),
+(574, 'CONSUMO_VENTA', 'Pan Perro Americano', 'Consumo de 5.00 und por Venta #168 (5x Prod #5)', 1, '2026-10-22 15:33:23', 13, 'SALIDA', 5.00, 'Venta #168', 24),
+(575, 'CONSUMO_VENTA', 'Salchicha Suiza Ahumada', 'Consumo de 5.00 und por Venta #168 (5x Prod #5)', 1, '2026-10-22 15:33:23', 17, 'SALIDA', 5.00, 'Venta #168', 24),
+(576, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.15 kg por Venta #168 (5x Prod #5)', 1, '2026-10-22 15:33:23', 18, 'SALIDA', 0.15, 'Venta #168', 24),
+(577, 'CONSUMO_VENTA', 'Queso Mozzarella Rallado', 'Consumo de 0.25 kg por Venta #168 (5x Prod #5)', 1, '2026-10-22 15:33:23', 20, 'SALIDA', 0.25, 'Venta #168', 24),
+(578, 'CONSUMO_VENTA', 'Cebolla Cabezona Blanca', 'Consumo de 0.15 kg por Venta #168 (5x Prod #5)', 1, '2026-10-22 15:33:23', 24, 'SALIDA', 0.15, 'Venta #168', 24),
+(579, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #169 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #169', 24),
+(580, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #169 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #169', 24),
+(581, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #169 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #169', 24),
+(582, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #169 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #169', 24),
+(583, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #169 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #169', 24),
+(584, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #169 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #169', 24),
+(585, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #170 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #170', 24),
+(586, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #170 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #170', 24),
+(587, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #170 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #170', 24),
+(588, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #170 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #170', 24),
+(589, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #170 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #170', 24),
+(590, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #170 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #170', 24),
+(591, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #171 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #171', 24),
+(592, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #171 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #171', 24),
+(593, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #171 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #171', 24),
+(594, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #171 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #171', 24),
+(595, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #171 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #171', 24),
+(596, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #171 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #171', 24),
+(597, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #172 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #172', 24),
+(598, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #172 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #172', 24),
+(599, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #172 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #172', 24),
+(600, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #172 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #172', 24),
+(601, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #172 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #172', 24),
+(602, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #172 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #172', 24),
+(603, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #173 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #173', 24),
+(604, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #173 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #173', 24),
+(605, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #173 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #173', 24),
+(606, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #173 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #173', 24),
+(607, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #173 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #173', 24),
+(608, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #173 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #173', 24),
+(609, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #174 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #174', 24),
+(610, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #174 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #174', 24),
+(611, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #174 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #174', 24),
+(612, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #174 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #174', 24),
+(613, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #174 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #174', 24),
+(614, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #174 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #174', 24),
+(615, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #175 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #175', 24),
+(616, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #175 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #175', 24),
+(617, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #175 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #175', 24),
+(618, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #175 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #175', 24),
+(619, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #175 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #175', 24),
+(620, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #175 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #175', 24),
+(621, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #176 (1x Prod #1)', 1, '2026-10-22 15:57:49', 12, 'SALIDA', 1.00, 'Venta #176', 24),
+(622, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #176 (1x Prod #1)', 1, '2026-10-22 15:57:49', 14, 'SALIDA', 0.15, 'Venta #176', 24),
+(623, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #176 (1x Prod #1)', 1, '2026-10-22 15:57:49', 19, 'SALIDA', 1.00, 'Venta #176', 24),
+(624, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #176 (1x Prod #1)', 1, '2026-10-22 15:57:49', 18, 'SALIDA', 0.03, 'Venta #176', 24),
+(625, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #176 (1x Prod #1)', 1, '2026-10-22 15:57:49', 22, 'SALIDA', 0.02, 'Venta #176', 24),
+(626, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #176 (1x Prod #1)', 1, '2026-10-22 15:57:49', 23, 'SALIDA', 0.03, 'Venta #176', 24),
+(627, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #177 (2x Prod #1)', 1, '2026-10-22 15:57:50', 12, 'SALIDA', 2.00, 'Venta #177', 24),
+(628, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #177 (2x Prod #1)', 1, '2026-10-22 15:57:50', 14, 'SALIDA', 0.30, 'Venta #177', 24),
+(629, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #177 (2x Prod #1)', 1, '2026-10-22 15:57:50', 19, 'SALIDA', 2.00, 'Venta #177', 24),
+(630, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #177 (2x Prod #1)', 1, '2026-10-22 15:57:50', 18, 'SALIDA', 0.06, 'Venta #177', 24),
+(631, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #177 (2x Prod #1)', 1, '2026-10-22 15:57:50', 22, 'SALIDA', 0.04, 'Venta #177', 24),
+(632, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #177 (2x Prod #1)', 1, '2026-10-22 15:57:50', 23, 'SALIDA', 0.06, 'Venta #177', 24),
+(633, 'CONSUMO_VENTA', 'Pan Perro Americano', 'Consumo de 5.00 und por Venta #177 (5x Prod #5)', 1, '2026-10-22 15:57:50', 13, 'SALIDA', 5.00, 'Venta #177', 24),
+(634, 'CONSUMO_VENTA', 'Salchicha Suiza Ahumada', 'Consumo de 5.00 und por Venta #177 (5x Prod #5)', 1, '2026-10-22 15:57:50', 17, 'SALIDA', 5.00, 'Venta #177', 24),
+(635, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.15 kg por Venta #177 (5x Prod #5)', 1, '2026-10-22 15:57:50', 18, 'SALIDA', 0.15, 'Venta #177', 24),
+(636, 'CONSUMO_VENTA', 'Queso Mozzarella Rallado', 'Consumo de 0.25 kg por Venta #177 (5x Prod #5)', 1, '2026-10-22 15:57:50', 20, 'SALIDA', 0.25, 'Venta #177', 24),
+(637, 'CONSUMO_VENTA', 'Cebolla Cabezona Blanca', 'Consumo de 0.15 kg por Venta #177 (5x Prod #5)', 1, '2026-10-22 15:57:50', 24, 'SALIDA', 0.15, 'Venta #177', 24),
+(638, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #178 (2x Prod #1)', 1, '2026-10-22 15:58:01', 12, 'SALIDA', 2.00, 'Venta #178', 24),
+(639, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #178 (2x Prod #1)', 1, '2026-10-22 15:58:01', 14, 'SALIDA', 0.30, 'Venta #178', 24),
+(640, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #178 (2x Prod #1)', 1, '2026-10-22 15:58:01', 19, 'SALIDA', 2.00, 'Venta #178', 24),
+(641, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #178 (2x Prod #1)', 1, '2026-10-22 15:58:01', 18, 'SALIDA', 0.06, 'Venta #178', 24),
+(642, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #178 (2x Prod #1)', 1, '2026-10-22 15:58:01', 22, 'SALIDA', 0.04, 'Venta #178', 24),
+(643, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #178 (2x Prod #1)', 1, '2026-10-22 15:58:01', 23, 'SALIDA', 0.06, 'Venta #178', 24),
+(644, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Tocineta Ahumada en Tiras (2 kg) en Venta #178', 1, '2026-10-22 15:58:01', 18, 'SALIDA', 2.00, 'Venta #178 (Adición)', 24),
+(645, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #179 (1x Prod #1)', 0, '2026-10-28 15:51:59', 12, 'SALIDA', 1.00, 'Venta #179', 4),
+(646, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #179 (1x Prod #1)', 0, '2026-10-28 15:51:59', 14, 'SALIDA', 0.15, 'Venta #179', 4),
+(647, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #179 (1x Prod #1)', 0, '2026-10-28 15:51:59', 19, 'SALIDA', 1.00, 'Venta #179', 4),
+(648, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #179 (1x Prod #1)', 0, '2026-10-28 15:51:59', 18, 'SALIDA', 0.03, 'Venta #179', 4),
+(649, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #179 (1x Prod #1)', 0, '2026-10-28 15:51:59', 22, 'SALIDA', 0.02, 'Venta #179', 4),
+(650, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #179 (1x Prod #1)', 0, '2026-10-28 15:51:59', 23, 'SALIDA', 0.03, 'Venta #179', 4);
 
 INSERT INTO `trazabilidad` (`idTrazabilidad`, `tipo`, `entidadNombre`, `detalle`, `leido`, `fecha`, `idInsumo`, `tipoMovimiento`, `cantidad`, `motivo`, `usuarioId`) VALUES
-(29, 'Creado', 'Distribuidora Avícola San Jerónimo', 'Se registró el proveedor en el sistema: Distribuidora Avícola San Jerónimo', 1, '2026-08-18 05:42:24', NULL, NULL, NULL, 'Registro inicial de proveedor', NULL),
-(41, 'Creado', 'Carne con carolina reapper 150g', 'Se creó un nuevo insumo en el inventario: Carne con carolina reapper 150g', 1, '2026-08-18 05:58:08', 7, 'Entrada', 10.00, 'Registro inicial de insumo', NULL),
-(42, 'Creado', 'Adición: Queso extra cheddar', 'Se creó la adición Queso extra cheddar por $2500', 1, '2026-08-18 06:10:34', 4, NULL, NULL, 'Creación de adición', NULL),
-(43, 'Eliminado', 'samuel', 'Se movió a la papelera el insumo: samuel', 1, '2026-08-31 11:08:00', 3, NULL, NULL, 'Inactivación / Envío a papelera', NULL),
-(44, 'Eliminado', 'Yeison Food', 'Se movió a la papelera el insumo: Yeison Food', 1, '2026-08-31 11:08:02', 4, NULL, NULL, 'Inactivación / Envío a papelera', NULL),
-(45, 'Eliminado', 'Alexis', 'Se movió a la papelera el insumo: Alexis', 1, '2026-08-31 11:08:06', 6, NULL, NULL, 'Inactivación / Envío a papelera', NULL),
-(46, 'Creado', 'Pan de papa', 'Se creó un nuevo insumo en el inventario: Pan de papa', 1, '2026-08-31 11:17:50', 8, 'Entrada', 60.00, 'Registro inicial de insumo', NULL),
-(47, 'Creado', 'Carne de Res', 'Se creó un nuevo insumo en el inventario: Carne de Res', 1, '2026-08-31 11:24:49', 9, 'Entrada', 45.00, 'Registro inicial de insumo', NULL),
-(48, 'Eliminado', 'aguacate', 'Se movió a la papelera el insumo: aguacate', 1, '2026-08-31 11:41:03', 1, NULL, NULL, 'Inactivación / Envío a papelera', NULL),
-(49, 'Creado', 'papa', 'Se creó un nuevo insumo en el inventario: papa', 1, '2026-09-01 11:57:44', 10, 'Entrada', 100.00, 'Registro inicial de insumo', NULL),
-(50, 'Creado', 'papa2', 'Se creó un nuevo insumo en el inventario: papa2', 1, '2026-09-01 12:00:01', 11, 'Entrada', 100.00, 'Registro inicial de insumo', NULL),
-(51, 'Editado', 'Carne con carolina reapper 150g', 'Se actualizaron los datos del insumo: Carne con carolina reapper 150g', 1, '2026-09-01 14:24:51', 7, NULL, NULL, 'Actualización de datos', NULL),
-(52, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #82 (2x Prod #10)', 1, '2026-09-08 20:53:52', 12, 'SALIDA', 2.00, 'Venta #82', 24),
-(53, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #82 (2x Prod #10)', 1, '2026-09-08 20:53:52', 14, 'SALIDA', 0.30, 'Venta #82', 24),
-(54, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #82 (2x Prod #10)', 1, '2026-09-08 20:53:52', 19, 'SALIDA', 2.00, 'Venta #82', 24),
-(55, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #82 (2x Prod #10)', 1, '2026-09-08 20:53:52', 18, 'SALIDA', 0.06, 'Venta #82', 24),
-(56, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #82 (2x Prod #10)', 1, '2026-09-08 20:53:52', 22, 'SALIDA', 0.04, 'Venta #82', 24),
-(57, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #82 (2x Prod #10)', 1, '2026-09-08 20:53:52', 23, 'SALIDA', 0.06, 'Venta #82', 24),
-(58, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #83 (2x Prod #10)', 1, '2026-09-08 20:56:29', 12, 'SALIDA', 2.00, 'Venta #83', 24),
-(59, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #83 (2x Prod #10)', 1, '2026-09-08 20:56:29', 14, 'SALIDA', 0.30, 'Venta #83', 24),
-(60, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #83 (2x Prod #10)', 1, '2026-09-08 20:56:29', 19, 'SALIDA', 2.00, 'Venta #83', 24),
-(61, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #83 (2x Prod #10)', 1, '2026-09-08 20:56:29', 18, 'SALIDA', 0.06, 'Venta #83', 24),
-(62, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #83 (2x Prod #10)', 1, '2026-09-08 20:56:29', 22, 'SALIDA', 0.04, 'Venta #83', 24),
-(63, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #83 (2x Prod #10)', 1, '2026-09-08 20:56:29', 23, 'SALIDA', 0.06, 'Venta #83', 24),
-(64, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #83', 1, '2026-09-08 20:56:29', 18, 'SALIDA', 2.00, 'Venta #83 (Adición)', 24),
-(65, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #84 (2x Prod #10)', 1, '2026-09-08 20:56:52', 12, 'SALIDA', 2.00, 'Venta #84', 24),
-(66, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #84 (2x Prod #10)', 1, '2026-09-08 20:56:52', 14, 'SALIDA', 0.30, 'Venta #84', 24),
-(67, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #84 (2x Prod #10)', 1, '2026-09-08 20:56:52', 19, 'SALIDA', 2.00, 'Venta #84', 24),
-(68, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #84 (2x Prod #10)', 1, '2026-09-08 20:56:52', 18, 'SALIDA', 0.06, 'Venta #84', 24),
-(69, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #84 (2x Prod #10)', 1, '2026-09-08 20:56:52', 22, 'SALIDA', 0.04, 'Venta #84', 24),
-(70, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #84 (2x Prod #10)', 1, '2026-09-08 20:56:52', 23, 'SALIDA', 0.06, 'Venta #84', 24),
-(71, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #84', 1, '2026-09-08 20:56:52', 18, 'SALIDA', 2.00, 'Venta #84 (Adición)', 24),
-(72, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #85 (2x Prod #10)', 1, '2026-09-08 20:57:23', 12, 'SALIDA', 2.00, 'Venta #85', 24),
-(73, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #85 (2x Prod #10)', 1, '2026-09-08 20:57:23', 14, 'SALIDA', 0.30, 'Venta #85', 24),
-(74, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #85 (2x Prod #10)', 1, '2026-09-08 20:57:23', 19, 'SALIDA', 2.00, 'Venta #85', 24),
-(75, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #85 (2x Prod #10)', 1, '2026-09-08 20:57:23', 18, 'SALIDA', 0.06, 'Venta #85', 24),
-(76, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #85 (2x Prod #10)', 1, '2026-09-08 20:57:23', 22, 'SALIDA', 0.04, 'Venta #85', 24),
-(77, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #85 (2x Prod #10)', 1, '2026-09-08 20:57:23', 23, 'SALIDA', 0.06, 'Venta #85', 24),
-(78, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #85', 1, '2026-09-08 20:57:23', 18, 'SALIDA', 2.00, 'Venta #85 (Adición)', 24),
-(79, 'Eliminado', 'Salsa Especial de la Casa', 'Se movió a la papelera el insumo preparado: Salsa Especial de la Casa', 1, '2026-09-08 21:05:10', NULL, NULL, NULL, 'Envío a papelera de preparado', NULL),
-(80, 'Eliminado', 'salsa de la casa', 'Se movió a la papelera el insumo preparado: salsa de la casa', 1, '2026-09-08 21:05:26', NULL, NULL, NULL, 'Envío a papelera de preparado', NULL),
-(81, 'Eliminado', 'Carne con carolina reapper 150g', 'Se movió a la papelera el insumo: Carne con carolina reapper 150g', 1, '2026-09-08 21:05:48', 7, NULL, NULL, 'Envío a papelera', NULL),
-(82, 'Eliminado', 'Receta Especial Jalapeños', 'Se movió a la papelera el insumo preparado: Receta Especial Jalapeños', 1, '2026-09-08 21:06:28', NULL, NULL, NULL, 'Envío a papelera de preparado', NULL),
-(83, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #95 (2x Prod #10)', 1, '2026-09-08 21:08:40', 12, 'SALIDA', 2.00, 'Venta #95', 24),
-(84, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #95 (2x Prod #10)', 1, '2026-09-08 21:08:40', 14, 'SALIDA', 0.30, 'Venta #95', 24),
-(85, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #95 (2x Prod #10)', 1, '2026-09-08 21:08:40', 19, 'SALIDA', 2.00, 'Venta #95', 24),
-(86, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #95 (2x Prod #10)', 1, '2026-09-08 21:08:40', 18, 'SALIDA', 0.06, 'Venta #95', 24),
-(87, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #95 (2x Prod #10)', 1, '2026-09-08 21:08:40', 22, 'SALIDA', 0.04, 'Venta #95', 24),
-(88, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #95 (2x Prod #10)', 1, '2026-09-08 21:08:40', 23, 'SALIDA', 0.06, 'Venta #95', 24),
-(89, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #95', 1, '2026-09-08 21:08:40', 18, 'SALIDA', 2.00, 'Venta #95 (Adición)', 24),
-(90, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #96 (2x Prod #10)', 1, '2026-09-08 21:11:30', 12, 'SALIDA', 2.00, 'Venta #96', 24),
-(91, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #96 (2x Prod #10)', 1, '2026-09-08 21:11:30', 14, 'SALIDA', 0.30, 'Venta #96', 24),
-(92, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #96 (2x Prod #10)', 1, '2026-09-08 21:11:30', 19, 'SALIDA', 2.00, 'Venta #96', 24),
-(93, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #96 (2x Prod #10)', 1, '2026-09-08 21:11:30', 18, 'SALIDA', 0.06, 'Venta #96', 24),
-(94, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #96 (2x Prod #10)', 1, '2026-09-08 21:11:30', 22, 'SALIDA', 0.04, 'Venta #96', 24),
-(95, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #96 (2x Prod #10)', 1, '2026-09-08 21:11:30', 23, 'SALIDA', 0.06, 'Venta #96', 24),
-(96, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #96', 1, '2026-09-08 21:11:30', 18, 'SALIDA', 2.00, 'Venta #96 (Adición)', 24),
-(97, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #106 (2x Prod #10)', 1, '2026-09-08 21:32:34', 12, 'SALIDA', 2.00, 'Venta #106', 24),
-(98, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #106 (2x Prod #10)', 1, '2026-09-08 21:32:34', 14, 'SALIDA', 0.30, 'Venta #106', 24),
-(99, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #106 (2x Prod #10)', 1, '2026-09-08 21:32:34', 19, 'SALIDA', 2.00, 'Venta #106', 24),
-(100, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #106 (2x Prod #10)', 1, '2026-09-08 21:32:34', 18, 'SALIDA', 0.06, 'Venta #106', 24),
-(101, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #106 (2x Prod #10)', 1, '2026-09-08 21:32:34', 22, 'SALIDA', 0.04, 'Venta #106', 24),
-(102, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #106 (2x Prod #10)', 1, '2026-09-08 21:32:34', 23, 'SALIDA', 0.06, 'Venta #106', 24),
-(103, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #106', 1, '2026-09-08 21:32:34', 18, 'SALIDA', 2.00, 'Venta #106 (Adición)', 24),
-(104, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #116 (2x Prod #10)', 1, '2026-09-08 22:22:53', 12, 'SALIDA', 2.00, 'Venta #116', 24),
-(105, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #116 (2x Prod #10)', 1, '2026-09-08 22:22:53', 14, 'SALIDA', 0.30, 'Venta #116', 24),
-(106, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #116 (2x Prod #10)', 1, '2026-09-08 22:22:53', 19, 'SALIDA', 2.00, 'Venta #116', 24),
-(107, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #116 (2x Prod #10)', 1, '2026-09-08 22:22:53', 18, 'SALIDA', 0.06, 'Venta #116', 24),
-(108, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #116 (2x Prod #10)', 1, '2026-09-08 22:22:53', 22, 'SALIDA', 0.04, 'Venta #116', 24),
-(109, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #116 (2x Prod #10)', 1, '2026-09-08 22:22:53', 23, 'SALIDA', 0.06, 'Venta #116', 24),
-(110, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #116', 1, '2026-09-08 22:22:53', 18, 'SALIDA', 2.00, 'Venta #116 (Adición)', 24),
-(111, 'Editado', 'Adición: Porción Cebolla Caramelizada (50g)', 'Se actualizó la adición Porción Cebolla Caramelizada (50g)', 1, '2026-09-09 13:16:06', 24, NULL, NULL, 'Actualización de adición', NULL),
-(112, 'Editado', 'Adición: Jalapeños Picantes Extra (40g)', 'Se actualizó la adición Jalapeños Picantes Extra (40g)', 1, '2026-09-09 13:17:54', 25, NULL, NULL, 'Actualización de adición', NULL),
-(113, 'Editado', 'Adición: Extra Queso Cheddar (2 lonchas)', 'Se actualizó la adición Extra Queso Cheddar (2 lonchas)', 1, '2026-09-09 15:01:57', 19, NULL, NULL, 'Actualización de adición', NULL),
-(114, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #117 (1x Prod #1)', 1, '2026-09-14 11:48:36', 12, 'SALIDA', 1.00, 'Venta #117', 6),
-(115, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #117 (1x Prod #1)', 1, '2026-09-14 11:48:36', 14, 'SALIDA', 0.15, 'Venta #117', 6),
-(116, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #117 (1x Prod #1)', 1, '2026-09-14 11:48:36', 19, 'SALIDA', 1.00, 'Venta #117', 6),
-(117, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #117 (1x Prod #1)', 1, '2026-09-14 11:48:36', 18, 'SALIDA', 0.03, 'Venta #117', 6),
-(118, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #117 (1x Prod #1)', 1, '2026-09-14 11:48:36', 22, 'SALIDA', 0.02, 'Venta #117', 6),
-(119, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #117 (1x Prod #1)', 1, '2026-09-14 11:48:36', 23, 'SALIDA', 0.03, 'Venta #117', 6),
-(120, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 2.00 und por Venta #118 (2x Prod #1)', 1, '2026-09-14 16:01:28', 12, 'SALIDA', 2.00, 'Venta #118', 24),
-(121, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.30 kg por Venta #118 (2x Prod #1)', 1, '2026-09-14 16:01:28', 14, 'SALIDA', 0.30, 'Venta #118', 24),
-(122, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 2.00 und por Venta #118 (2x Prod #1)', 1, '2026-09-14 16:01:28', 19, 'SALIDA', 2.00, 'Venta #118', 24),
-(123, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.06 kg por Venta #118 (2x Prod #1)', 1, '2026-09-14 16:01:28', 18, 'SALIDA', 0.06, 'Venta #118', 24),
-(124, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.04 kg por Venta #118 (2x Prod #1)', 1, '2026-09-14 16:01:28', 22, 'SALIDA', 0.04, 'Venta #118', 24),
-(125, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.06 kg por Venta #118 (2x Prod #1)', 1, '2026-09-14 16:01:28', 23, 'SALIDA', 0.06, 'Venta #118', 24),
-(126, 'CONSUMO_ADICION', 'Tocineta Ahumada en Tiras', 'Adición Extra Tocineta Ahumada (2 tiras) (2 kg) en Venta #118', 1, '2026-09-14 16:01:28', 18, 'SALIDA', 2.00, 'Venta #118 (Adición)', 24),
-(127, 'Creado', 'testeo', 'Se registró el proveedor en el sistema: testeo', 1, '2026-09-17 01:13:11', NULL, NULL, NULL, 'Registro inicial de proveedor', NULL),
-(128, 'Creado', 'test', 'Se creó un nuevo insumo en el inventario: test', 0, '2026-09-17 01:15:37', 46, 'Entrada', 100.00, 'Registro inicial de insumo', NULL),
-(129, 'compra', 'test', 'Reabastecimiento por compra COMP-0003 — Proveedor: testeo | Precio unitario: $2.000 | Subtotal: $200.000 | Estado final: RECIBIDA', 0, '2026-09-17 01:18:07', 46, 'Entrada', 100.00, 'Compra COMP-0003 marcada como Recibida — Proveedor: testeo', NULL),
-(130, 'CONSUMO_VENTA', 'test', 'Consumo de 0.50 Kg por Venta #119 (1x Prod #38)', 0, '2026-09-17 01:29:22', 46, 'SALIDA', 0.50, 'Venta #119', 4),
-(131, 'CONSUMO_VENTA', 'test', 'Consumo de 0.50 Kg por Venta #119 (1x Prod #38)', 0, '2026-09-17 01:29:22', 46, 'SALIDA', 0.50, 'Venta #119', 4),
-(132, 'CONSUMO_VENTA', 'test', 'Consumo de 0.50 Kg por Venta #120 (1x Prod #38)', 0, '2026-09-17 01:30:01', 46, 'SALIDA', 0.50, 'Venta #120', 4),
-(133, 'CONSUMO_VENTA', 'test', 'Consumo de 1.50 Kg por Venta #121 (3x Prod #38)', 0, '2026-09-17 01:53:09', 46, 'SALIDA', 1.50, 'Venta #121', 6),
-(134, 'Editado', 'Salchicha Suiza Ahumada', 'Se actualizaron los datos del insumo: Salchicha Suiza Ahumada', 0, '2026-09-21 20:58:49', 17, NULL, NULL, 'Actualización de datos', NULL);
+(651, 'CONSUMO_VENTA', 'Pan Brioche Artesanal', 'Consumo de 1.00 und por Venta #180 (1x Prod #1)', 0, '2026-10-28 15:53:06', 12, 'SALIDA', 1.00, 'Venta #180', 4),
+(652, 'CONSUMO_VENTA', 'Carne de Res Molida 80/20', 'Consumo de 0.15 kg por Venta #180 (1x Prod #1)', 0, '2026-10-28 15:53:06', 14, 'SALIDA', 0.15, 'Venta #180', 4),
+(653, 'CONSUMO_VENTA', 'Queso Cheddar en Lonchas', 'Consumo de 1.00 und por Venta #180 (1x Prod #1)', 0, '2026-10-28 15:53:06', 19, 'SALIDA', 1.00, 'Venta #180', 4),
+(654, 'CONSUMO_VENTA', 'Tocineta Ahumada en Tiras', 'Consumo de 0.03 kg por Venta #180 (1x Prod #1)', 0, '2026-10-28 15:53:06', 18, 'SALIDA', 0.03, 'Venta #180', 4),
+(655, 'CONSUMO_VENTA', 'Lechuga Batavia Fresca', 'Consumo de 0.02 kg por Venta #180 (1x Prod #1)', 0, '2026-10-28 15:53:06', 22, 'SALIDA', 0.02, 'Venta #180', 4),
+(656, 'CONSUMO_VENTA', 'Tomate Chonto Maduro', 'Consumo de 0.03 kg por Venta #180 (1x Prod #1)', 0, '2026-10-28 15:53:06', 23, 'SALIDA', 0.03, 'Venta #180', 4);
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `usuario`
---
-
+-- Tabla: `usuario`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `usuario`;
 CREATE TABLE `usuario` (
   `idUsuario` int(11) NOT NULL AUTO_INCREMENT,
@@ -1274,6 +1495,7 @@ CREATE TABLE `usuario` (
   `estado` varchar(255) DEFAULT 'ACTIVO',
   `fechaRegistro` datetime DEFAULT NULL,
   `idRol` int(11) NOT NULL,
+  `foto` text DEFAULT NULL,
   PRIMARY KEY (`idUsuario`),
   UNIQUE KEY `UK_Usuario_Email` (`email`),
   UNIQUE KEY `email` (`email`),
@@ -1340,39 +1562,23 @@ CREATE TABLE `usuario` (
   KEY `IDX_UsuarioRol` (`idRol`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `usuario`
---
-
-INSERT INTO `usuario` (`idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `email`, `contrasena`, `estado`, `fechaRegistro`, `idRol`) VALUES
-(1, 'Fernando', 'Gómez Jaramillo', 'C.C.', '1', '3014599890', 'gomezjaramillofer@gmail.com', '$2a$10$85QpBu8Uj3qXzVtWTjCLveU8HpnJ1.uHuQfL1izYlVRe67hhDK3yO', 'ACTIVO', '2026-07-26 20:09:41', 4),
-(2, 'Juan Alberto', 'Pérez Palermo', 'C.C.', '2', '3456457689', 'testgestionusuarios@gmail.com', '$2a$10$e/p3rV1gEKEGUhT3F6FxG.MOTnyYdSh3m533n7UeVifuKffYi6MQC', 'ACTIVO', '2026-07-20 18:40:14', 4),
-(3, 'Juan ALbeiro', 'Perez Oso', 'C.C.', '3', '314567897', 'gomezpavas26@gmail.com', '$2a$10$j5oVx6JEwM.KjqhBZyM05uF6.D5f.xRWFtCQQRX47UDhzidE5qvVq', 'ACTIVO', '2026-07-21 17:01:48', 4),
-(4, 'Admin', 'Sistema', 'C.C.', '4', '3190000001', 'admin@chazinfood.com', '$2a$10$dS5LiLdTlcXUBSRahZAYNexfLybhvFXykk9833rsPuWz.iFzW1TcW', 'ACTIVO', '2026-07-18 11:53:44', 1),
-(5, 'Carlos', 'Martínez', 'C.C.', '5', '3190000003', 'cocinero@chazinfood.com', '$2a$10$KHZuIZ9INvEesGntm9OE.e4JIIQBMBoeWqY3k6YGdni/ZTrPSjDW2', 'ACTIVO', '2026-07-18 13:02:36', 2),
-(6, 'María', 'García', 'C.C.', '6432234344', '3190000002', 'cliente@chazinfood.com', '$2a$10$5Y9vYponOKrFOkM8Tl92CO3kA2gx2U88w5g2hkAI0Bqzjwr/.6c8y', 'ACTIVO', '2026-07-18 13:02:36', 4),
-(7, 'Ana', 'Martínez', 'C.C.', '7', '3190000004', 'ana.martinez@chazinfood.com', '$2a$10$pgPCLRzjuABNj2teljRYsOGCK.4BNyxpeXmrX/BE4/VkIAiWonOeW', 'ACTIVO', '2026-07-18 13:02:36', 4),
-(8, 'Luis', 'Rodríguez', 'C.C.', '8', '3190000005', 'luis.rodriguez@chazinfood.com', '$2a$10$so2k56hBmTlkKkyIE7SOWuHPdIWBHB89vG.3L.dwGWVTXu8aLVsHK', 'ACTIVO', '2026-07-18 13:02:36', 2),
-(9, 'Sandra', 'Gómez', 'C.C.', '9', '3190000006', 'sandra.gomez@chazinfood.com', '$2a$10$phMmRnOVMy0225SkqUNtgeL052lNC1TR3Jt1xfWrx9n7J7w.S2g5K', 'ACTIVO', '2026-07-18 13:02:37', 4),
-(10, 'Alexis', 'Gómez Pavas', 'C.C.', '10', '3023155969', 'gomezpavas34@gmail.com', '$2a$10$iz/WLUsWy6UdDkJ8MQMxguMy9fjq5JSJGlmNGZ6cA2.hPjM7pnR.e', 'ACTIVO', '2026-07-18 13:02:36', 4),
-(11, 'Alejandro', 'Gómez Plata', 'T.I.', '11', '3456897065', 'agp7ytwxp@gmail.com', '$2a$10$gtCAOCDL/8D0XSq/VtQ3XOH9SY16Wn.WTNUDNEUBBsuAOpa5neUky', 'ACTIVO', '2026-07-23 04:07:38', 4),
-(12, 'María Modificada', 'García López', 'C.C.', '12', '3190000002', 'maria@correo.com', '$2a$10$4v55hrZPMEk3zLiJfU5fo.J6rRy17QeQHpRQHBfvOh07OsKfiQM.W', 'ACTIVO', '2026-07-18 11:57:25', 4),
-(13, 'María Teresa', 'Pavas Toro', 'C.C.', '13', '3143122970', 'pavasteresa@gmail.com', '$2a$10$RTap7rl1N.ZPYC8v.mGVfe5qgwFF4ISPLRGWLSDJp00LgV.JbqYoW', 'ACTIVO', '2026-08-01 00:27:11', 4),
-(14, 'Prueba Temp', 'Cliente Test', NULL, '14', '', 'temp1785814635778@test.com', '$2a$10$yfxH94DYnP.U5nS2ioc5AObqQeVsz8j7fLeUHakVEB2WLuJmk0YtG', '1', '2026-08-04 03:37:15', 4),
-(15, 'Clientee', 'Prueba QA', NULL, '15', '5699999999', 'qa+cliente@example.test', '$2a$10$DTl16FqCKS.DjKvj55oUbeuvOORVS5G9Dikcrn3zRvU.8DubJ0O12', '1', '2026-08-06 03:44:26', 4),
-(19, 'Cliente QA Automatizado Prueba SistemaA', 'Prueba Sistema', NULL, '19', '3009998877', 'qa.test.1785989087646@chazinfood.test', '$2a$10$Q9BXFFHAtg8Af8hyUbs2OemDnFkHREmOyhBz67SmulOlE.9kLAn7a', 'ACTIVO', '2026-08-06 04:04:47', 4),
-(20, 'iñigo osorio perez', '', NULL, '20', '300233456', 'ininguito@gmail.com', '$2a$10$Y8/I6UKSLZA1nw1DxTD57OyeyWDzi58W2nQMbwImkLYMQ021Un3Re', '1', '2026-08-08 22:11:00', 4),
-(21, 'jose de la rosa ocampo angeles', '', 'C.C.', '21', '39908765', 'delarouse@gmail.com', '$2a$10$EriRPtRkc/pFi10A55MXfOVG4M9/cbAXA9jbEO2YjZBS5DuHSErbK', 'ACTIVO', '2026-08-08 22:30:01', 4),
-(22, 'jusepe', 'garcía ruíz', 'C.C.', '22', '322890765', 'jusepito@gmail.com', '$2a$10$MYdDVcOrn5A444u2h3pf6OqLCgErKseCbvyFbLyrmiUu7PXrZhdE2', 'ACTIVO', '2026-08-08 23:20:42', 4),
-(23, 'Laura', '', '', '23', '3001234567', 'samu36669@gmail.com', '$2a$10$eQv7Rw8/ws1JqDdbv0Lr.utO2kcfDaA0UhdltfdGA654PfZpmObFK', 'ACTIVO', '2026-08-09 06:53:45', 4),
-(24, 'Vendedor Principal', 'Chazin', 'C.C.', '24', '3001234567', 'vendedor@chazinfood.com', '$2a$10$YizLrUBkaC5CXWb8GUGq6.cxRe9Xxwl8WGJrFP0pEze9MAsjNphMm', 'ACTIVO', '2026-08-14 09:36:36', 3);
+INSERT INTO `usuario` (`idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `email`, `contrasena`, `estado`, `fechaRegistro`, `idRol`, `foto`) VALUES
+(1, 'Fernando', 'Gómez Jaramillo', 'C.C.', '1', '3014599890', 'gomezjaramillofer@gmail.com', '$2a$10$85QpBu8Uj3qXzVtWTjCLveU8HpnJ1.uHuQfL1izYlVRe67hhDK3yO', 'ACTIVO', '2026-07-26 20:09:41', 4, NULL),
+(4, 'Admin', 'Sistema', 'C.C.', '4', '3190000001', 'admin@chazinfood.com', '$2a$10$dS5LiLdTlcXUBSRahZAYNexfLybhvFXykk9833rsPuWz.iFzW1TcW', 'ACTIVO', '2026-07-18 11:53:44', 1, NULL),
+(6, 'María', 'García', 'C.C.', '6432234344', '3190000002', 'cliente@chazinfood.com', '$2a$10$5Y9vYponOKrFOkM8Tl92CO3kA2gx2U88w5g2hkAI0Bqzjwr/.6c8y', 'ACTIVO', '2026-07-18 13:02:36', 4, NULL),
+(24, 'Vendedor Principal', 'Chazin', 'C.C.', '24', '3001234567', 'vendedor@chazinfood.com', '$2a$10$YizLrUBkaC5CXWb8GUGq6.cxRe9Xxwl8WGJrFP0pEze9MAsjNphMm', 'ACTIVO', '2026-08-14 09:36:36', 3, NULL),
+(25, 'Mariana', 'Silva Vergara', 'C.C.', '1056783045', '3054675789', 'mariana123@mailinator.com', '$2a$10$CHcvOtoR3eI4BrXf0LGDI.aCqb16qwcpMddDMW0DochM5BsRt0WEm', 'ACTIVO', '2026-09-23 11:29:37', 4, NULL),
+(26, 'sofyan', 'amrabat', 'C.C.', '8765432198', '3338977654', 'sofyan@mailinator.com', '$2a$10$gHexTX7kKBlxJCNPcufUX.7q0TXNr5n4l/jWkWM8XJ9VSSoNl2OKa', 'ACTIVO', '2026-09-24 05:13:59', 4, NULL),
+(27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', '$2a$10$/z23BjiussU6jhOO.5D6ZuOlovSMyCzhdEb/CwcKm0LsU3nLpdKk6', 'ACTIVO', '2026-10-06 12:19:50', 2, NULL),
+(28, 'Juan', 'PPerez', 'C.C.', '12345678', '3001234567', 'juanperez@gmail.com', '$2a$10$jGN8TU1E8U36jTA4nP7YPumzttjJo2uBtVVUBT49p9cWLsltyvQEe', 'ACTIVO', '2026-10-18 17:42:29', 4, NULL),
+(32, 'Nuevo Cliente', '', 'C.C.', '32', NULL, 'nuevocliente@gmail.com', '$2a$10$23BT7J5O62odP42cfRGxm.p6LqvSjDdcXtSqlxgKynTjzjO6KDBRa', 'ACTIVO', '2026-10-19 05:05:00', 4, NULL),
+(33, 'Pedro', 'Jajaja', 'C.C.', '33', NULL, 'jajajapedro2@gmail.com', '$2a$10$z651yjoa0c7saLp4VdVIzuG.y7kzMBlnQSvrKsb3q00KuFzg.NAKO', 'ACTIVO', '2026-10-20 14:42:48', 4, 'https://lh3.googleusercontent.com/a/ACg8ocIGFU4ouBL7lt9zWlG2aIR76fZA30Sw3ndhDlD1cxSYpYbyMA=s96-c'),
+(34, 'Samuel Gutiérrez franco', '', 'C.C.', '34', NULL, 'samu36669@gmail.com', '$2a$10$XNIfoAMcbHGAg9aU4crLte/uL87RHrZJ1uEN4SYtH8WHOgcP.Ww..', 'ACTIVO', '2026-10-21 02:49:04', 4, 'https://lh3.googleusercontent.com/a/ACg8ocKmapNwCVpwyd7XnVj1loQQ9a43jOPDmTcBpztbkZAtZms3lti_=s96-c');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `variante`
---
-
+-- Tabla: `variante`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `variante`;
 CREATE TABLE `variante` (
   `idVariante` int(11) NOT NULL AUTO_INCREMENT,
@@ -1385,10 +1591,7 @@ CREATE TABLE `variante` (
   KEY `IDX_VarianteProducto` (`idProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `variante`
---
-
 INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`, `imagen`) VALUES
 (0, 0, '__SISTEMA_VARIANTE_CERO__', 0.00, 0, NULL),
 (10, 1, 'Clásica 150g', 18000.00, 1, NULL),
@@ -1398,17 +1601,8 @@ INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`
 (14, 5, 'Perro Suizo Gourmet', 17000.00, 1, NULL),
 (15, 6, 'Salchipapa Personal Grande', 23000.00, 1, NULL),
 (16, 7, 'Combo Pareja Completo', 38000.00, 1, NULL),
-(17, 8, 'Coca-Cola Sabor Original 400ml', 4500.00, 1, NULL),
-(18, 9, 'Botella 400ml', 4000.00, 1, NULL),
 (19, 10, 'Botella 500ml', 3000.00, 1, NULL),
-(20, 8, 'Coca-Cola Sin Azúcar / Light 400ml', 4500.00, 1, NULL),
-(21, 11, 'Pepsi Regular 400ml', 4000.00, 1, NULL),
-(22, 11, 'Pepsi Light / Black 400ml', 4000.00, 1, NULL),
-(23, 12, 'Colombiana Botella 400ml', 4000.00, 1, NULL),
-(24, 13, 'Sprite Botella 400ml', 4500.00, 1, NULL),
-(25, 14, 'Cuatro Botella 400ml', 4500.00, 1, NULL),
 (26, 15, 'Porción Individual 150g', 5000.00, 1, NULL),
-(27, 16, 'Botella 400ml', 4500.00, 1, NULL),
 (28, 17, 'Porción Individual', 10500.00, 1, NULL),
 (29, 18, 'Porción Individual', 8500.00, 1, NULL),
 (30, 19, 'Porción Individual', 10500.00, 1, NULL),
@@ -1435,14 +1629,43 @@ INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`
 (52, 35, 'Combo Familiar 4 Personas', 68000.00, 1, NULL),
 (53, 36, 'Combo Dúo Perros Calientes', 32000.00, 1, NULL),
 (55, 37, 'Edición Especial', 24000.00, 1, NULL),
-(56, 38, 'Estándar', 20000.00, 1, NULL);
+(58, 8, 'Sin Azúcar / Light 400ml', 4500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789342941/rcxdoursw1roe9f8bmpw.png'),
+(59, 9, 'Botella 1.5 Litros', 8500.00, 1, '/images/drinks/manzana_1.5_L-removebg-preview.png'),
+(60, 9, 'Mega Botella 2.5 Litros', 12000.00, 1, '/images/drinks/Manzana-Super-Gigante-25-Litros-223182_a-removebg-preview.png'),
+(61, 8, 'Botella 1.5 Litros', 9500.00, 1, '/images/drinks/coca_cola_1.5-LITROS-removebg-preview.png'),
+(62, 8, 'Mega Botella 2.5 Litros', 13500.00, 1, '/images/drinks/mega_coca_cola-removebg-preview.png'),
+(63, 11, 'Botella 1.5 Litros', 8500.00, 1, '/images/drinks/pepsi_1.5-removebg-preview.png'),
+(64, 11, 'Mega Botella 2.5 Litros', 12000.00, 1, '/images/drinks/mega_pepsi-removebg-preview.png'),
+(65, 11, 'Sin Azúcar / Light 400ml', 4000.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1789872832/akjyapmemvunluyjl0vo.png'),
+(66, 12, 'Botella 1.5 Litros', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136012/cvrko0myywmpm9uu29y6.png'),
+(67, 12, 'Mega Botella 2.5 Litros', 12000.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136012/vkjyox7pahkfvpvvd704.png'),
+(68, 12, 'Sabor Uva 400ml', 4000.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136013/fdhjpw2iyq3jrp5y4val.png'),
+(69, 12, 'Sabor Naranja 400ml', 4000.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136013/upl99pgij1ibrm5bga6o.png'),
+(70, 12, 'Sabor Manzana 400ml', 4000.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136013/puq7ofiaex69bes5yhly.png'),
+(71, 9, 'Sabor Uva 400ml', 8500.00, 1, '/images/drinks/uva_postobon-removebg-preview.png'),
+(72, 9, 'Sabor Naranja 400ml', 8500.00, 1, '/images/drinks/images__Gaseosa_naranja_-removebg-preview.png'),
+(73, 9, 'Gaseosa Colombiana Postobón 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136069/w7lobhfvjxbjafr2co3x.png'),
+(74, 13, 'Botella 1.5 Litros', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136146/krtmjhqcdyagp6jlk1t0.webp'),
+(75, 13, 'Mega Botella 2.5 Litros', 12000.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136142/yh8hi4excjrn95lxsvpi.png'),
+(76, 14, 'Botella 1.5 Litros', 8500.00, 1, '/images/drinks/gaseosa-quatro-15-lt-removebg-preview.png'),
+(77, 14, 'Mega Botella 2.5 Litros', 12000.00, 1, '/images/drinks/quatro_mega-removebg-preview.png'),
+(78, 16, 'Con Azúcar 400ml', 4500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136235/wrexzfrkodlfb3n4cp7w.png'),
+(79, 16, 'Botella 1.5 Litros', 4500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136235/cuhvubrfxj5vcwbedq24.jpg'),
+(80, 16, 'Mega Botella 2.5 Litros', 4500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790136235/sianbch6fdcmoasvwugn.jpg'),
+(81, 38, 'Botella 1.5 Litros', 8500.00, 1, '/images/drinks/bebida-uva-1500ml_00-600x600-removebg-preview.png'),
+(82, 38, 'Mega Botella 2.5 Litros', 12000.00, 1, '/images/drinks/Uva_mega-removebg-preview.png'),
+(83, 38, 'Sabor Naranja 400ml', 8500.00, 1, '/images/drinks/images__Gaseosa_naranja_-removebg-preview.png'),
+(84, 38, 'Sabor Manzana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790137311/kiyyjb6ar74oyzdtdcyg.png'),
+(85, 38, 'Sabor Colombiana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790137311/uhp9lcertbfyn5wzicpb.png'),
+(86, 39, 'Botella 1.5 Litros', 8500.00, 1, '/images/drinks/naranga_1.5-removebg-preview.png'),
+(87, 39, 'Mega Botella 2.5 Litros', 12000.00, 1, '/images/drinks/postob_n_naranja_2.5l_1_-removebg-preview.png'),
+(88, 39, 'Sabor Uva 400ml', 8500.00, 1, '/images/drinks/uva_postobon-removebg-preview.png'),
+(89, 39, 'Sabor Manzana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790140466/xnkmahkxmrvwlrueok5y.png'),
+(90, 39, 'Sabor Colombiana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790140466/mwzer41bv7rr3y5xbela.png');
 
 -- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `venta`
---
-
+-- Tabla: `venta`
+-- --------------------------------------------------------
 DROP TABLE IF EXISTS `venta`;
 CREATE TABLE `venta` (
   `idVenta` int(11) NOT NULL AUTO_INCREMENT,
@@ -1456,6 +1679,8 @@ CREATE TABLE `venta` (
   `total` decimal(12,2) NOT NULL,
   `estadoEntrega` enum('PENDIENTE','PREPARANDO','LISTO','EN_CAMINO','ENTREGADO','CANCELADO') DEFAULT 'PENDIENTE',
   `observaciones` text DEFAULT NULL,
+  `origen` varchar(30) DEFAULT NULL,
+  `tiempoEstimadoEntrega` varchar(60) DEFAULT NULL,
   `estadoAprobacion` enum('PENDIENTE','APROBADO','RECHAZADO') DEFAULT 'PENDIENTE',
   PRIMARY KEY (`idVenta`),
   KEY `IDX_VentaCliente` (`idCliente`),
@@ -1463,204 +1688,166 @@ CREATE TABLE `venta` (
   KEY `IDX_VentaDescuento` (`idDescuento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
 -- Volcado de datos para la tabla `venta`
---
+INSERT INTO `venta` (`idVenta`, `idCliente`, `idUsuario`, `idDescuento`, `fechaVenta`, `tipoVenta`, `subtotal`, `descuentoAplicado`, `total`, `estadoEntrega`, `observaciones`, `origen`, `tiempoEstimadoEntrega`, `estadoAprobacion`) VALUES
+(117, 2, 6, NULL, '2026-09-14 11:48:35', 'DOMICILIO', 18000.00, 2700.00, 15300.00, 'PENDIENTE', '{\"horario\":\"06:48 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-5939\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":1,\"idVariante\":1,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":1,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(118, 8, 24, NULL, '2026-09-14 16:01:28', 'PUNTO_DE_VENTA', 43000.00, 6450.00, 36550.00, 'ENTREGADO', '{\"horario\":\"11:01 a. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-8661\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":3,\"id\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"cantidad\":1,\"precio\":3500}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(119, 16, 4, NULL, '2026-09-17 01:29:21', 'PUNTO_DE_VENTA', 40000.00, 0.00, 40000.00, 'PENDIENTE', '{\"horario\":\"08:29 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1738\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]},{\"idVariante\":38,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":40000,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]},{\"idVariante\":38,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":40000,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(120, 16, 4, NULL, '2026-09-17 01:30:00', 'PUNTO_DE_VENTA', 20000.00, 0.00, 20000.00, 'PENDIENTE', '{\"horario\":\"08:30 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-0665\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":20000,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":20000,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(121, 2, 6, NULL, '2026-09-17 01:53:09', 'DOMICILIO', 60000.00, 9000.00, 51000.00, 'PENDIENTE', '{\"horario\":\"08:53 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-9092\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":38,\"idVariante\":38,\"nombre\":\"tester\",\"cantidad\":3,\"precioUnitario\":20000,\"total\":60000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"51000\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(122, 16, 4, NULL, '2026-09-22 23:53:08', 'PUNTO_DE_VENTA', 23000.00, 3450.00, 19550.00, 'PENDIENTE', '{\"horario\":\"06:53 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-8328\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idProducto\":6,\"idVariante\":15,\"nombre\":\"Salchipapa Salvaje Gourmet\",\"cantidad\":1,\"precioUnitario\":23000,\"total\":19550,\"observaciones\":\"\",\"adiciones\":[],\"descuento\":15,\"evento\":\"Super Fin de Semana Chazin (15% OFF)\"}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":23000,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idProducto\":6,\"idVariante\":15,\"nombre\":\"Salchipapa Salvaje Gourmet\",\"cantidad\":1,\"precioUnitario\":23000,\"total\":19550,\"observaciones\":\"\",\"adiciones\":[],\"descuento\":15,\"evento\":\"Super Fin de Semana Chazin (15% OFF)\"}]},\"efectivoConCuanto\":23000,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\",\"descuentoPorcentaje\":15,\"descuentoAplicado\":3450,\"eventoPromocional\":\"Super Fin de Semana Chazin (15% OFF)\"}', NULL, NULL, 'PENDIENTE'),
+(123, 16, 4, NULL, '2026-09-22 23:53:51', 'PUNTO_DE_VENTA', 15500.00, 0.00, 15500.00, 'PENDIENTE', '{\"horario\":\"06:53 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1276\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idProducto\":22,\"idVariante\":33,\"nombre\":\"Papas con Chili Mediana\",\"cantidad\":1,\"precioUnitario\":15500,\"total\":15500,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":15500,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idProducto\":22,\"idVariante\":33,\"nombre\":\"Papas con Chili Mediana\",\"cantidad\":1,\"precioUnitario\":15500,\"total\":15500,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":15500,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\",\"descuentoPorcentaje\":0,\"descuentoAplicado\":0}', NULL, NULL, 'PENDIENTE'),
+(124, 8, 24, NULL, '2026-09-22 23:55:53', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"06:55 p. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-3672\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(125, 16, 4, NULL, '2026-09-23 06:13:57', 'PUNTO_DE_VENTA', 18000.00, 0.00, 18000.00, 'PENDIENTE', '{\"horario\":\"01:13 a. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-7132\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idProducto\":1,\"idVariante\":10,\"nombre\":\"Clásica 150g\",\"cantidad\":1,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":20000,\"vueltoEfectivo\":2000,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idProducto\":1,\"idVariante\":10,\"nombre\":\"Clásica 150g\",\"cantidad\":1,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":20000,\"vueltoEfectivo\":2000,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(126, 17, 25, NULL, '2026-09-23 11:34:05', 'DOMICILIO', 120500.00, 0.00, 120500.00, 'ENTREGADO', '{\"horario\":\"06:34 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi (CARD)\",\"direccion\":\"Calle 102A #22D - 40\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-5367\",\"clienteNombre\":\"Mariana Silva Vergara\",\"productos\":[{\"id\":27,\"idVariante\":27,\"nombre\":\"Individual BBQ Bacon 150g\",\"cantidad\":1,\"precioUnitario\":22000,\"total\":22000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":28,\"idVariante\":28,\"nombre\":\"Mexicana Clásica\",\"cantidad\":4,\"precioUnitario\":23500,\"total\":94000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":58,\"idVariante\":58,\"nombre\":\"Gaseosa Coca-Cola 400ml\",\"cantidad\":1,\"precioUnitario\":4500,\"total\":4500,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\",\"wompiTransactionId\":\"12178141-1790163366-39770\",\"wompiStatus\":\"APPROVED\",\"paymentMethodType\":\"CARD\",\"wompiPaymentMethod\":{\"type\":\"CARD\",\"extra\":{\"bin\":\"424242\",\"name\":\"VISA-4242\",\"brand\":\"VISA\",\"issuer\":\"STRIPE PAYMENTS UK LIMITED\",\"card_type\":\"CREDIT\",\"last_four\":\"4242\",\"card_holder\":\"Mariana\",\"is_three_ds\":true,\"country_iso2\":\"GB\",\"three_ds_auth\":{\"current_step\":\"AUTHENTICATION\",\"current_step_status\":\"COMPLETED\"},\"three_ds_auth_type\":null,\"external_identifier\":\"SacwRk9iTF\",\"processor_response_code\":\"00\"},\"installments\":1,\"is_click_to_pay\":false}}', NULL, NULL, 'APROBADO'),
+(127, 17, 24, NULL, '2026-09-23 11:43:45', 'PUNTO_DE_VENTA', 321450.00, 0.00, 321450.00, 'PENDIENTE', '{\"horario\":\"06:43 a. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-5567\",\"clienteNombre\":\"Mariana Silva Vergara\",\"productos\":[{\"id\":1,\"idVariante\":1,\"nombre\":\"Hamburguesa Clásica Chazin (Jueves 2x1 de Burger Artesanal)\",\"cantidad\":1,\"cantidadCocina\":2,\"is2x1Promo\":true,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"🔥 ¡PROMO 2x1!: Preparar 2 unidades (1 pagada + 1 gratis)\",\"adiciones\":[]},{\"id\":2,\"idVariante\":2,\"nombre\":\"Hamburguesa Doble Carne & Tocineta (20% OFF en Doble Carne & Tocineta)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":3,\"idVariante\":3,\"nombre\":\"Hamburguesa Pollo Crispy Gourmet (Promo Relámpago: Pollo Crispy Gourmet)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":17500,\"total\":17500,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":4,\"idVariante\":4,\"nombre\":\"Perro Caliente Especial Americano (Super Fin de Semana Chazin (15% OFF))\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":11900,\"total\":11900,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":5,\"idVariante\":5,\"nombre\":\"Perro Suizo Chazin (Festival de Toppings: Perro Suizo + Doble Tocineta Gratis)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":17000,\"total\":17000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":6,\"idVariante\":6,\"nombre\":\"Salchipapa Salvaje Gourmet (Super Fin de Semana Chazin (15% OFF))\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":19550,\"total\":19550,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":7,\"idVariante\":7,\"nombre\":\"Combo Pareja Chazin (Combo Pareja Festivo)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":34000,\"total\":34000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":8,\"idVariante\":8,\"nombre\":\"Coca-Cola Original (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":4500,\"total\":4500,\"observaciones\":\"Sabor: Coca-Cola Original, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":9,\"idVariante\":9,\"nombre\":\"Gaseosa Manzana Postobón (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":8500,\"total\":8500,\"observaciones\":\"Sabor: Gaseosa Manzana Postobón, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":10,\"idVariante\":10,\"nombre\":\"Agua Cristal sin Gas 600ml\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":3000,\"total\":3000,\"observaciones\":\"Sabor: Agua Cristal sin Gas\",\"adiciones\":[]},{\"id\":11,\"idVariante\":11,\"nombre\":\"Pepsi Regular (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":4000,\"total\":4000,\"observaciones\":\"Sabor: Pepsi Regular, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":12,\"idVariante\":12,\"nombre\":\"Gaseosa Colombiana Postobón (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":4000,\"total\":4000,\"observaciones\":\"Sabor: Gaseosa Colombiana Postobón, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":13,\"idVariante\":13,\"nombre\":\" (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":8500,\"total\":8500,\"observaciones\":\"Sabor: Botella 400 ml, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":14,\"idVariante\":14,\"nombre\":\" (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":8500,\"total\":8500,\"observaciones\":\"Sabor: Botella 400 ml, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":15,\"idVariante\":15,\"nombre\":\"Porción Individual 150g\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":5000,\"total\":5000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":16,\"idVariante\":16,\"nombre\":\"Coca-Cola Sin Azúcar / Light (400 ml)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":4500,\"total\":4500,\"observaciones\":\"Sabor: Coca-Cola Sin Azúcar / Light, Presentación: 400 ml\",\"adiciones\":[]},{\"id\":17,\"idVariante\":17,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":10500,\"total\":10500,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":18,\"idVariante\":18,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":8500,\"total\":8500,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":19,\"idVariante\":19,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":10500,\"total\":10500,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":20,\"idVariante\":20,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":8500,\"total\":8500,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":21,\"idVariante\":21,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":13500,\"total\":13500,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":22,\"idVariante\":22,\"nombre\":\"Porción Individual\",\"cantidad\":2,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":15500,\"total\":31000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":23,\"idVariante\":23,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":17500,\"total\":17500,\"observaciones\":\"Bebidas combo: 1x Gaseosa Manzana Postobón 400ml\",\"adiciones\":[]},{\"id\":23,\"idVariante\":23,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":17500,\"total\":17500,\"observaciones\":\"Bebidas combo: 1x Gaseosa Sprite 400ml\",\"adiciones\":[]},{\"id\":24,\"idVariante\":24,\"nombre\":\"Porción Individual\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":15500,\"total\":15500,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"322000\",\"vueltoEfectivo\":550,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(128, 16, 4, NULL, '2026-09-23 11:55:45', 'PUNTO_DE_VENTA', 20000.00, 0.00, 20000.00, 'ENTREGADO', '{\"horario\":\"06:55 a. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Transferencia\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-5872\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idProducto\":2,\"idVariante\":11,\"nombre\":\"Doble Carne 300g\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Transferencia\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":null,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":\"Otro\",\"transferenciaReferencia\":\"12345678\",\"especificaciones\":\"\",\"productos\":[{\"idProducto\":2,\"idVariante\":11,\"nombre\":\"Doble Carne 300g\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"12345678\",\"transferBanco\":\"Otro\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(129, 16, 4, NULL, '2026-09-23 11:57:01', 'PUNTO_DE_VENTA', 20000.00, 0.00, 20000.00, 'ENTREGADO', '{\"horario\":\"06:57 a. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1300\",\"clienteNombre\":\"Yeison Barrios\",\"productos\":[{\"idProducto\":2,\"idVariante\":11,\"nombre\":\"Doble Carne 300g\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Yeison Barrios\",\"efectivoConCuanto\":20000,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idProducto\":2,\"idVariante\":11,\"nombre\":\"Doble Carne 300g\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":20000,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(130, 2, 6, NULL, '2026-09-24 04:47:02', 'DOMICILIO', 20500.00, 3075.00, 17425.00, 'PENDIENTE', '{\"horario\":\"11:47 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-2306\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":30,\"idVariante\":30,\"nombre\":\"Perro Mexicano Clásico\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":16000,\"total\":16000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":58,\"idVariante\":58,\"nombre\":\"Gaseosa Coca-Cola 400ml\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":4500,\"total\":4500,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"20500\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(131, 2, 6, NULL, '2026-09-24 04:47:41', 'DOMICILIO', 17500.00, 2625.00, 14875.00, 'LISTO', '{\"horario\":\"11:47 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1098\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":3,\"idVariante\":3,\"nombre\":\"Hamburguesa Pollo Crispy Gourmet (Promo Relámpago: Pollo Crispy Gourmet)\",\"cantidad\":1,\"cantidadCocina\":1,\"is2x1Promo\":false,\"precioUnitario\":17500,\"total\":17500,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"20000\",\"vueltoEfectivo\":2500,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\",\"horaEstado\":\"06:37 a. m.\",\"fechaCambioEstado\":\"2026-10-29T11:37:31.209Z\",\"historialEstados\":[{\"estado\":\"LISTO\",\"hora\":\"06:37 a. m.\",\"fecha\":\"2026-10-29T11:37:31.209Z\"}]}', NULL, NULL, 'APROBADO'),
+(132, 2, 6, NULL, '2026-09-24 11:51:30', 'DOMICILIO', 18000.00, 2700.00, 15300.00, 'ENTREGADO', '{\"horario\":\"06:51 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-0797\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":1,\"idVariante\":1,\"nombre\":\"Hamburguesa Clásica Chazin (Jueves 2x1 de Burger Artesanal)\",\"cantidad\":1,\"cantidadCocina\":2,\"is2x1Promo\":true,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"🔥 ¡PROMO 2x1!: Preparar 2 unidades (1 pagada + 1 gratis)\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"20000\",\"vueltoEfectivo\":4700,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(133, 21, 27, NULL, '2026-10-06 12:26:46', 'DOMICILIO', 130000.00, 0.00, 130000.00, 'ENTREGADO', '{\"horario\":\"07:26 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi (CARD)\",\"direccion\":\"Casa de mi mamá\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-6171\",\"clienteNombre\":\"Magnolia Pripra\",\"productos\":[{\"id\":37,\"idVariante\":37,\"nombre\":\"Hamburguesa Burger Fest Trufada (Chazin Burger Fest 2026 - Edicion Limitada)\",\"cantidad\":1,\"precioUnitario\":24000,\"total\":24000,\"observaciones\":\"\",\"adiciones\":[]},{\"id\":29,\"idVariante\":29,\"nombre\":\"Individual Campesina\",\"cantidad\":2,\"precioUnitario\":23000,\"total\":58000,\"observaciones\":\"Sin Lechuga Batavia Fresca\",\"adiciones\":[{\"idAdicion\":19,\"nombre\":\"Queso Cheddar en Lonchas\",\"precio\":2500,\"cantidad\":1},{\"idAdicion\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"precio\":3500,\"cantidad\":1}]},{\"id\":27,\"idVariante\":27,\"nombre\":\"Individual BBQ Bacon 150g\",\"cantidad\":2,\"precioUnitario\":22000,\"total\":48000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":17,\"nombre\":\"Salchicha Suiza Ahumada\",\"precio\":2000,\"cantidad\":1}]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\",\"wompiTransactionId\":\"12178141-1791289821-97279\",\"wompiStatus\":\"APPROVED\",\"paymentMethodType\":\"CARD\",\"wompiPaymentMethod\":{\"type\":\"CARD\",\"extra\":{\"bin\":\"424242\",\"name\":\"VISA-4242\",\"brand\":\"VISA\",\"issuer\":\"STRIPE PAYMENTS UK LIMITED\",\"card_type\":\"CREDIT\",\"last_four\":\"4242\",\"card_holder\":\"Magnolia\",\"is_three_ds\":true,\"country_iso2\":\"GB\",\"three_ds_auth\":{\"current_step\":\"AUTHENTICATION\",\"current_step_status\":\"COMPLETED\"},\"three_ds_auth_type\":null,\"external_identifier\":\"u46505xGU4\",\"processor_response_code\":\"00\"},\"installments\":1,\"is_click_to_pay\":false}}', NULL, NULL, 'APROBADO'),
+(134, 22, 28, NULL, '2026-10-18 17:44:05', 'DOMICILIO', 18000.00, 0.00, 18000.00, 'PENDIENTE', '{\"horario\":\"12:44 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle 12 # 34-56\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-5844\",\"clienteNombre\":\"Juan Perez\",\"productos\":[{\"id\":1,\"idVariante\":1,\"nombre\":\"Hamburguesa Clásica Chazin (Jueves 2x1 de Burger Artesanal)\",\"cantidad\":1,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"🔥 ¡PROMO 2x1!: Preparar 2 unidades (1 pagada + 1 gratis)\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\",\"tiempoEstimadoEntrega\":\"Aprox. 45 min\"}', NULL, NULL, 'PENDIENTE'),
+(135, 16, 4, NULL, '2026-10-19 04:18:45', 'PUNTO_DE_VENTA', 18000.00, 0.00, 18000.00, 'PENDIENTE', '{\"horario\":\"11:18 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Tarjeta\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-5801\",\"clienteNombre\":\"Juan Perez\",\"productos\":[{\"idProducto\":1,\"idVariante\":10,\"nombre\":\"Clásica 150g (Promo 2x1 - Paga 1 Lleva 2)\",\"cantidad\":1,\"cantidadCocina\":2,\"is2x1Promo\":true,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"🔥 ¡PROMO 2x1!: Preparar 2 unidades (1 pagada + 1 gratis)\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Tarjeta\",\"clienteNombre\":\"Juan Perez\",\"efectivoConCuanto\":50000,\"vueltoEfectivo\":32000,\"tarjetaNumero\":\"4000 1234 5678 9010\",\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idProducto\":1,\"idVariante\":10,\"nombre\":\"Clásica 150g (Promo 2x1 - Paga 1 Lleva 2)\",\"cantidad\":1,\"cantidadCocina\":2,\"is2x1Promo\":true,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"🔥 ¡PROMO 2x1!: Preparar 2 unidades (1 pagada + 1 gratis)\",\"adiciones\":[]}]},\"efectivoConCuanto\":50000,\"vueltoEfectivo\":32000,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"4000 1234 5678 9010\",\"estadoAprobacion\":\"PENDIENTE\"}', NULL, NULL, 'PENDIENTE'),
+(136, 8, 24, NULL, '2026-10-21 02:14:31', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"09:14 p. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1905\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(137, 8, 24, NULL, '2026-10-21 02:17:31', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1834\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(138, 8, 24, NULL, '2026-10-21 02:17:57', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-7577\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(139, 8, 24, NULL, '2026-10-21 02:17:57', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-7743\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(140, 8, 24, NULL, '2026-10-21 02:17:57', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-7852\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(141, 8, 24, NULL, '2026-10-21 02:17:57', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-7953\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(142, 8, 24, NULL, '2026-10-21 02:17:58', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-8063\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(143, 8, 24, NULL, '2026-10-21 02:17:58', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-8170\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(144, 8, 24, NULL, '2026-10-21 02:17:58', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-8262\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(145, 8, 24, NULL, '2026-10-21 02:17:58', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-8383\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(146, 8, 24, NULL, '2026-10-21 02:17:59', 'PUNTO_DE_VENTA', 45000.00, 6750.00, 38250.00, 'PENDIENTE', '{\"horario\":\"09:17 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Carrera 10 #20-30, Bogotá\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9014\",\"clienteNombre\":\"Carlos Prueba\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":2,\"precioUnitario\":15000,\"total\":30000,\"observaciones\":\"\",\"adiciones\":[]},{\"nombre\":\"Producto\",\"cantidad\":5,\"precioUnitario\":3000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"Sin cebolla, dejar en portería\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(147, 8, 24, NULL, '2026-10-21 02:25:17', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"09:25 p. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-7970\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(148, 8, 24, NULL, '2026-10-21 02:37:04', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-4827\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(149, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4236\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(150, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4366\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(151, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4471\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(152, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4574\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(153, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4675\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(154, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4771\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(155, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4863\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(156, 8, 24, NULL, '2026-10-21 02:37:34', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-4953\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(157, 8, 24, NULL, '2026-10-21 02:37:35', 'PUNTO_DE_VENTA', 45000.00, 6750.00, 38250.00, 'PENDIENTE', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Carrera 10 #20-30, Bogotá\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-5642\",\"clienteNombre\":\"Carlos Prueba\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":2,\"precioUnitario\":15000,\"total\":30000,\"observaciones\":\"\",\"adiciones\":[]},{\"nombre\":\"Producto\",\"cantidad\":5,\"precioUnitario\":3000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"Sin cebolla, dejar en portería\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(158, 8, 24, NULL, '2026-10-21 02:37:45', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"09:37 p. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-5083\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(159, 8, 24, NULL, '2026-10-22 15:09:36', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"10:09 a. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-6396\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(160, 8, 24, NULL, '2026-10-22 15:33:22', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-2309\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(161, 8, 24, NULL, '2026-10-22 15:33:22', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-2482\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(162, 8, 24, NULL, '2026-10-22 15:33:22', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-2601\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(163, 8, 24, NULL, '2026-10-22 15:33:22', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-2709\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(164, 8, 24, NULL, '2026-10-22 15:33:22', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-2814\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(165, 8, 24, NULL, '2026-10-22 15:33:22', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-2924\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(166, 8, 24, NULL, '2026-10-22 15:33:23', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-3029\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO');
 
-INSERT INTO `venta` (`idVenta`, `idCliente`, `idUsuario`, `idDescuento`, `fechaVenta`, `tipoVenta`, `subtotal`, `descuentoAplicado`, `total`, `estadoEntrega`, `observaciones`, `estadoAprobacion`) VALUES
-(117, 3, 6, NULL, '2026-09-14 11:48:35', 'DOMICILIO', 18000.00, 2700.00, 15300.00, 'PENDIENTE', '{\"horario\":\"06:48 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-5939\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":1,\"idVariante\":1,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":1,\"precioUnitario\":18000,\"total\":18000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"{\\\"tipoEntrega\\\":\\\"Domicilio\\\",\\\"metodoPago\\\":\\\"Wompi\\\",\\\"direccion\\\":\\\"Calle Falsa 123\\\",\\\"especificaciones\\\":\\\"\\\",\\\"clienteNombre\\\":\\\"María García\\\",\\\"productos\\\":[{\\\"id\\\":1,\\\"idVariante\\\":1,\\\"nombre\\\":\\\"Hamburguesa Clásica Chazin\\\",\\\"cantidad\\\":1,\\\"precioUnitario\\\":18000,\\\"total\\\":18000,\\\"observaciones\\\":\\\"\\\",\\\"adiciones\\\":[]}],\\\"wompiReference\\\":\\\"CHAZIN-1789386515913-3476\\\",\\\"montoEnCentavos\\\":1530000,\\\"moneda\\\":\\\"COP\\\",\\\"estadoPago\\\":\\\"Pendiente\\\",\\\"fechaIntencion\\\":\\\"2026-09-14T11:48:35.914Z\\\"}\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', 'PENDIENTE'),
-(118, 10, 24, NULL, '2026-09-14 16:01:28', 'PUNTO_DE_VENTA', 43000.00, 6450.00, 36550.00, 'ENTREGADO', '{\"horario\":\"11:01 a. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-8661\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":3,\"id\":3,\"nombre\":\"Extra Tocineta Ahumada (2 tiras)\",\"cantidad\":1,\"precio\":3500}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', 'PENDIENTE'),
-(119, 26, 4, NULL, '2026-09-17 01:29:21', 'PUNTO_DE_VENTA', 40000.00, 2000.00, 38000.00, 'PENDIENTE', '{\"horario\":\"08:29 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1738\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]},{\"idVariante\":38,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":40000,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]},{\"idVariante\":38,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":40000,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', 'PENDIENTE'),
-(120, 26, 4, NULL, '2026-09-17 01:30:00', 'PUNTO_DE_VENTA', 20000.00, 1000.00, 19000.00, 'PENDIENTE', '{\"horario\":\"08:30 p. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-0665\",\"clienteNombre\":\"Cliente Mostrador\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":{\"tipoEntrega\":\"Recoger\",\"direccion\":\"Recoger en Local\",\"metodoPago\":\"Efectivo\",\"clienteNombre\":\"Cliente Mostrador\",\"efectivoConCuanto\":20000,\"vueltoEfectivo\":null,\"tarjetaNumero\":null,\"transferBanco\":null,\"transferenciaReferencia\":null,\"especificaciones\":\"\",\"productos\":[{\"idVariante\":56,\"nombre\":\"tester\",\"cantidad\":1,\"precioUnitario\":20000,\"total\":20000,\"observaciones\":\"\",\"adiciones\":[]}]},\"efectivoConCuanto\":20000,\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', 'PENDIENTE'),
-(121, 3, 6, NULL, '2026-09-17 01:53:09', 'DOMICILIO', 60000.00, 9000.00, 51000.00, 'PENDIENTE', '{\"horario\":\"08:53 p. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-9092\",\"clienteNombre\":\"María García\",\"productos\":[{\"id\":38,\"idVariante\":38,\"nombre\":\"tester\",\"cantidad\":3,\"precioUnitario\":20000,\"total\":60000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"{\\\"tipoEntrega\\\":\\\"Domicilio\\\",\\\"metodoPago\\\":\\\"Efectivo\\\",\\\"direccion\\\":\\\"Calle Falsa 123\\\",\\\"especificaciones\\\":\\\"\\\",\\\"efectivoConCuanto\\\":\\\"51000\\\",\\\"vueltoEfectivo\\\":0,\\\"transferenciaReferencia\\\":\\\"\\\",\\\"transferenciaBanco\\\":\\\"Bancolombia\\\",\\\"tarjetaNumero\\\":\\\"\\\",\\\"codigoPedido\\\":\\\"VEN-9092\\\",\\\"productos\\\":[{\\\"id\\\":38,\\\"idVariante\\\":38,\\\"nombre\\\":\\\"tester\\\",\\\"cantidad\\\":3,\\\"precioUnitario\\\":20000,\\\"total\\\":60000,\\\"observaciones\\\":\\\"\\\",\\\"adiciones\\\":[]}]}\",\"efectivoConCuanto\":\"51000\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"PENDIENTE\"}', 'PENDIENTE');
+INSERT INTO `venta` (`idVenta`, `idCliente`, `idUsuario`, `idDescuento`, `fechaVenta`, `tipoVenta`, `subtotal`, `descuentoAplicado`, `total`, `estadoEntrega`, `observaciones`, `origen`, `tiempoEstimadoEntrega`, `estadoAprobacion`) VALUES
+(167, 8, 24, NULL, '2026-10-22 15:33:23', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-3151\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(168, 8, 24, NULL, '2026-10-22 15:33:23', 'PUNTO_DE_VENTA', 45000.00, 6750.00, 38250.00, 'PENDIENTE', '{\"horario\":\"10:33 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Carrera 10 #20-30, Bogotá\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-3730\",\"clienteNombre\":\"Carlos Prueba\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":2,\"precioUnitario\":15000,\"total\":30000,\"observaciones\":\"\",\"adiciones\":[]},{\"nombre\":\"Producto\",\"cantidad\":5,\"precioUnitario\":3000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"Sin cebolla, dejar en portería\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(169, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9137\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(170, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9292\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(171, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9412\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(172, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9517\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(173, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9614\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(174, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9722\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(175, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9816\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(176, 8, 24, NULL, '2026-10-22 15:57:49', 'PUNTO_DE_VENTA', 15000.00, 2250.00, 12750.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Calle Falsa 123\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-9911\",\"clienteNombre\":\"Test Wompi\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":15000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(177, 8, 24, NULL, '2026-10-22 15:57:50', 'PUNTO_DE_VENTA', 45000.00, 6750.00, 38250.00, 'PENDIENTE', '{\"horario\":\"10:57 a. m.\",\"tipoEntrega\":\"Domicilio\",\"metodoPago\":\"Wompi\",\"direccion\":\"Carrera 10 #20-30, Bogotá\",\"estadoPago\":\"Pendiente\",\"codigoPedido\":\"VEN-0544\",\"clienteNombre\":\"Carlos Prueba\",\"productos\":[{\"nombre\":\"Producto\",\"cantidad\":2,\"precioUnitario\":15000,\"total\":30000,\"observaciones\":\"\",\"adiciones\":[]},{\"nombre\":\"Producto\",\"cantidad\":5,\"precioUnitario\":3000,\"total\":15000,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"Sin cebolla, dejar en portería\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(178, 8, 24, NULL, '2026-10-22 15:58:01', 'PUNTO_DE_VENTA', 36000.00, 5400.00, 30600.00, 'ENTREGADO', '{\"horario\":\"10:58 a. m.\",\"tipoEntrega\":\"Mesa\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-1516\",\"clienteNombre\":\"Fernando Gómez Jaramillo\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Hamburguesa Clásica Chazin\",\"cantidad\":2,\"precioUnitario\":18000,\"total\":36000,\"observaciones\":\"\",\"adiciones\":[{\"idAdicion\":18,\"id\":18,\"nombre\":\"Tocineta Ahumada en Tiras\",\"cantidad\":1,\"precio\":null}]}],\"especificaciones\":\"Prueba Automatizada de Descuento de Stock Chazin Food\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"estadoAprobacion\":\"APROBADO\"}', NULL, NULL, 'APROBADO'),
+(179, 16, 4, NULL, '2026-10-28 15:51:59', 'PUNTO_DE_VENTA', 100.00, 0.00, 100.00, 'CANCELADO', '{\"horario\":\"10:51 a. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-9647\",\"clienteNombre\":\"Admin Sistema\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":100,\"total\":100,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"QA_SECURITY_TEST_PRICE_MANIPULATION\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"origen\":\"PUNTO_FISICO\",\"tiempoEstimadoEntrega\":\"15 - 20 min\",\"empaqueParaLlevar\":false,\"estadoAprobacion\":\"APROBADO\",\"horaEstado\":\"10:52 a. m.\",\"fechaCambioEstado\":\"2026-10-28T15:52:00.016Z\",\"historialEstados\":[{\"estado\":\"CANCELADO\",\"hora\":\"10:52 a. m.\",\"fecha\":\"2026-10-28T15:52:00.016Z\"}]}', 'PUNTO_FISICO', '15 - 20 min', 'RECHAZADO'),
+(180, 16, 4, NULL, '2026-10-28 15:53:06', 'PUNTO_DE_VENTA', 100.00, 0.00, 100.00, 'CANCELADO', '{\"horario\":\"10:53 a. m.\",\"tipoEntrega\":\"Recoger\",\"metodoPago\":\"Efectivo\",\"direccion\":\"Recoger en Local\",\"estadoPago\":\"Pagado\",\"codigoPedido\":\"VEN-6822\",\"clienteNombre\":\"Admin Sistema\",\"productos\":[{\"idVariante\":10,\"nombre\":\"Producto\",\"cantidad\":1,\"precioUnitario\":100,\"total\":100,\"observaciones\":\"\",\"adiciones\":[]}],\"especificaciones\":\"QA_SECURITY_TEST_PRICE_MANIPULATION\",\"efectivoConCuanto\":\"\",\"vueltoEfectivo\":0,\"transferenciaReferencia\":\"\",\"transferBanco\":\"\",\"tarjetaNumero\":\"\",\"origen\":\"PUNTO_FISICO\",\"tiempoEstimadoEntrega\":\"15 - 20 min\",\"empaqueParaLlevar\":false,\"estadoAprobacion\":\"APROBADO\",\"horaEstado\":\"10:53 a. m.\",\"fechaCambioEstado\":\"2026-10-28T15:53:07.008Z\",\"historialEstados\":[{\"estado\":\"CANCELADO\",\"hora\":\"10:53 a. m.\",\"fecha\":\"2026-10-28T15:53:07.008Z\"}]}', 'PUNTO_FISICO', '15 - 20 min', 'RECHAZADO');
 
 -- --------------------------------------------------------
-
---
+-- Vistas
 -- --------------------------------------------------------
-
---
--- --------------------------------------------------------
-
---
--- --------------------------------------------------------
-
---
--- Estructura para la vista `vwinventario`
---
 DROP VIEW IF EXISTS `vwinventario`;
+CREATE VIEW `vwinventario` AS SELECT `i`.`idInsumo` AS `idInsumo`, `i`.`nombre` AS `nombre`, `c`.`nombre` AS `Categoria`, `i`.`stock` AS `stock`, `i`.`stockMinimo` AS `stockMinimo`, `i`.`unidadMedida` AS `unidadMedida`, `i`.`fechaVencimiento` AS `fechaVencimiento` FROM (`insumo` `i` join `categoriainsumo` `c` on(`c`.`idCategoriaInsumo` = `i`.`idCategoriaInsumo`));
 
-CREATE    VIEW `vwinventario`  AS SELECT `i`.`idInsumo` AS `idInsumo`, `i`.`nombre` AS `nombre`, `c`.`nombre` AS `Categoria`, `i`.`stock` AS `stock`, `i`.`stockMinimo` AS `stockMinimo`, `i`.`unidadMedida` AS `unidadMedida`, `i`.`fechaVencimiento` AS `fechaVencimiento` FROM (`insumo` `i` join `categoriainsumo` `c` on(`c`.`idCategoriaInsumo` = `i`.`idCategoriaInsumo`)) ;
-
--- --------------------------------------------------------
-
---
--- Estructura para la vista `vwproductos`
---
 DROP VIEW IF EXISTS `vwproductos`;
+CREATE VIEW `vwproductos` AS SELECT `p`.`idProducto` AS `idProducto`, `p`.`nombre` AS `nombre`, `cp`.`nombre` AS `Categoria`, `v`.`nombre` AS `Variante`, `v`.`precio` AS `precio` FROM ((`producto` `p` join `categoriaproducto` `cp` on(`cp`.`idCategoriaProducto` = `p`.`idCategoriaProducto`)) join `variante` `v` on(`v`.`idProducto` = `p`.`idProducto`));
 
-CREATE    VIEW `vwproductos`  AS SELECT `p`.`idProducto` AS `idProducto`, `p`.`nombre` AS `nombre`, `cp`.`nombre` AS `Categoria`, `v`.`nombre` AS `Variante`, `v`.`precio` AS `precio` FROM ((`producto` `p` join `categoriaproducto` `cp` on(`cp`.`idCategoriaProducto` = `p`.`idCategoriaProducto`)) join `variante` `v` on(`v`.`idProducto` = `p`.`idProducto`)) ;
+DROP VIEW IF EXISTS `vwventas`;
+CREATE VIEW `vwventas` AS SELECT `v`.`idVenta` AS `idVenta`, concat(`u`.`nombre`,' ',`u`.`apellidos`) AS `Cliente`, `v`.`fechaVenta` AS `fechaVenta`, `v`.`subtotal` AS `subtotal`, `v`.`descuentoAplicado` AS `descuentoAplicado`, `v`.`total` AS `total`, `v`.`estadoEntrega` AS `estadoEntrega` FROM ((`venta` `v` join `cliente` `c` on(`c`.`idCliente` = `v`.`idCliente`)) join `usuario` `u` on(`u`.`idUsuario` = `c`.`idUsuario`));
 
 -- --------------------------------------------------------
-
---
--- Estructura para la vista `vwventas`
---
-DROP VIEW IF EXISTS `vwventas`;
-
-CREATE    VIEW `vwventas`  AS SELECT `v`.`idVenta` AS `idVenta`, concat(`u`.`nombre`,' ',`u`.`apellidos`) AS `Cliente`, `v`.`fechaVenta` AS `fechaVenta`, `v`.`subtotal` AS `subtotal`, `v`.`descuentoAplicado` AS `descuentoAplicado`, `v`.`total` AS `total`, `v`.`estadoEntrega` AS `estadoEntrega` FROM ((`venta` `v` join `cliente` `c` on(`c`.`idCliente` = `v`.`idCliente`)) join `usuario` `u` on(`u`.`idUsuario` = `c`.`idUsuario`)) ;
-
---
-
-
--- Restricciones para tablas volcadas
---
-
---
--- Filtros para la tabla `cliente`
---
+-- Claves foráneas (Restricciones)
+-- --------------------------------------------------------
 ALTER TABLE `cliente`
   ADD CONSTRAINT `cliente_ibfk_1` FOREIGN KEY (`idUsuario`) REFERENCES `usuario` (`idUsuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `compra`
---
 ALTER TABLE `compra`
   ADD CONSTRAINT `compra_ibfk_1` FOREIGN KEY (`idProveedor`) REFERENCES `proveedor` (`idProveedor`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `descuento`
---
 ALTER TABLE `descuento`
   ADD CONSTRAINT `descuento_ibfk_1` FOREIGN KEY (`idEvento`) REFERENCES `evento` (`idEvento`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `detallecomprainsumo`
---
 ALTER TABLE `detallecomprainsumo`
   ADD CONSTRAINT `detallecomprainsumo_ibfk_115` FOREIGN KEY (`idCompra`) REFERENCES `compra` (`idCompra`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `detallecomprainsumo_ibfk_116` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `detallefichainsumo`
---
 ALTER TABLE `detallefichainsumo`
   ADD CONSTRAINT `detallefichainsumo_ibfk_115` FOREIGN KEY (`idFichaTecnica`) REFERENCES `fichatecnica` (`idFichaTecnica`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `detallefichainsumo_ibfk_116` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE CASCADE ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `detalleinsumopreparadoinsumo`
---
 ALTER TABLE `detalleinsumopreparadoinsumo`
   ADD CONSTRAINT `detalleinsumopreparadoinsumo_ibfk_119` FOREIGN KEY (`idPreparado`) REFERENCES `insumopreparado` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `detalleinsumopreparadoinsumo_ibfk_120` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `detalleventaadicion`
---
 ALTER TABLE `detalleventaadicion`
   ADD CONSTRAINT `detalleventaadicion_ibfk_115` FOREIGN KEY (`idDetalleVenta`) REFERENCES `detalleventaproducto` (`idDetalleVenta`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_detalleventaadicion_insumo` FOREIGN KEY (`idAdicion`) REFERENCES `insumo` (`idInsumo`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_dva_insumo` FOREIGN KEY (`idAdicion`) REFERENCES `insumo` (`idInsumo`) ON DELETE CASCADE ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `detalleventaproducto`
---
 ALTER TABLE `detalleventaproducto`
   ADD CONSTRAINT `detalleventaproducto_ibfk_119` FOREIGN KEY (`idVenta`) REFERENCES `venta` (`idVenta`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `detalleventaproducto_ibfk_120` FOREIGN KEY (`idVariante`) REFERENCES `variante` (`idVariante`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `devolucion`
---
 ALTER TABLE `devolucion`
   ADD CONSTRAINT `devolucion_ibfk_1` FOREIGN KEY (`idVenta`) REFERENCES `venta` (`idVenta`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `evento`
---
 ALTER TABLE `evento`
   ADD CONSTRAINT `evento_ibfk_1` FOREIGN KEY (`idProducto`) REFERENCES `producto` (`idProducto`) ON DELETE SET NULL ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `fichatecnica`
---
 ALTER TABLE `fichatecnica`
   ADD CONSTRAINT `fichatecnica_ibfk_177` FOREIGN KEY (`idVariante`) REFERENCES `variante` (`idVariante`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fichatecnica_ibfk_178` FOREIGN KEY (`idProducto`) REFERENCES `producto` (`idProducto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fichatecnica_ibfk_179` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE CASCADE ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `insumo`
---
 ALTER TABLE `insumo`
   ADD CONSTRAINT `insumo_ibfk_119` FOREIGN KEY (`idCategoriaInsumo`) REFERENCES `categoriainsumo` (`idCategoriaInsumo`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `insumo_ibfk_120` FOREIGN KEY (`idProveedor`) REFERENCES `proveedor` (`idProveedor`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `pago`
---
 ALTER TABLE `pago`
   ADD CONSTRAINT `pago_ibfk_1` FOREIGN KEY (`idVenta`) REFERENCES `venta` (`idVenta`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `pedido`
---
 ALTER TABLE `pedido`
   ADD CONSTRAINT `pedido_ibfk_1` FOREIGN KEY (`clienteId`) REFERENCES `cliente` (`idCliente`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `producto`
---
 ALTER TABLE `producto`
   ADD CONSTRAINT `producto_ibfk_1` FOREIGN KEY (`idCategoriaProducto`) REFERENCES `categoriaproducto` (`idCategoriaProducto`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `proveedor`
---
 ALTER TABLE `proveedor`
   ADD CONSTRAINT `proveedor_ibfk_121` FOREIGN KEY (`idTipoProveedor`) REFERENCES `tipoproveedor` (`idTipoProveedor`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `proveedor_ibfk_122` FOREIGN KEY (`idTipoDocumento`) REFERENCES `tipodocumento` (`idTipoDocumento`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `rolpermiso`
---
 ALTER TABLE `rolpermiso`
   ADD CONSTRAINT `rolpermiso_ibfk_167` FOREIGN KEY (`idRol`) REFERENCES `rol` (`idRol`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `rolpermiso_ibfk_168` FOREIGN KEY (`idPermiso`) REFERENCES `permiso` (`idPermiso`) ON DELETE CASCADE ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `trazabilidad`
---
 ALTER TABLE `trazabilidad`
   ADD CONSTRAINT `trazabilidad_ibfk_119` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `trazabilidad_ibfk_120` FOREIGN KEY (`usuarioId`) REFERENCES `usuario` (`idUsuario`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `usuario`
---
 ALTER TABLE `usuario`
   ADD CONSTRAINT `usuario_ibfk_1` FOREIGN KEY (`idRol`) REFERENCES `rol` (`idRol`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `variante`
---
 ALTER TABLE `variante`
   ADD CONSTRAINT `variante_ibfk_1` FOREIGN KEY (`idProducto`) REFERENCES `producto` (`idProducto`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
---
--- Filtros para la tabla `venta`
---
 ALTER TABLE `venta`
   ADD CONSTRAINT `venta_ibfk_178` FOREIGN KEY (`idCliente`) REFERENCES `cliente` (`idCliente`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_179` FOREIGN KEY (`idUsuario`) REFERENCES `usuario` (`idUsuario`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_180` FOREIGN KEY (`idDescuento`) REFERENCES `descuento` (`idDescuento`) ON DELETE NO ACTION ON UPDATE CASCADE;
-COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
