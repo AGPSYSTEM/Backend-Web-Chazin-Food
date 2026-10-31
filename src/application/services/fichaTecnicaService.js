@@ -2,6 +2,39 @@ const { Sequelize } = require('sequelize');
 const { FichaTecnica, DetalleFichaInsumo, Insumo, Product, Variante, InsumoPreparado } = require('../../persistence/models');
 const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
 
+const VERSION_TAG_REGEX = /\n?<!--CHAZIN_FT_VERSIONS:([\s\S]*?)-->/;
+
+function extractEmbeddedVersionMeta(rawObservaciones) {
+  if (!rawObservaciones || typeof rawObservaciones !== 'string') {
+    return { cleanObservaciones: rawObservaciones || '', meta: null };
+  }
+  const match = rawObservaciones.match(VERSION_TAG_REGEX);
+  if (!match) {
+    return { cleanObservaciones: rawObservaciones, meta: null };
+  }
+  const cleanObservaciones = rawObservaciones.replace(VERSION_TAG_REGEX, '').trim();
+  try {
+    const parsed = JSON.parse(match[1]);
+    return { cleanObservaciones, meta: parsed };
+  } catch (_) {
+    return { cleanObservaciones, meta: null };
+  }
+}
+
+function parseVersionesList(rawVal) {
+  if (!rawVal) return [];
+  if (Array.isArray(rawVal)) return rawVal;
+  if (typeof rawVal === 'string') {
+    try {
+      const parsed = JSON.parse(rawVal);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return [];
+}
+
 class FichaTecnicaService {
   static formatFicha(f) {
     if (!f) return null;
@@ -99,6 +132,18 @@ class FichaTecnicaService {
       }
     }
 
+    const { meta: embeddedMeta } = extractEmbeddedVersionMeta(f.observaciones);
+    const nativeVersiones = parseVersionesList(f.versionesAnteriores);
+    const embeddedVersiones = parseVersionesList(embeddedMeta?.versionesAnteriores);
+    const resolvedVersiones =
+      nativeVersiones.length >= embeddedVersiones.length ? nativeVersiones : embeddedVersiones;
+    const resolvedVersionActual =
+      Number(embeddedMeta?.versionActual) ||
+      Number(f.versionActual) ||
+      resolvedVersiones.length + 1;
+    const resolvedFechaInicioVigencia =
+      embeddedMeta?.fechaInicioVigencia || f.fechaInicioVigencia || f.fechaCreacion;
+
     return {
       id: f.idFichaTecnica,
       idFichaTecnica: f.idFichaTecnica,
@@ -119,6 +164,9 @@ class FichaTecnicaService {
       condicionesAlmacenamiento: f.condicionesAlmacenamiento || '',
       vidaUtil: f.vidaUtil || '',
       observaciones: f.observaciones || '',
+      versionActual: resolvedVersionActual,
+      fechaInicioVigencia: resolvedFechaInicioVigencia,
+      versionesAnteriores: resolvedVersiones,
       fechaCreacion: f.fechaCreacion,
       producto: f.producto || null,
       insumoInfo: f.insumoInfo || null,
@@ -250,6 +298,73 @@ class FichaTecnicaService {
     return null;
   }
 
+  static resolveVersionFieldsOnWrite(existingFicha, data, existingDetalles = []) {
+    const nowIso = new Date().toISOString();
+    const { cleanObservaciones: incomingCleanObs, meta: incomingMeta } = extractEmbeddedVersionMeta(data.observaciones);
+    const incomingVersiones = parseVersionesList(data.versionesAnteriores || incomingMeta?.versionesAnteriores);
+
+    if (!existingFicha) {
+      return {
+        versionActual: Number(data.versionActual || incomingMeta?.versionActual || 1),
+        fechaInicioVigencia: data.fechaInicioVigencia || incomingMeta?.fechaInicioVigencia || nowIso,
+        versionesAnteriores: JSON.stringify(incomingVersiones)
+      };
+    }
+
+    const { cleanObservaciones: prevCleanObs, meta: prevMeta } = extractEmbeddedVersionMeta(existingFicha.observaciones);
+    const prevVersiones = parseVersionesList(existingFicha.versionesAnteriores || prevMeta?.versionesAnteriores);
+    const prevVersionNum =
+      Number(prevMeta?.versionActual) ||
+      Number(existingFicha.versionActual) ||
+      prevVersiones.length + 1;
+    const prevFechaInicio =
+      prevMeta?.fechaInicioVigencia ||
+      existingFicha.fechaInicioVigencia ||
+      existingFicha.fechaCreacion ||
+      nowIso;
+
+    // Si el frontend ya calculó y envió el historial de versiones actualizado (nueva versión o restauración de versión anterior), respetarlo
+    if (incomingVersiones.length > 0 || Number(data.versionActual || incomingMeta?.versionActual || 0) > 0) {
+      return {
+        versionActual:
+          Number(data.versionActual || incomingMeta?.versionActual || 0) ||
+          incomingVersiones.length + 1,
+        fechaInicioVigencia: data.fechaInicioVigencia || incomingMeta?.fechaInicioVigencia || nowIso,
+        versionesAnteriores: JSON.stringify(incomingVersiones)
+      };
+    }
+
+    // Si se actualizó directamente contra el API sin que el cliente enviara versionesAnteriores, crear snapshot automático
+    const archivedSnapshot = {
+      version: prevVersionNum,
+      fechaInicio: prevFechaInicio,
+      fechaFin: nowIso,
+      procedimiento: existingFicha.procedimiento || existingFicha.descripcion || '',
+      tiempoPreparacion: Number(existingFicha.tiempoPreparacion || 0),
+      rendimiento: existingFicha.rendimiento || '',
+      especificaciones: existingFicha.especificaciones || '',
+      caracteristicas: existingFicha.caracteristicas || '',
+      informacionNutricional: existingFicha.informacionNutricional || '',
+      condicionesAlmacenamiento: existingFicha.condicionesAlmacenamiento || '',
+      vidaUtil: existingFicha.vidaUtil || '',
+      observaciones: prevCleanObs || '',
+      detalles: (existingDetalles || []).map((d) => ({
+        idInsumo: d.idInsumo,
+        nombreInsumo: d.insumo?.nombre || `Insumo #${d.idInsumo}`,
+        cantidad: Number(d.cantidad || 0),
+        unidadMedida: d.unidadMedida || d.insumo?.unidadMedida || 'und',
+        precioUnitario: Number(d.insumo?.precioUnitario || 0)
+      }))
+    };
+
+    const nextHistory = [archivedSnapshot, ...prevVersiones];
+    return {
+      versionActual: prevVersionNum + 1,
+      fechaInicioVigencia: nowIso,
+      versionesAnteriores: JSON.stringify(nextHistory)
+    };
+  }
+
   static async saveForProducto(idProducto, data) {
     if (!idProducto || !data) return null;
 
@@ -272,8 +387,18 @@ class FichaTecnicaService {
       }
     }
 
-    let f = await FichaTecnica.findOne({ where: { idProducto: String(idProducto) } });
+    let f = await FichaTecnica.findOne({
+      where: { idProducto: String(idProducto) },
+      include: [
+        {
+          model: DetalleFichaInsumo,
+          as: 'detalles',
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
+        }
+      ]
+    });
     const resolvedVarianteId = await this.resolveVarianteId(idProducto, null, data.idVariante);
+    const versionFields = this.resolveVersionFieldsOnWrite(f, data, f?.detalles || []);
 
     if (!f) {
       f = await FichaTecnica.create({
@@ -291,6 +416,9 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
         observaciones: data.observaciones || '',
+        versionActual: versionFields.versionActual,
+        fechaInicioVigencia: versionFields.fechaInicioVigencia,
+        versionesAnteriores: versionFields.versionesAnteriores,
         fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
       });
     } else {
@@ -308,6 +436,9 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
         observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
+        versionActual: versionFields.versionActual,
+        fechaInicioVigencia: versionFields.fechaInicioVigencia,
+        versionesAnteriores: versionFields.versionesAnteriores,
         estado: data.estado !== undefined ? data.estado : 1
       };
       if (f.estado === 0) {
@@ -337,8 +468,19 @@ class FichaTecnicaService {
   }
 
   static async saveForInsumoPreparado(idPreparado, data, options = {}) {
-    let f = await FichaTecnica.findOne({ where: { idInsumo: String(idPreparado) }, transaction: options.transaction });
+    let f = await FichaTecnica.findOne({
+      where: { idInsumo: String(idPreparado) },
+      include: [
+        {
+          model: DetalleFichaInsumo,
+          as: 'detalles',
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
+        }
+      ],
+      transaction: options.transaction
+    });
     const resolvedVarianteId = await this.resolveVarianteId(null, idPreparado, data.idVariante);
+    const versionFields = this.resolveVersionFieldsOnWrite(f, data, f?.detalles || []);
 
     if (!f) {
       f = await FichaTecnica.create({
@@ -356,6 +498,9 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento || '',
         vidaUtil: data.vidaUtil || '',
         observaciones: data.observaciones || '',
+        versionActual: versionFields.versionActual,
+        fechaInicioVigencia: versionFields.fechaInicioVigencia,
+        versionesAnteriores: versionFields.versionesAnteriores,
         fechaCreacion: Sequelize.literal("CONVERT_TZ(NOW(), '+00:00', '-05:00')")
       }, { transaction: options.transaction });
     } else {
@@ -374,6 +519,9 @@ class FichaTecnicaService {
         condicionesAlmacenamiento: data.condicionesAlmacenamiento !== undefined ? data.condicionesAlmacenamiento : f.condicionesAlmacenamiento,
         vidaUtil: data.vidaUtil !== undefined ? data.vidaUtil : f.vidaUtil,
         observaciones: data.observaciones !== undefined ? data.observaciones : f.observaciones,
+        versionActual: versionFields.versionActual,
+        fechaInicioVigencia: versionFields.fechaInicioVigencia,
+        versionesAnteriores: versionFields.versionesAnteriores,
         estado: data.estado !== undefined ? data.estado : 1
       };
       if (f.estado === 0) {
@@ -471,12 +619,23 @@ class FichaTecnicaService {
   }
 
   static async update(id, data) {
-    const f = await FichaTecnica.findByPk(id);
+    const f = await FichaTecnica.findOne({
+      where: { idFichaTecnica: id },
+      include: [
+        {
+          model: DetalleFichaInsumo,
+          as: 'detalles',
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
+        }
+      ]
+    });
     if (!f) {
       const error = new Error('Ficha técnica no encontrada');
       error.statusCode = 404;
       throw error;
     }
+
+    const versionFields = this.resolveVersionFieldsOnWrite(f, data, f.detalles || []);
 
     if (f.idInsumo) {
       f.idVariante = 0;
@@ -497,6 +656,9 @@ class FichaTecnicaService {
     if (data.condicionesAlmacenamiento !== undefined) f.condicionesAlmacenamiento = data.condicionesAlmacenamiento;
     if (data.vidaUtil !== undefined) f.vidaUtil = data.vidaUtil;
     if (data.observaciones !== undefined) f.observaciones = data.observaciones;
+    f.versionActual = versionFields.versionActual;
+    f.fechaInicioVigencia = versionFields.fechaInicioVigencia;
+    f.versionesAnteriores = versionFields.versionesAnteriores;
     if (data.estado !== undefined) f.estado = data.estado;
 
     await f.save();

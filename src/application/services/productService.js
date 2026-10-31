@@ -215,6 +215,7 @@ class ProductService {
           imagen: p.imagen || '',
           stock: stockDisponible,
           ventas: totalVentas,
+          tieneVentas: totalVentas > 0,
           idCategoriaProducto: p.idCategoriaProducto,
           categoriaId: p.idCategoriaProducto,
           categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
@@ -356,6 +357,7 @@ class ProductService {
       imagen: p.imagen || '',
       stock: stockDisponible,
       ventas: ventasCount,
+      tieneVentas: ventasCount > 0,
       idCategoriaProducto: p.idCategoriaProducto,
       categoriaId: p.idCategoriaProducto,
       categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
@@ -450,26 +452,6 @@ class ProductService {
       const error = new Error('Producto no encontrado');
       error.statusCode = 404;
       throw error;
-    }
-
-    // Requisito 104: Restricción de edición si el producto ya cuenta con ventas asociadas
-    const variantes = await Variante.findAll({ where: { idProducto: id } });
-    const varianteIds = variantes.map(v => v.idVariante);
-    let tieneVentas = false;
-    if (varianteIds.length > 0) {
-      const inVenta = await DetalleVentaProducto.findOne({ where: { idVariante: varianteIds } });
-      if (inVenta) tieneVentas = true;
-    }
-
-    if (tieneVentas) {
-      // Solo permitir cambiar estado (Activo/Inactivo) si ya tiene ventas
-      const keys = Object.keys(data);
-      const isOnlyEstado = keys.every(k => data[k] === undefined || k === 'estado');
-      if (!isOnlyEstado) {
-        const error = new Error('No es posible editar las características de este producto porque ya cuenta con ventas registradas en el sistema para garantizar la integridad histórica y contable.');
-        error.statusCode = 400;
-        throw error;
-      }
     }
 
     const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo, itemsCombo } = data;
