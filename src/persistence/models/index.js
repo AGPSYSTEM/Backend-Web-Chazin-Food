@@ -637,6 +637,18 @@ const FichaTecnica = sequelize.define('fichatecnica', {
   observaciones: {
     type: DataTypes.TEXT
   },
+  versionActual: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1
+  },
+  fechaInicioVigencia: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  versionesAnteriores: {
+    type: DataTypes.TEXT('long'),
+    allowNull: true
+  },
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
