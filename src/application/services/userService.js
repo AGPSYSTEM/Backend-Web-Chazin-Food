@@ -27,7 +27,7 @@ class UserService {
     return users.map(user => {
       const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
       const cleanTel = sanitizeTelefono(user.telefono);
-      const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+      const docVal = (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '';
       return {
         _id: user.idUsuario,
         id: user.idUsuario,
@@ -66,7 +66,7 @@ class UserService {
 
     const { nombre: cleanNom, apellidos: cleanApe } = cleanNameAndLastName(user.nombre, user.apellidos);
     const cleanTel = sanitizeTelefono(user.telefono);
-    const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+    const docVal = (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '';
     const permisos = user.rolInfo && user.rolInfo.permisos
       ? user.rolInfo.permisos.map(p => p.nombrePermiso)
       : [];
@@ -156,10 +156,7 @@ class UserService {
     if (cleanDoc) {
       const existingDoc = await User.findOne({
         where: {
-          [Op.or]: [
-            { numeroDocumento: cleanDoc },
-            ...(!isNaN(parseInt(cleanDoc)) ? [{ idUsuario: parseInt(cleanDoc) }] : [])
-          ]
+          numeroDocumento: cleanDoc
         }
       });
       if (existingDoc) {
@@ -275,15 +272,12 @@ class UserService {
     if (rawDoc !== undefined) {
       const targetTipoDoc = user.tipoDocumento || 'C.C.';
       const cleanDoc = sanitizeDocumento(rawDoc, targetTipoDoc);
-      const currentDoc = String(user.numeroDocumento || user.idUsuario || '');
+      const currentDoc = String(user.numeroDocumento || '');
       if (cleanDoc && cleanDoc !== currentDoc) {
         const existingDoc = await User.findOne({
           where: {
             idUsuario: { [Op.ne]: id },
-            [Op.or]: [
-              { numeroDocumento: cleanDoc },
-              ...(!isNaN(parseInt(cleanDoc)) ? [{ idUsuario: parseInt(cleanDoc) }] : [])
-            ]
+            numeroDocumento: cleanDoc
           }
         });
         if (existingDoc) {

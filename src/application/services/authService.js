@@ -302,8 +302,10 @@ class AuthService {
       apellidos: user.apellidos,
       apellido: user.apellidos,
       tipoDocumento: user.tipoDocumento || 'C.C.',
-      numeroDocumento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
-      documento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
+      numeroDocumento: (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '',
+      tieneCedulaRegistrada: Boolean(user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6),
+      esUsuarioGoogle: Boolean(user.foto && user.foto.includes('googleusercontent.com')),
+      documento: (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '',
       telefono: user.telefono,
       email: user.email,
       correo: user.email,
@@ -381,7 +383,7 @@ class AuthService {
       }
     }
 
-    const docVal = user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : '');
+    const docVal = (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '';
 
     let metaFoto = null;
     if (user.clienteInfo?.direccion && user.clienteInfo.direccion.trim().startsWith('{')) {
@@ -403,6 +405,8 @@ class AuthService {
       tipoDocumento: user.tipoDocumento || 'C.C.',
       numeroDocumento: docVal,
       documento: docVal,
+      tieneCedulaRegistrada: Boolean(docVal && docVal.length >= 6),
+      esUsuarioGoogle: Boolean(user.foto && user.foto.includes('googleusercontent.com')),
       telefono: user.telefono,
       email: user.email,
       correo: user.email,
@@ -423,30 +427,38 @@ class AuthService {
   static async updateProfile(userId, profileData) {
     const { passwordActual, passwordNueva, ...otherData } = profileData;
 
-    // If password change is requested
+    const user = await User.findByPk(userId);
+    if (!user) {
+      const error = new Error('Usuario no encontrado');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // If password change or initial password creation is requested
     if (passwordNueva) {
-      if (!passwordActual) {
-        const error = new Error('Debes ingresar tu contraseña actual para cambiarla');
-        error.statusCode = 400;
-        throw error;
-      }
       if (passwordNueva.length < 6) {
         const error = new Error('La nueva contraseña debe tener al menos 6 caracteres');
         error.statusCode = 400;
         throw error;
       }
-      const user = await User.findByPk(userId);
-      if (!user) {
-        const error = new Error('Usuario no encontrado');
-        error.statusCode = 404;
-        throw error;
+
+      const isGoogleUser = Boolean(user.foto && user.foto.includes('googleusercontent.com'));
+      const allowDirectSet = Boolean(profileData.crearPasswordDirecta || (isGoogleUser && !passwordActual));
+
+      if (!allowDirectSet) {
+        if (!passwordActual) {
+          const error = new Error('Debes ingresar tu contraseña actual para cambiarla');
+          error.statusCode = 400;
+          throw error;
+        }
+        const isMatch = await bcrypt.compare(passwordActual, user.contrasena);
+        if (!isMatch) {
+          const error = new Error('La contraseña actual es incorrecta');
+          error.statusCode = 400;
+          throw error;
+        }
       }
-      const isMatch = await bcrypt.compare(passwordActual, user.contrasena);
-      if (!isMatch) {
-        const error = new Error('La contraseña actual es incorrecta');
-        error.statusCode = 400;
-        throw error;
-      }
+
       const salt = await bcrypt.genSalt(10);
       const hashed = await bcrypt.hash(passwordNueva, salt);
       await user.update({ contrasena: hashed });
@@ -831,8 +843,10 @@ class AuthService {
       apellidos: user.apellidos,
       apellido: user.apellidos,
       tipoDocumento: user.tipoDocumento || 'C.C.',
-      numeroDocumento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
-      documento: user.numeroDocumento || (user.idUsuario ? String(user.idUsuario) : ''),
+      numeroDocumento: (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '',
+      tieneCedulaRegistrada: Boolean(user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6),
+      esUsuarioGoogle: Boolean(user.foto && user.foto.includes('googleusercontent.com')),
+      documento: (user.numeroDocumento && String(user.numeroDocumento).trim().length >= 6) ? String(user.numeroDocumento).trim() : '',
       telefono: user.telefono || '',
       email: user.email,
       correo: user.email,

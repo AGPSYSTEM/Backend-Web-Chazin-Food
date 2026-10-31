@@ -102,7 +102,19 @@ function formatNombreCompleto(nombre = '', apellidos = '') {
   return `${cleaned.nombre} ${cleaned.apellidos}`.trim();
 }
 
+
+function isValidDocumento(value = '', tipoDoc = 'C.C.') {
+  const clean = sanitizeDocumento(value, tipoDoc);
+  if (!clean) return false;
+  const norm = String(tipoDoc || 'C.C.').trim().toUpperCase();
+  if (norm.includes('T.I.') || norm === 'TI') {
+    return clean.length >= 10 && clean.length <= 11;
+  }
+  return clean.length >= 6;
+}
+
 module.exports = {
+  isValidDocumento,
   sanitizeTelefono,
   sanitizeDocumento,
   cleanNameAndLastName,

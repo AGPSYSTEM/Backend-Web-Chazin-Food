@@ -1564,17 +1564,17 @@ CREATE TABLE `usuario` (
 
 -- Volcado de datos para la tabla `usuario`
 INSERT INTO `usuario` (`idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `email`, `contrasena`, `estado`, `fechaRegistro`, `idRol`, `foto`) VALUES
-(1, 'Fernando', 'Gómez Jaramillo', 'C.C.', '1', '3014599890', 'gomezjaramillofer@gmail.com', '$2a$10$85QpBu8Uj3qXzVtWTjCLveU8HpnJ1.uHuQfL1izYlVRe67hhDK3yO', 'ACTIVO', '2026-07-26 20:09:41', 4, NULL),
+(1, 'Fernando', 'Gómez Jaramillo', 'C.C.', NULL, '3014599890', 'gomezjaramillofer@gmail.com', '$2a$10$85QpBu8Uj3qXzVtWTjCLveU8HpnJ1.uHuQfL1izYlVRe67hhDK3yO', 'ACTIVO', '2026-07-26 20:09:41', 4, NULL),
 (4, 'Admin', 'Sistema', 'C.C.', '4', '3190000001', 'admin@chazinfood.com', '$2a$10$dS5LiLdTlcXUBSRahZAYNexfLybhvFXykk9833rsPuWz.iFzW1TcW', 'ACTIVO', '2026-07-18 11:53:44', 1, NULL),
 (6, 'María', 'García', 'C.C.', '6432234344', '3190000002', 'cliente@chazinfood.com', '$2a$10$5Y9vYponOKrFOkM8Tl92CO3kA2gx2U88w5g2hkAI0Bqzjwr/.6c8y', 'ACTIVO', '2026-07-18 13:02:36', 4, NULL),
-(24, 'Vendedor Principal', 'Chazin', 'C.C.', '24', '3001234567', 'vendedor@chazinfood.com', '$2a$10$YizLrUBkaC5CXWb8GUGq6.cxRe9Xxwl8WGJrFP0pEze9MAsjNphMm', 'ACTIVO', '2026-08-14 09:36:36', 3, NULL),
+(24, 'Vendedor Principal', 'Chazin', 'C.C.', NULL, '3001234567', 'vendedor@chazinfood.com', '$2a$10$YizLrUBkaC5CXWb8GUGq6.cxRe9Xxwl8WGJrFP0pEze9MAsjNphMm', 'ACTIVO', '2026-08-14 09:36:36', 3, NULL),
 (25, 'Mariana', 'Silva Vergara', 'C.C.', '1056783045', '3054675789', 'mariana123@mailinator.com', '$2a$10$CHcvOtoR3eI4BrXf0LGDI.aCqb16qwcpMddDMW0DochM5BsRt0WEm', 'ACTIVO', '2026-09-23 11:29:37', 4, NULL),
 (26, 'sofyan', 'amrabat', 'C.C.', '8765432198', '3338977654', 'sofyan@mailinator.com', '$2a$10$gHexTX7kKBlxJCNPcufUX.7q0TXNr5n4l/jWkWM8XJ9VSSoNl2OKa', 'ACTIVO', '2026-09-24 05:13:59', 4, NULL),
 (27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', '$2a$10$/z23BjiussU6jhOO.5D6ZuOlovSMyCzhdEb/CwcKm0LsU3nLpdKk6', 'ACTIVO', '2026-10-06 12:19:50', 2, NULL),
 (28, 'Juan', 'PPerez', 'C.C.', '12345678', '3001234567', 'juanperez@gmail.com', '$2a$10$jGN8TU1E8U36jTA4nP7YPumzttjJo2uBtVVUBT49p9cWLsltyvQEe', 'ACTIVO', '2026-10-18 17:42:29', 4, NULL),
-(32, 'Nuevo Cliente', '', 'C.C.', '32', NULL, 'nuevocliente@gmail.com', '$2a$10$23BT7J5O62odP42cfRGxm.p6LqvSjDdcXtSqlxgKynTjzjO6KDBRa', 'ACTIVO', '2026-10-19 05:05:00', 4, NULL),
-(33, 'Pedro', 'Jajaja', 'C.C.', '33', NULL, 'jajajapedro2@gmail.com', '$2a$10$z651yjoa0c7saLp4VdVIzuG.y7kzMBlnQSvrKsb3q00KuFzg.NAKO', 'ACTIVO', '2026-10-20 14:42:48', 4, 'https://lh3.googleusercontent.com/a/ACg8ocIGFU4ouBL7lt9zWlG2aIR76fZA30Sw3ndhDlD1cxSYpYbyMA=s96-c'),
-(34, 'Samuel Gutiérrez franco', '', 'C.C.', '34', NULL, 'samu36669@gmail.com', '$2a$10$XNIfoAMcbHGAg9aU4crLte/uL87RHrZJ1uEN4SYtH8WHOgcP.Ww..', 'ACTIVO', '2026-10-21 02:49:04', 4, 'https://lh3.googleusercontent.com/a/ACg8ocKmapNwCVpwyd7XnVj1loQQ9a43jOPDmTcBpztbkZAtZms3lti_=s96-c');
+(32, 'Nuevo Cliente', '', 'C.C.', NULL, NULL, 'nuevocliente@gmail.com', '$2a$10$23BT7J5O62odP42cfRGxm.p6LqvSjDdcXtSqlxgKynTjzjO6KDBRa', 'ACTIVO', '2026-10-19 05:05:00', 4, NULL),
+(33, 'Pedro', 'Jajaja', 'C.C.', NULL, NULL, 'jajajapedro2@gmail.com', '$2a$10$z651yjoa0c7saLp4VdVIzuG.y7kzMBlnQSvrKsb3q00KuFzg.NAKO', 'ACTIVO', '2026-10-20 14:42:48', 4, 'https://lh3.googleusercontent.com/a/ACg8ocIGFU4ouBL7lt9zWlG2aIR76fZA30Sw3ndhDlD1cxSYpYbyMA=s96-c'),
+(34, 'Samuel Gutiérrez franco', '', 'C.C.', NULL, NULL, 'samu36669@gmail.com', '$2a$10$XNIfoAMcbHGAg9aU4crLte/uL87RHrZJ1uEN4SYtH8WHOgcP.Ww..', 'ACTIVO', '2026-10-21 02:49:04', 4, 'https://lh3.googleusercontent.com/a/ACg8ocKmapNwCVpwyd7XnVj1loQQ9a43jOPDmTcBpztbkZAtZms3lti_=s96-c');
 
 -- --------------------------------------------------------
 -- Tabla: `variante`
