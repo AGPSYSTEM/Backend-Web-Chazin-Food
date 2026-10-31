@@ -86,6 +86,24 @@ async function ensureFichaTecnicaTrashSchema() {
   if (columns.length === 0) {
     await sequelize.query('ALTER TABLE `fichatecnica` ADD COLUMN `estado` TINYINT NOT NULL DEFAULT 1 AFTER `observaciones`');
   }
+
+  try {
+    const [verCols] = await sequelize.query("SHOW COLUMNS FROM `fichatecnica` LIKE 'versionActual'");
+    if (!verCols || verCols.length === 0) {
+      await sequelize.query('ALTER TABLE `fichatecnica` ADD COLUMN `versionActual` INT NOT NULL DEFAULT 1 AFTER `observaciones`');
+    }
+    const [iniCols] = await sequelize.query("SHOW COLUMNS FROM `fichatecnica` LIKE 'fechaInicioVigencia'");
+    if (!iniCols || iniCols.length === 0) {
+      await sequelize.query('ALTER TABLE `fichatecnica` ADD COLUMN `fechaInicioVigencia` DATETIME NULL AFTER `versionActual`');
+      await sequelize.query('UPDATE `fichatecnica` SET `fechaInicioVigencia` = `fechaCreacion` WHERE `fechaInicioVigencia` IS NULL');
+    }
+    const [histCols] = await sequelize.query("SHOW COLUMNS FROM `fichatecnica` LIKE 'versionesAnteriores'");
+    if (!histCols || histCols.length === 0) {
+      await sequelize.query('ALTER TABLE `fichatecnica` ADD COLUMN `versionesAnteriores` LONGTEXT NULL AFTER `fechaInicioVigencia`');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando columnas de versionamiento en fichatecnica:', err.message);
+  }
 }
 
 /**
