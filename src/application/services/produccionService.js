@@ -416,6 +416,43 @@ class ProduccionService {
           finalMesa = 'En Local';
         }
 
+        // Enrich productosList with saved checklist verification if present
+        const savedChecklist = Array.isArray(obsObj.checklistPreparacion) ? obsObj.checklistPreparacion : null;
+        if (savedChecklist && savedChecklist.length > 0) {
+          productosList.forEach((prodItem, idx) => {
+            const matchedCheck = savedChecklist.find(
+              c => (c.id !== undefined && c.id === prodItem.id) ||
+                   (c.index !== undefined && Number(c.index) === idx) ||
+                   (c.nombre && prodItem.nombre && c.nombre.toLowerCase().trim() === prodItem.nombre.toLowerCase().trim())
+            ) || savedChecklist[idx];
+            if (matchedCheck) {
+              prodItem.completado = Boolean(matchedCheck.completado);
+              prodItem.cantidadPreparada = matchedCheck.cantidadPreparada !== undefined
+                ? Number(matchedCheck.cantidadPreparada)
+                : (matchedCheck.completado ? prodItem.cantidad : 0);
+              prodItem.estadoChecklist = matchedCheck.estadoChecklist || (matchedCheck.completado ? 'COMPLETO' : 'NO_PREPARADO');
+              prodItem.motivoNoPreparado = matchedCheck.motivo || matchedCheck.motivoNoPreparado || "";
+            }
+          });
+        }
+
+        const pedidoCompleto = obsObj.pedidoCompleto !== undefined
+          ? Boolean(obsObj.pedidoCompleto)
+          : (savedChecklist && savedChecklist.length > 0
+              ? savedChecklist.every(c => Boolean(c.completado) && Number(c.cantidadPreparada ?? c.cantidad ?? 1) >= Number(c.cantidad ?? 1))
+              : null);
+
+        const tieneAlertaIncompleto = pedidoCompleto === false;
+
+        // El cliente es quien recibe; el responsable/cocinero es quien cocina (Requisito 9)
+        const cocineroNombre = obsObj.cocinero ||
+          obsObj.responsableCocina ||
+          (v.usuario && v.usuario.idRol !== 4 ? `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim() : null) ||
+          "Chef de Turno";
+
+        const horaEstadoCalculada = obsObj.horaEstado ||
+          (obsObj.fechaCambioEstado ? new Date(obsObj.fechaCambioEstado).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' }) : horaStr);
+
         return {
           id: v.idVenta,
           idVenta: v.idVenta,
@@ -424,21 +461,29 @@ class ProduccionService {
           imagen: mainEmoji,
           cantidad: totalItemsCount || 1,
           cliente: clienteNombre,
-          responsable: clienteNombre,
-          cocinero: "Cocina Principal",
+          responsable: cocineroNombre,
+          cocinero: cocineroNombre,
+          responsableCocina: cocineroNombre,
           tiempo: primaryProd?.receta?.tiempoPreparacion || "15 min",
           fecha: fechaStr,
           horaInicio: horaStr,
+          horaEstado: horaEstadoCalculada,
+          fechaCambioEstado: obsObj.fechaCambioEstado || null,
+          historialEstados: obsObj.historialEstados || [],
           fechaVenta: v.fechaVenta,
           estado: estadoStr,
           estadoAprobacion: 'APROBADO',
           estadoEntrega: v.estadoEntrega || 'PENDIENTE',
-          alerta: false,
+          alerta: tieneAlertaIncompleto,
           observaciones: cleanGeneralObs,
           tipo: finalTipo,
           mesa: finalMesa,
           tipoVenta: v.tipoVenta || (finalTipo === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
-          productos: productosList
+          productos: productosList,
+          checklistPreparacion: savedChecklist,
+          pedidoCompleto,
+          observacionCocina: obsObj.observacionCocina || "",
+          fechaVerificacionCocina: obsObj.fechaVerificacionCocina || null
         };
       });
 
@@ -476,7 +521,7 @@ class ProduccionService {
     throw error;
   }
 
-  static async updateEstado(id, nuevoEstado) {
+  static async updateEstado(id, nuevoEstado, extraData = {}) {
     const { Op } = require('sequelize');
     let v = null;
     let idVentaNum = Number(id);
@@ -557,11 +602,78 @@ class ProduccionService {
     const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
     obsObj.horaEstado = horaActual;
     obsObj.fechaCambioEstado = ahora.toISOString();
+
+    // Guardar nombre del cocinero / responsable de cocina en turno (Requisito 9)
+    if (extraData?.cocinero || extraData?.responsable || extraData?.usuarioNombre) {
+      obsObj.cocinero = extraData.cocinero || extraData.responsable || extraData.usuarioNombre;
+      obsObj.responsableCocina = obsObj.cocinero;
+    }
+
+    // Persist kitchen preparation verification checklist if provided
+    if (Array.isArray(extraData?.checklistPreparacion) && extraData.checklistPreparacion.length > 0) {
+      const normalizedChecklist = extraData.checklistPreparacion.map((item, idx) => {
+        const cantSolicitada = Number(item.cantidad ?? item.cantidadSolicitada ?? 1);
+        const completado = Boolean(item.completado);
+        const cantPreparada = item.cantidadPreparada !== undefined
+          ? Number(item.cantidadPreparada)
+          : (completado ? cantSolicitada : 0);
+        return {
+          id: item.id,
+          index: idx,
+          idProducto: item.idProducto || null,
+          idVariante: item.idVariante || null,
+          nombre: item.nombre || `Producto #${idx + 1}`,
+          cantidad: cantSolicitada,
+          cantidadPreparada: cantPreparada,
+          completado,
+          estadoChecklist: completado && cantPreparada >= cantSolicitada
+            ? 'COMPLETO'
+            : cantPreparada > 0
+            ? 'PARCIAL'
+            : 'NO_PREPARADO',
+          motivo: item.motivo || item.motivoNoPreparado || ''
+        };
+      });
+
+      const isFullOrder = extraData.pedidoCompleto !== undefined
+        ? Boolean(extraData.pedidoCompleto)
+        : normalizedChecklist.every(it => it.completado && it.cantidadPreparada >= it.cantidad);
+
+      obsObj.checklistPreparacion = normalizedChecklist;
+      obsObj.pedidoCompleto = isFullOrder;
+      obsObj.observacionCocina = extraData.observacionCocina !== undefined
+        ? String(extraData.observacionCocina || '').trim()
+        : (obsObj.observacionCocina || '');
+      obsObj.fechaVerificacionCocina = ahora.toISOString();
+      obsObj.horaVerificacionCocina = horaActual;
+
+      if (Array.isArray(obsObj.productos)) {
+        obsObj.productos = obsObj.productos.map((op, idx) => {
+          const match = normalizedChecklist.find(
+            c => (c.id !== undefined && c.id === op.id) ||
+                 (c.index === idx) ||
+                 (c.nombre && op.nombre && c.nombre.toLowerCase().trim() === op.nombre.toLowerCase().trim())
+          ) || normalizedChecklist[idx];
+          if (match) {
+            return {
+              ...op,
+              completado: match.completado,
+              cantidadPreparada: match.cantidadPreparada,
+              estadoChecklist: match.estadoChecklist,
+              motivoNoPreparado: match.motivo
+            };
+          }
+          return op;
+        });
+      }
+    }
+
     if (!Array.isArray(obsObj.historialEstados)) obsObj.historialEstados = [];
     obsObj.historialEstados.push({
       estado: estadoEnum,
       hora: horaActual,
-      fecha: ahora.toISOString()
+      fecha: ahora.toISOString(),
+      ...(obsObj.pedidoCompleto !== undefined ? { pedidoCompleto: obsObj.pedidoCompleto } : {})
     });
     v.observaciones = JSON.stringify(obsObj);
 
@@ -574,6 +686,9 @@ class ProduccionService {
       estadoEntrega: estadoEnum,
       estadoAprobacion: newAprobacion,
       horaEstado: horaActual,
+      checklistPreparacion: obsObj.checklistPreparacion || null,
+      pedidoCompleto: obsObj.pedidoCompleto !== undefined ? obsObj.pedidoCompleto : null,
+      observacionCocina: obsObj.observacionCocina || "",
       message: `Estado de la orden #${v.idVenta} actualizado a "${nuevoEstado}" con éxito`
     };
   }
