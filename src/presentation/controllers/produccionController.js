@@ -20,7 +20,7 @@ const createOrden = async (req, res, next) => {
 
 const updateEstadoOrden = async (req, res, next) => {
   try {
-    const orden = await ProduccionService.updateEstado(req.params.id, req.body.estado);
+    const orden = await ProduccionService.updateEstado(req.params.id, req.body.estado, req.body);
     res.json(orden);
   } catch (error) {
     next(error);

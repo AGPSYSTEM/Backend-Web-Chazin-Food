@@ -386,6 +386,10 @@ class VentaService {
       direccion: obsData.direccion || null,
       especificaciones: extractCleanSpecifications(obsData.especificaciones || obsData.nota || ""),
       observaciones: v.observaciones,
+      checklistPreparacion: Array.isArray(obsData.checklistPreparacion) ? obsData.checklistPreparacion : null,
+      pedidoCompleto: obsData.pedidoCompleto !== undefined ? Boolean(obsData.pedidoCompleto) : null,
+      observacionCocina: obsData.observacionCocina || "",
+      horaVerificacionCocina: obsData.horaVerificacionCocina || null,
       productos,
       detalles: v.detalles || []
     };
