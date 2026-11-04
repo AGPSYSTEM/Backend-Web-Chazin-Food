@@ -422,7 +422,9 @@ class DashboardService {
 
       // Consultar los detalles de venta reales uniendo con venta, producto y variante
       const [rows] = await sequelize.query(`
-        SELECT dv.idVariante, dv.observaciones, dv.cantidad, p.nombre as productoNombre, var.nombre as varNombre, v.fechaVenta
+        SELECT dv.idVariante, dv.observaciones, dv.cantidad, dv.precioUnitario, dv.subtotal,
+               p.nombre as productoNombre, p.precio as productoPrecio,
+               var.nombre as varNombre, var.precio as varPrecio, v.fechaVenta
         FROM detalleventaproducto dv
         INNER JOIN venta v ON dv.idVenta = v.idVenta
         LEFT JOIN variante var ON dv.idVariante = var.idVariante
@@ -439,17 +441,19 @@ class DashboardService {
       rows.forEach(r => {
         // Priorizar el nombre real del producto en base de datos
         let pName = r.productoNombre || r.varNombre || null;
+        let unitPrice = parseFloat(r.precioUnitario) || parseFloat(r.varPrecio) || parseFloat(r.productoPrecio) || 0;
 
         // Si no tiene nombre por join, verificar si observaciones es un JSON estructurado con nombre
-        if (!pName && r.observaciones) {
+        if (r.observaciones) {
           try {
             if (typeof r.observaciones === 'string' && r.observaciones.startsWith('{')) {
               const parsed = JSON.parse(r.observaciones);
-              pName = parsed.nombre || parsed.nombreProducto || null;
+              pName = parsed.nombre || parsed.nombreProducto || pName;
+              if (parsed.precio && !unitPrice) {
+                unitPrice = parseFloat(parsed.precio) || 0;
+              }
             }
-          } catch (e) {
-            pName = null;
-          }
+          } catch (e) {}
         }
 
         // Descartar si es un placeholder genérico o inválido
@@ -465,23 +469,49 @@ class DashboardService {
         let nombreLimpio = pName.replace(/\s*\(.*?\)/g, "").replace(/\s*-\s*base/i, "").trim();
         if (!nombreLimpio || nombreLimpio === "Producto" || nombreLimpio === "Pedido de Venta" || nombreLimpio === "Producto General") return;
 
+        const qty = parseInt(r.cantidad) || 1;
+        let subtotal = parseFloat(r.subtotal) || 0;
+        if (subtotal <= 0 && unitPrice > 0) {
+          subtotal = unitPrice * qty;
+        } else if (subtotal > 0 && unitPrice <= 0) {
+          unitPrice = Math.round(subtotal / qty);
+        }
+
         const key = nombreLimpio.toLowerCase();
         if (!productCounts[key]) {
-          productCounts[key] = { nombre: nombreLimpio, ventas: 0 };
+          productCounts[key] = { nombre: nombreLimpio, ventas: 0, ingresos: 0, unitPrice: unitPrice };
         }
-        productCounts[key].ventas += (parseInt(r.cantidad) || 1);
+        productCounts[key].ventas += qty;
+        productCounts[key].ingresos += subtotal;
+        if (!productCounts[key].unitPrice && unitPrice > 0) {
+          productCounts[key].unitPrice = unitPrice;
+        }
       });
+
+      const totalGlobalIngresos = Object.values(productCounts).reduce((acc, p) => acc + (p.ingresos || 0), 0);
+      const totalGlobalUnidades = Object.values(productCounts).reduce((acc, p) => acc + (p.ventas || 0), 0);
 
       const sorted = Object.values(productCounts)
         .sort((a, b) => b.ventas - a.ventas)
         .slice(0, 5);
 
-      return sorted.map((p, i) => ({
-        id: i + 1,
-        nombre: p.nombre,
-        ventas: p.ventas,
-        ingresos: 0
-      }));
+      return sorted.map((p, i) => {
+        const precioUnitario = p.ventas > 0 && p.ingresos > 0
+          ? Math.round(p.ingresos / p.ventas)
+          : (p.unitPrice || 0);
+        const porcentaje = totalGlobalIngresos > 0
+          ? Math.round((p.ingresos / totalGlobalIngresos) * 1000) / 10
+          : (totalGlobalUnidades > 0 ? Math.round((p.ventas / totalGlobalUnidades) * 1000) / 10 : 0);
+
+        return {
+          id: i + 1,
+          nombre: p.nombre,
+          ventas: p.ventas,
+          ingresos: Math.round(p.ingresos),
+          precioUnitario,
+          porcentaje
+        };
+      });
     } catch (error) {
       console.error('Error in getProductosPopulares:', error);
       return [];
