@@ -429,13 +429,27 @@ class ProductService {
       configuracionCombo: comboConfigStr
     });
 
-    // Crear variante base con el mismo precio del producto
-    await Variante.create({
-      idProducto: product.idProducto,
-      nombre: `${nombre.trim()} - base`,
-      precio: finalPrecio,
-      estado: normalizedEstado
-    });
+    // Crear variantes enviadas o variante base por defecto
+    if (Array.isArray(data.variantes) && data.variantes.length > 0) {
+      for (const v of data.variantes) {
+        if (v && v.nombre && v.nombre.trim()) {
+          await Variante.create({
+            idProducto: product.idProducto,
+            nombre: v.nombre.trim(),
+            precio: finalPrecio,
+            imagen: v.imagen || null,
+            estado: normalizedEstado
+          });
+        }
+      }
+    } else {
+      await Variante.create({
+        idProducto: product.idProducto,
+        nombre: `${nombre.trim()} - base`,
+        precio: finalPrecio,
+        estado: normalizedEstado
+      });
+    }
 
     // Sincronizar items del combo si aplica (Ítems #97, #106)
     const comboItemsToSave = itemsCombo || (configuracionCombo?.itemsCombo);
@@ -454,7 +468,7 @@ class ProductService {
       throw error;
     }
 
-    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo, itemsCombo } = data;
+    const { nombre, precio, descripcion, imagen, categoria, adiciones, estado, idCategoriaProducto, configuracionCombo, itemsCombo, variantes } = data;
 
     // Requisito 105: Coherencia de Categoría (impedir pasar comida a bebidas o viceversa)
     if (idCategoriaProducto || categoria) {
@@ -497,8 +511,53 @@ class ProductService {
 
     await p.save();
 
-    // Sincronizar precio en variantes (Ítem #100)
-    if (precio !== undefined && precio !== null && precio !== '') {
+    // Sincronizar variantes (nombre, precio, imagen, creación y actualización)
+    if (Array.isArray(variantes) && variantes.length > 0) {
+      const basePrice = Number(p.precio) || 0;
+      const existingVariantes = await Variante.findAll({ where: { idProducto: id } });
+      const existingIds = existingVariantes.map(v => Number(v.idVariante));
+      const incomingIds = [];
+
+      for (let i = 0; i < variantes.length; i++) {
+        const v = variantes[i];
+        if (!v || !v.nombre || !v.nombre.trim()) continue;
+        const vNombre = v.nombre.trim();
+        const vPrecio = basePrice;
+        const vImagen = v.imagen || null;
+
+        if (v.idVariante && existingIds.includes(Number(v.idVariante))) {
+          incomingIds.push(Number(v.idVariante));
+          await Variante.update(
+            { nombre: vNombre, precio: vPrecio, imagen: vImagen },
+            { where: { idVariante: v.idVariante } }
+          );
+        } else if (existingVariantes[i]) {
+          const matchedVar = existingVariantes[i];
+          incomingIds.push(Number(matchedVar.idVariante));
+          await Variante.update(
+            { nombre: vNombre, precio: vPrecio, imagen: vImagen },
+            { where: { idVariante: matchedVar.idVariante } }
+          );
+        } else {
+          const newVar = await Variante.create({
+            idProducto: id,
+            nombre: vNombre,
+            precio: vPrecio,
+            imagen: vImagen,
+            estado: p.estado
+          });
+          incomingIds.push(Number(newVar.idVariante));
+        }
+      }
+
+      const toRemove = existingIds.filter(vId => !incomingIds.includes(vId));
+      for (const removeId of toRemove) {
+        const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: removeId } }).catch(() => null);
+        if (!hasSales) {
+          await Variante.destroy({ where: { idVariante: removeId } }).catch(() => null);
+        }
+      }
+    } else if (precio !== undefined && precio !== null && precio !== '') {
       const nuevoPrecio = Number(precio) || 0;
       await Variante.update({ precio: nuevoPrecio }, { where: { idProducto: id } });
     }
