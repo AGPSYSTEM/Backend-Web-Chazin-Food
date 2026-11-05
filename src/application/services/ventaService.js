@@ -321,7 +321,12 @@ class VentaService {
       estado: 'Activo'
     };
 
-    const horaEstado = obsData.horaEstado || horario || "12:30 PM";
+    const ultimoCambio = Array.isArray(obsData.historialEstados) && obsData.historialEstados.length > 0
+      ? obsData.historialEstados[obsData.historialEstados.length - 1]
+      : null;
+
+    const horaEstado = obsData.horaEstado || ultimoCambio?.hora || horario || "12:30 PM";
+    const fechaCambioEstado = obsData.fechaCambioEstado || ultimoCambio?.fecha || v.fechaVenta || null;
 
     const origenColumna = String(v.origen || '').toUpperCase();
     const isOnline = origenColumna ? origenColumna === 'ONLINE' : (
@@ -365,6 +370,9 @@ class VentaService {
       fechaFormatted,
       horario,
       horaEstado,
+      horaCambioEstado: horaEstado,
+      fechaCambioEstado,
+      historialEstados: obsData.historialEstados || [],
       origen,
       origenNombre,
       tiempoEstimadoEntrega,
@@ -837,7 +845,9 @@ class VentaService {
       tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || "",
       origen: origenVenta,
       tiempoEstimadoEntrega: tiempoEstimadoEntregaVenta,
-      empaqueParaLlevar
+      empaqueParaLlevar,
+      horaEstado: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' }),
+      fechaCambioEstado: new Date().toISOString()
     };
 
     // Las ventas online no pueden autodeclararse pagadas: quedan pendientes hasta confirmación de Wompi o aprobación manual (Ítem #116)
