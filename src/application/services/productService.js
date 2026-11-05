@@ -33,6 +33,27 @@ function convertToInsumoUnit(recetaCantidad, recetaUnidad, insumoUnidad) {
   return rCant;
 }
 
+function isDummyOrBaseVariant(vName, pName) {
+  if (!vName) return true;
+  const vn = String(vName).trim().toLowerCase();
+  const pn = String(pName || '').trim().toLowerCase();
+  if (vn === pn) return true;
+  if (vn === `${pn} - base` || vn === `${pn} - completo` || vn === `${pn} base` || vn === `${pn} completo`) return true;
+  if (['base', 'estándar', 'estandar', 'completo', 'combo', 'única', 'unica'].includes(vn)) return true;
+  if (vn.startsWith('porción individual') || vn.startsWith('porcion individual')) return true;
+  if (vn === 'edición especial' || vn === 'edicion especial') return true;
+  if (vn === 'edición especial burger fest' || vn === 'edicion especial burger fest') return true;
+  if (vn === 'porción costeña grande' || vn === 'porcion costeña grande') return true;
+  if (vn === 'salchipapa personal grande') return true;
+  if (['perro especial', 'perro suizo gourmet', 'perro mexicano clásico', 'perro mexicano clasico', 'perro criollo gourmet'].includes(vn)) return true;
+  if (vn === 'clásica 150g' || vn === 'clasica 150g') return true;
+  if (vn === 'doble carne 300g' && pn.includes('doble carne')) return true;
+  if (vn === 'pollo crispy 180g' && pn.includes('pollo crispy')) return true;
+  if (vn === 'individual campesina' && pn.includes('campesina')) return true;
+  if (vn === 'botella 500ml' && pn.includes('cristal')) return true;
+  return false;
+}
+
 class ProductService {
   /**
    * Sincroniza la tabla relacional detallecombo a partir de itemsCombo
@@ -216,150 +237,23 @@ class ProductService {
         }
 
         const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
-          ? parseFloat(p.precio)
-          : (p.variantes?.[0] ? parseFloat(p.variantes[0].precio || 0) : 0);
-
-        // Forzar que las variantes tengan el mismo precio del producto (Ítem #100)
-        const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
-          ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: realPrecio }))
-          : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
-
-        // Calcular número total de ventas históricas del producto (Ítem #104)
-        let totalVentas = 0;
-        variantes.forEach(v => {
-          totalVentas += (ventasMap.get(Number(v.idVariante)) || 0);
-        });
-
-        // Calcular stock real disponible según receta, insumo directo o productos del combo
-        const isCombo = Boolean(cfgCombo?.esCombo || (p.categoria && String(p.categoria).toLowerCase().includes('combo')));
-        let stockDisponible = computeSingleProductStock(p);
-
-        if (isCombo && Array.isArray(p.itemsCombo) && p.itemsCombo.length > 0) {
-          let minCombo = stockDisponible;
-          for (const it of p.itemsCombo) {
-            const comp = it.productoComponente;
-            const reqCompQty = Math.max(1, Number(it.cantidad || 1));
-            if (comp) {
-              if (comp.estado === 0) {
-                minCombo = 0;
-                break;
-              }
-              const compStock = computeSingleProductStock(comp);
-              minCombo = Math.min(minCombo, Math.floor(compStock / reqCompQty));
-            }
-          }
-          stockDisponible = minCombo;
-        }
-
-        if (p.estado === 0) stockDisponible = 0;
-
-        const itemsComboFormatted = (p.itemsCombo || []).map(it => ({
-          idDetalleCombo: it.idDetalleCombo,
-          idCombo: it.idCombo,
-          idProducto: it.idProducto,
-          cantidad: it.cantidad,
-          esOpcional: Boolean(it.esOpcional),
-          grupoSeleccion: it.grupoSeleccion,
-          producto: it.productoComponente ? {
-            id: it.productoComponente.idProducto,
-            idProducto: it.productoComponente.idProducto,
-            nombre: it.productoComponente.nombre,
-            precio: parseFloat(it.productoComponente.precio || 0),
-            imagen: it.productoComponente.imagen || '',
-            estado: it.productoComponente.estado
-          } : null
-        }));
-
-        return {
-          _id: p.idProducto,
-          id: p.idProducto,
-          idProducto: p.idProducto,
-          nombre: p.nombre,
-          precio: realPrecio,
-          descripcion: p.descripcion || '',
-          imagen: p.imagen || '',
-          stock: stockDisponible,
-          agotado: stockDisponible <= 0 || p.estado === 0,
-          ventas: totalVentas,
-          tieneVentas: totalVentas > 0,
-          idCategoriaProducto: p.idCategoriaProducto,
-          categoriaId: p.idCategoriaProducto,
-          categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
-          estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-          esCombo: isCombo,
-          configuracionCombo: cfgCombo,
-          itemsCombo: itemsComboFormatted,
-          variantes,
-          adiciones,
-          eventos: p.eventos || []
-        };
-      });
-  }
-
-  static async getProductById(id) {
-    const p = await Product.findByPk(id, {
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'categoria', 'adiciones', 'configuracionCombo'],
-      include: [
-        { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
-        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
-        { 
-          model: Evento, 
-          as: 'eventos', 
-          required: false, 
-          where: { 
-            estado: 1,
-            [Op.or]: [
-              { fechaFin: null },
-              { fechaFin: { [Op.gte]: new Date().toISOString().split('T')[0] } }
-            ]
-          } 
-        },
-        {
-          model: ComboProducto,
-          as: 'itemsCombo',
-          required: false,
-          include: [
-            {
-              model: Product,
-              as: 'productoComponente',
-              attributes: ['idProducto', 'nombre', 'precio', 'imagen', 'estado']
-            }
-          ]
-        }
-      ]
-    });
-    if (!p) {
-      const error = new Error('Producto no encontrado');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    let adiciones = [];
-    try {
-      adiciones = typeof p.adiciones === 'string' ? JSON.parse(p.adiciones) : (p.adiciones || []);
-    } catch (e) {
-      adiciones = [];
-    }
-
-    let cfgCombo = null;
-    try {
-      cfgCombo = typeof p.configuracionCombo === 'string' ? JSON.parse(p.configuracionCombo) : (p.configuracionCombo || null);
-    } catch (e) {
-      cfgCombo = null;
-    }
-
-    const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
       ? parseFloat(p.precio)
       : (p.variantes?.[0] ? parseFloat(p.variantes[0].precio || 0) : 0);
 
-    const variantes = Array.isArray(p.variantes) && p.variantes.length > 0
-      ? p.variantes.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: realPrecio }))
-      : [{ id: p.idProducto, idVariante: p.idProducto, nombre: p.nombre, precio: realPrecio }];
+    const isCombo = Boolean(cfgCombo?.esCombo || (p.categoria && String(p.categoria).toLowerCase().includes('combo')));
+    const rawVars = Array.isArray(p.variantes) ? p.variantes : [];
+    const hasOnlyDummy = rawVars.length === 1 && isDummyOrBaseVariant(rawVars[0]?.nombre, p.nombre);
 
-    // Conteo de ventas históricas
-    const varianteIds = variantes.map(v => v.idVariante);
-    const ventasCount = varianteIds.length > 0
-      ? await DetalleVentaProducto.count({ where: { idVariante: varianteIds } }).catch(() => 0)
+    const variantes = (isCombo || hasOnlyDummy || rawVars.length === 0)
+      ? []
+      : rawVars.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: realPrecio, imagen: v.imagen || '' }));
+
+    const idVariantePrincipal = rawVars[0]?.idVariante || p.idProducto;
+
+    // Conteo de ventas históricas usando allVarIds
+    const allVarIds = rawVars.map(v => v.idVariante);
+    const ventasCount = allVarIds.length > 0
+      ? await DetalleVentaProducto.count({ where: { idVariante: allVarIds } }).catch(() => 0)
       : 0;
 
     // Calcular stock dinámico
@@ -437,8 +331,10 @@ class ProductService {
       configuracionCombo: cfgCombo,
       itemsCombo: itemsComboFormatted,
       variantes,
-      adiciones,
-      eventos: p.eventos || []
+          idVariantePrincipal,
+          tieneVariantes: variantes.length > 0,
+          adiciones,
+          eventos: p.eventos || []
     };
   }
 
@@ -501,17 +397,19 @@ class ProductService {
     });
 
     // Crear variantes enviadas o variante base por defecto
-    if (Array.isArray(data.variantes) && data.variantes.length > 0) {
-      for (const v of data.variantes) {
-        if (v && v.nombre && v.nombre.trim()) {
-          await Variante.create({
-            idProducto: product.idProducto,
-            nombre: v.nombre.trim(),
-            precio: finalPrecio,
-            imagen: v.imagen || null,
-            estado: normalizedEstado
-          });
-        }
+    const validVariants = Array.isArray(data.variantes)
+      ? data.variantes.filter(v => v && v.nombre && v.nombre.trim() && v.nombre.trim().toLowerCase() !== nombre.trim().toLowerCase())
+      : [];
+
+    if (validVariants.length > 0) {
+      for (const v of validVariants) {
+        await Variante.create({
+          idProducto: product.idProducto,
+          nombre: v.nombre.trim(),
+          precio: finalPrecio,
+          imagen: v.imagen || null,
+          estado: normalizedEstado
+        });
       }
     } else {
       await Variante.create({
@@ -583,49 +481,67 @@ class ProductService {
     await p.save();
 
     // Sincronizar variantes (nombre, precio, imagen, creación y actualización)
-    if (Array.isArray(variantes) && variantes.length > 0) {
+    if (Array.isArray(variantes)) {
       const basePrice = Number(p.precio) || 0;
       const existingVariantes = await Variante.findAll({ where: { idProducto: id } });
       const existingIds = existingVariantes.map(v => Number(v.idVariante));
-      const incomingIds = [];
+      
+      const filteredIncoming = variantes.filter(v => v && v.nombre && v.nombre.trim() && v.nombre.trim().toLowerCase() !== p.nombre.toLowerCase());
 
-      for (let i = 0; i < variantes.length; i++) {
-        const v = variantes[i];
-        if (!v || !v.nombre || !v.nombre.trim()) continue;
-        const vNombre = v.nombre.trim();
-        const vPrecio = basePrice;
-        const vImagen = v.imagen || null;
+      if (filteredIncoming.length > 0) {
+        const incomingIds = [];
+        for (let i = 0; i < filteredIncoming.length; i++) {
+          const v = filteredIncoming[i];
+          const vNombre = v.nombre.trim();
+          const vPrecio = basePrice;
+          const vImagen = v.imagen || null;
 
-        if (v.idVariante && existingIds.includes(Number(v.idVariante))) {
-          incomingIds.push(Number(v.idVariante));
-          await Variante.update(
-            { nombre: vNombre, precio: vPrecio, imagen: vImagen },
-            { where: { idVariante: v.idVariante } }
-          );
-        } else if (existingVariantes[i]) {
-          const matchedVar = existingVariantes[i];
-          incomingIds.push(Number(matchedVar.idVariante));
-          await Variante.update(
-            { nombre: vNombre, precio: vPrecio, imagen: vImagen },
-            { where: { idVariante: matchedVar.idVariante } }
-          );
-        } else {
-          const newVar = await Variante.create({
-            idProducto: id,
-            nombre: vNombre,
-            precio: vPrecio,
-            imagen: vImagen,
-            estado: p.estado
-          });
-          incomingIds.push(Number(newVar.idVariante));
+          if (v.idVariante && existingIds.includes(Number(v.idVariante))) {
+            incomingIds.push(Number(v.idVariante));
+            await Variante.update(
+              { nombre: vNombre, precio: vPrecio, imagen: vImagen },
+              { where: { idVariante: v.idVariante } }
+            );
+          } else if (existingVariantes[i]) {
+            const matchedVar = existingVariantes[i];
+            incomingIds.push(Number(matchedVar.idVariante));
+            await Variante.update(
+              { nombre: vNombre, precio: vPrecio, imagen: vImagen },
+              { where: { idVariante: matchedVar.idVariante } }
+            );
+          } else {
+            const newVar = await Variante.create({
+              idProducto: id,
+              nombre: vNombre,
+              precio: vPrecio,
+              imagen: vImagen,
+              estado: p.estado
+            });
+            incomingIds.push(Number(newVar.idVariante));
+          }
         }
-      }
 
-      const toRemove = existingIds.filter(vId => !incomingIds.includes(vId));
-      for (const removeId of toRemove) {
-        const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: removeId } }).catch(() => null);
-        if (!hasSales) {
-          await Variante.destroy({ where: { idVariante: removeId } }).catch(() => null);
+        const toRemove = existingIds.filter(vId => !incomingIds.includes(vId));
+        for (const removeId of toRemove) {
+          const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: removeId } }).catch(() => null);
+          if (!hasSales) {
+            await Variante.destroy({ where: { idVariante: removeId } }).catch(() => null);
+          }
+        }
+      } else {
+        // El producto se guardó sin variantes adicionales (producto simple)
+        if (existingVariantes.length > 0) {
+          await Variante.update(
+            { nombre: `${p.nombre.trim()} - base`, precio: basePrice },
+            { where: { idVariante: existingVariantes[0].idVariante } }
+          );
+          for (let i = 1; i < existingVariantes.length; i++) {
+            const remVar = existingVariantes[i];
+            const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: remVar.idVariante } }).catch(() => null);
+            if (!hasSales) {
+              await Variante.destroy({ where: { idVariante: remVar.idVariante } }).catch(() => null);
+            }
+          }
         }
       }
     } else if (precio !== undefined && precio !== null && precio !== '') {
