@@ -523,7 +523,7 @@ class ProductService {
     }
 
     // Sincronizar items del combo si aplica (Ítems #97, #106)
-    const comboItemsToSave = itemsCombo || (configuracionCombo?.itemsCombo);
+    const comboItemsToSave = itemsCombo || (configuracionCombo?.itemsCombo) || (configuracionCombo?.productosAsociados);
     if (Array.isArray(comboItemsToSave) && comboItemsToSave.length > 0) {
       await this.syncItemsCombo(product.idProducto, comboItemsToSave);
     }
@@ -634,7 +634,7 @@ class ProductService {
     }
 
     // Sincronizar items de combo si se enviaron (Ítems #97, #106)
-    const comboItemsToSave = itemsCombo || (configuracionCombo && typeof configuracionCombo === 'object' ? configuracionCombo.itemsCombo : null);
+    const comboItemsToSave = itemsCombo || (configuracionCombo && typeof configuracionCombo === 'object' ? (configuracionCombo.itemsCombo || configuracionCombo.productosAsociados) : null);
     if (comboItemsToSave !== undefined) {
       await this.syncItemsCombo(id, comboItemsToSave || []);
     }
