@@ -237,105 +237,94 @@ class ProductService {
         }
 
         const realPrecio = p.precio !== undefined && p.precio !== null && parseFloat(p.precio) > 0
-      ? parseFloat(p.precio)
-      : (p.variantes?.[0] ? parseFloat(p.variantes[0].precio || 0) : 0);
+          ? parseFloat(p.precio)
+          : (p.variantes?.[0] ? parseFloat(p.variantes[0].precio || 0) : 0);
 
-    const isCombo = Boolean(cfgCombo?.esCombo || (p.categoria && String(p.categoria).toLowerCase().includes('combo')));
-    const rawVars = Array.isArray(p.variantes) ? p.variantes : [];
-    const hasOnlyDummy = rawVars.length === 1 && isDummyOrBaseVariant(rawVars[0]?.nombre, p.nombre);
+        const isCombo = Boolean(cfgCombo?.esCombo || (p.categoria && String(p.categoria).toLowerCase().includes('combo')));
+        const rawVars = Array.isArray(p.variantes) ? p.variantes : [];
+        const hasOnlyDummy = rawVars.length === 1 && isDummyOrBaseVariant(rawVars[0]?.nombre, p.nombre);
 
-    const variantes = (isCombo || hasOnlyDummy || rawVars.length === 0)
-      ? []
-      : rawVars.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: realPrecio, imagen: v.imagen || '' }));
+        const variantes = (isCombo || hasOnlyDummy || rawVars.length === 0)
+          ? []
+          : rawVars.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: realPrecio, imagen: v.imagen || '' }));
 
-    const idVariantePrincipal = rawVars[0]?.idVariante || p.idProducto;
+        const idVariantePrincipal = rawVars[0]?.idVariante || p.idProducto;
 
-    // Conteo de ventas históricas usando allVarIds
-    const allVarIds = rawVars.map(v => v.idVariante);
-    const ventasCount = allVarIds.length > 0
-      ? await DetalleVentaProducto.count({ where: { idVariante: allVarIds } }).catch(() => 0)
-      : 0;
-
-    // Calcular stock dinámico
-    const ficha = await FichaTecnica.findOne({
-      where: { idProducto: id, estado: 1 },
-      include: [
-        {
-          model: DetalleFichaInsumo,
-          as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'unidadMedida', 'estado'] }]
+        // Calcular número total de ventas históricas del producto (Ítem #104)
+        let totalVentas = 0;
+        if (rawVars.length > 0) {
+          rawVars.forEach(v => {
+            totalVentas += (ventasMap.get(Number(v.idVariante)) || 0);
+          });
+        } else {
+          totalVentas = ventasMap.get(Number(p.idProducto)) || 0;
         }
-      ]
-    }).catch(() => null);
 
-    let stockDisponible = 50;
-    const isCombo = Boolean(cfgCombo?.esCombo || (p.categoria && String(p.categoria).toLowerCase().includes('combo')));
+        // Calcular stock real disponible según receta, insumo directo o productos del combo
+        let stockDisponible = computeSingleProductStock(p);
 
-    if (ficha && Array.isArray(ficha.detalles) && ficha.detalles.length > 0) {
-      let minPortions = Infinity;
-      for (const det of ficha.detalles) {
-        const insumo = det.insumo;
-        const cantReq = Number(det.cantidad || 0);
-        if (insumo && cantReq > 0) {
-          if (insumo.estado === 0) {
-            minPortions = 0;
-            break;
+        if (isCombo && Array.isArray(p.itemsCombo) && p.itemsCombo.length > 0) {
+          let minCombo = stockDisponible;
+          for (const it of p.itemsCombo) {
+            const comp = it.productoComponente;
+            const reqCompQty = Math.max(1, Number(it.cantidad || 1));
+            if (comp) {
+              if (comp.estado === 0) {
+                minCombo = 0;
+                break;
+              }
+              const compStock = computeSingleProductStock(comp);
+              minCombo = Math.min(minCombo, Math.floor(compStock / reqCompQty));
+            }
           }
-          const cantConvertida = convertToInsumoUnit(cantReq, det.unidadMedida, insumo.unidadMedida);
-          if (cantConvertida > 0) {
-            const stockInsumo = Math.max(0, Number(insumo.stock || 0));
-            const porciones = Math.floor(stockInsumo / cantConvertida);
-            minPortions = Math.min(minPortions, porciones);
-          }
+          stockDisponible = minCombo;
         }
-      }
-      if (minPortions !== Infinity) stockDisponible = minPortions;
-    }
 
-    if (p.estado === 0) stockDisponible = 0;
+        if (p.estado === 0) stockDisponible = 0;
 
-    const itemsComboFormatted = (p.itemsCombo || []).map(it => ({
-      idDetalleCombo: it.idDetalleCombo,
-      idCombo: it.idCombo,
-      idProducto: it.idProducto,
-      cantidad: it.cantidad,
-      esOpcional: Boolean(it.esOpcional),
-      grupoSeleccion: it.grupoSeleccion,
-      producto: it.productoComponente ? {
-        id: it.productoComponente.idProducto,
-        idProducto: it.productoComponente.idProducto,
-        nombre: it.productoComponente.nombre,
-        precio: parseFloat(it.productoComponente.precio || 0),
-        imagen: it.productoComponente.imagen || '',
-        estado: it.productoComponente.estado
-      } : null
-    }));
+        const itemsComboFormatted = (p.itemsCombo || []).map(it => ({
+          idDetalleCombo: it.idDetalleCombo,
+          idCombo: it.idCombo,
+          idProducto: it.idProducto,
+          cantidad: it.cantidad,
+          esOpcional: Boolean(it.esOpcional),
+          grupoSeleccion: it.grupoSeleccion,
+          producto: it.productoComponente ? {
+            id: it.productoComponente.idProducto,
+            idProducto: it.productoComponente.idProducto,
+            nombre: it.productoComponente.nombre,
+            precio: parseFloat(it.productoComponente.precio || 0),
+            imagen: it.productoComponente.imagen || '',
+            estado: it.productoComponente.estado
+          } : null
+        }));
 
-    return {
-      _id: p.idProducto,
-      id: p.idProducto,
-      idProducto: p.idProducto,
-      nombre: p.nombre,
-      precio: realPrecio,
-      descripcion: p.descripcion || '',
-      imagen: p.imagen || '',
-      stock: stockDisponible,
-      agotado: stockDisponible <= 0 || p.estado === 0,
-      ventas: ventasCount,
-      tieneVentas: ventasCount > 0,
-      idCategoriaProducto: p.idCategoriaProducto,
-      categoriaId: p.idCategoriaProducto,
-      categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
-      estado: p.estado === 1 ? 'Activo' : 'Inactivo',
-      esCombo: isCombo,
-      configuracionCombo: cfgCombo,
-      itemsCombo: itemsComboFormatted,
-      variantes,
+        return {
+          _id: p.idProducto,
+          id: p.idProducto,
+          idProducto: p.idProducto,
+          nombre: p.nombre,
+          precio: realPrecio,
+          descripcion: p.descripcion || '',
+          imagen: p.imagen || '',
+          stock: stockDisponible,
+          agotado: stockDisponible <= 0 || p.estado === 0,
+          ventas: totalVentas,
+          tieneVentas: totalVentas > 0,
+          idCategoriaProducto: p.idCategoriaProducto,
+          categoriaId: p.idCategoriaProducto,
+          categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
+          estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+          esCombo: isCombo,
+          configuracionCombo: cfgCombo,
+          itemsCombo: itemsComboFormatted,
+          variantes,
           idVariantePrincipal,
           tieneVariantes: variantes.length > 0,
           adiciones,
           eventos: p.eventos || []
-    };
+        };
+      });
   }
 
   static async createProduct(data) {
