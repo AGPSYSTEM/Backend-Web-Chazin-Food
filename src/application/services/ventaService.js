@@ -255,7 +255,7 @@ class VentaService {
       total = Math.max(0, subtotal - descuentoAplicado);
     }
 
-    const isMostradorSale = (v.idCliente === 26) ||
+    const isMostradorSale = (!clienteObj.idUsuario && !clienteObj.usuario) ||
       (clienteNombre && String(clienteNombre).toLowerCase().includes('mostrador')) ||
       (clienteObj && clienteObj.direccion && String(clienteObj.direccion).toLowerCase().includes('mostrador')) ||
       (!clienteObj.idUsuario);
@@ -586,9 +586,16 @@ class VentaService {
   }
 
   static async getOrCreateClienteMostrador() {
+    const { Op } = require('sequelize');
     let mostrador = await Cliente.findOne({
       where: {
-        idUsuario: null
+        idUsuario: null,
+        estado: 1,
+        [Op.or]: [
+          { direccion: { [Op.like]: '%"esMostrador":true%' } },
+          { direccion: { [Op.like]: '%"apellidos":"Mostrador"%' } },
+          { direccion: { [Op.like]: '%Cliente Mostrador%' } }
+        ]
       }
     });
 
@@ -596,6 +603,7 @@ class VentaService {
       const metaStr = JSON.stringify({
         nombre: 'Cliente',
         apellidos: 'Mostrador',
+        esMostrador: true,
         tipo: 'Nuevo',
         descuentoPorcentaje: 0,
         estado: 'Activo'
@@ -648,14 +656,59 @@ class VentaService {
     if (isStaff) {
       // Staff (Vendedor/Admin) creating POS sale -> seller is employee, NOT customer
       if (data.idCliente) {
-        finalClienteId = Number(data.idCliente);
+        const targetCliente = await Cliente.findByPk(data.idCliente, {
+          include: [{ model: User, as: 'usuario' }]
+        });
+        if (!targetCliente) {
+          const error = new Error('El cliente seleccionado no existe en el sistema.');
+          error.statusCode = 404;
+          throw error;
+        }
+
+        let metaCli = {};
+        if (targetCliente.direccion && targetCliente.direccion.trim().startsWith('{')) {
+          try { metaCli = JSON.parse(targetCliente.direccion); } catch (e) { metaCli = {}; }
+        }
+
+        const isCliInactive = 
+          targetCliente.estado === 0 || 
+          targetCliente.estado === false || 
+          metaCli.estado === 'Inactivo' || 
+          metaCli.estado === 0 ||
+          (targetCliente.usuario && (
+            String(targetCliente.usuario.estado).toUpperCase() === 'INACTIVO' ||
+            targetCliente.usuario.estado === 0 ||
+            targetCliente.usuario.estado === false
+          ));
+
+        if (isCliInactive) {
+          const clientDisplay = targetCliente.usuario
+            ? `${targetCliente.usuario.nombre} ${targetCliente.usuario.apellidos || ''}`.trim()
+            : (metaCli.nombre ? `${metaCli.nombre} ${metaCli.apellidos || ''}`.trim() : 'seleccionado');
+          const error = new Error(`El cliente "${clientDisplay}" se encuentra inactivo y no tiene permitido realizar compras.`);
+          error.statusCode = 400;
+          throw error;
+        }
+
+        const isCliPending = targetCliente.usuario && String(targetCliente.usuario.estado).toUpperCase() === 'PENDIENTE';
+        if (isCliPending) {
+          const clientDisplay = `${targetCliente.usuario.nombre} ${targetCliente.usuario.apellidos || ''}`.trim();
+          const error = new Error(`El cliente "${clientDisplay}" tiene su cuenta pendiente de activación y no puede realizar compras hasta activar su acceso.`);
+          error.statusCode = 400;
+          throw error;
+        }
+
+        finalClienteId = targetCliente.idCliente;
       } else {
         const mostrador = await this.getOrCreateClienteMostrador();
         finalClienteId = mostrador.idCliente;
       }
     } else {
       // Regular customer placing an order online
-      let clienteObj = await Cliente.findOne({ where: { idUsuario: targetUserId } });
+      let clienteObj = await Cliente.findOne({ 
+        where: { idUsuario: targetUserId },
+        include: [{ model: User, as: 'usuario' }]
+      });
       if (!clienteObj) {
         clienteObj = await Cliente.create({
           idUsuario: targetUserId,
@@ -669,8 +722,17 @@ class VentaService {
         try { clientMeta = JSON.parse(clienteObj.direccion); } catch (e) { clientMeta = {}; }
       }
 
-      if (clienteObj.estado === 0 || clientMeta.estado === 'Inactivo' || clientMeta.estado === 0) {
-        const error = new Error('No puedes realizar el pedido porque tu cliente está inactivo.');
+      const isOnlineInactive = 
+        clienteObj.estado === 0 || 
+        clienteObj.estado === false || 
+        clientMeta.estado === 'Inactivo' || 
+        clientMeta.estado === 0 ||
+        userObj.estado === 'INACTIVO' ||
+        userObj.estado === 0 ||
+        userObj.estado === '0';
+
+      if (isOnlineInactive) {
+        const error = new Error('No puedes realizar el pedido porque tu cuenta de cliente se encuentra inactiva. Comunícate con la administración para reactivar tu cuenta.');
         error.statusCode = 403;
         throw error;
       }
@@ -728,7 +790,7 @@ class VentaService {
     let finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
 
     const ClienteService = require('./clienteService');
-    const isMostradorSale = (Number(finalClienteId) === 26) ||
+    const isMostradorSale = (!data.idCliente && isStaff) ||
       (data.clienteNombre && String(data.clienteNombre).toLowerCase().includes('mostrador')) ||
       (parsedObs.clienteNombre && String(parsedObs.clienteNombre).toLowerCase().includes('mostrador')) ||
       (!data.idCliente && isStaff);
@@ -1222,7 +1284,7 @@ class VentaService {
 
     // Si la venta estaba PENDIENTE y ahora fue aprobada/procesada, registrar fidelidad del cliente (una sola vez)
     if (estadoAnterior === 'PENDIENTE' && (estadoEnum === 'PREPARANDO' || estadoEnum === 'LISTO' || estadoEnum === 'ENTREGADO')) {
-      if (v.idCliente && Number(v.idCliente) !== 26) {
+      if (v.idCliente) {
         await VentaService.registrarFidelidadUnaVez(v.idVenta);
       }
     }
@@ -1432,7 +1494,7 @@ class VentaService {
         obsData = { nota: v.observaciones || '' };
       }
       const clienteNombre = String(obsData.clienteNombre || '').toLowerCase();
-      if (obsData.fidelidadContabilizada || Number(v.idCliente) === 26 || clienteNombre.includes('mostrador')) {
+      if (obsData.fidelidadContabilizada || clienteNombre.includes('mostrador')) {
         await transaction.commit();
         return false;
       }

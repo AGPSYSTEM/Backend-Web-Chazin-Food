@@ -87,9 +87,7 @@ class ClienteService {
       console.warn(`Error cargando ventas para cliente #${c.idCliente}:`, err.message);
     }
 
-    const isMostradorClient = (c.idCliente === 26) || 
-      (cleanDireccion && cleanDireccion.toLowerCase().includes('mostrador')) ||
-      (meta.tipo && String(meta.tipo).toLowerCase().includes('mostrador'));
+    const isMostradorClient = Boolean(meta.esMostrador || (cleanDireccion && cleanDireccion.toLowerCase().includes('mostrador')) || (meta.tipo && String(meta.tipo).toLowerCase().includes('mostrador')) || (!c.idUsuario && meta.nombre === 'Cliente' && meta.apellidos === 'Mostrador'));
 
     const hasAccount = Boolean(c.idUsuario || c.usuario);
 
@@ -229,7 +227,7 @@ class ClienteService {
     const result = [];
     for (const c of clientes) {
       // Exclude Cliente Mostrador placeholder (id 26 or Mostrador) from registered clients list
-      if (c.idCliente === 26 || (c.direccion && c.direccion.toLowerCase().includes('cliente mostrador'))) {
+      if (!c.idUsuario && (c.direccion && (c.direccion.toLowerCase().includes('mostrador') || c.direccion.toLowerCase().includes('"esmostrador":true')))) {
         continue;
       }
 
@@ -599,8 +597,13 @@ class ClienteService {
   static async registrarCompraFidelidad(idCliente) {
     if (!idCliente || Number(idCliente) === 26) return null;
     try {
-      const c = await Cliente.findByPk(idCliente);
+      const c = await Cliente.findByPk(idCliente, {
+        include: [{ model: User, as: 'usuario' }]
+      });
       if (!c || !c.idUsuario) return null;
+      if (c.estado === 0 || c.estado === false || (c.usuario && (String(c.usuario.estado).toUpperCase() === 'INACTIVO' || c.usuario.estado === 0))) {
+        return null;
+      }
       if (c.direccion && c.direccion.toLowerCase().includes('mostrador')) return null;
 
       let meta = {};
