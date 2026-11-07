@@ -299,12 +299,15 @@ class EventoService {
         procedimiento: fData.procedimiento || pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
         tiempoPreparacion: Number(fData.tiempoPreparacion || pData.tiempoPreparacion) || 12,
         rendimiento: fData.rendimiento || pData.rendimiento || '1 porción',
-        especificaciones: fData.especificaciones || '',
-        caracteristicas: fData.caracteristicas || '',
-        informacionNutricional: fData.informacionNutricional || '',
-        condicionesAlmacenamiento: fData.condicionesAlmacenamiento || '',
-        vidaUtil: fData.vidaUtil || '',
-        observaciones: fData.observaciones || '',
+        especificaciones: fData.especificaciones || pData.especificaciones || '',
+        caracteristicas: fData.caracteristicas || pData.caracteristicas || '',
+        informacionNutricional: fData.informacionNutricional || pData.informacionNutricional || '',
+        condicionesAlmacenamiento: fData.condicionesAlmacenamiento || pData.condicionesAlmacenamiento || '',
+        vidaUtil: fData.vidaUtil || pData.vidaUtil || '',
+        observaciones: fData.observaciones || pData.observaciones || '',
+        versionActual: Number(fData.versionActual) || 1,
+        fechaInicioVigencia: fData.fechaInicioVigencia || new Date(),
+        versionesAnteriores: fData.versionesAnteriores ? (typeof fData.versionesAnteriores === 'string' ? fData.versionesAnteriores : JSON.stringify(fData.versionesAnteriores)) : '[]',
         estado: 1
       });
 

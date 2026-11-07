@@ -197,7 +197,7 @@ class FichaTecnicaService {
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario', 'estado'] }]
         },
-        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] },
+        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado', 'categoria'] },
         { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] },
         { model: InsumoPreparado, as: 'insumoPreparado', attributes: ['id', 'nombre', 'estado', 'unidadMedida', 'descripcion'] },
         { model: Variante, as: 'variante', attributes: ['idVariante', 'nombre', 'precio'] }
@@ -209,7 +209,14 @@ class FichaTecnicaService {
       const insumoActivo = !f.insumoInfo || f.insumoInfo.eliminado !== 1;
       const insumoPrepActivo = !f.insumoPreparado || f.insumoPreparado.eliminado !== 1;
       const productoActivo = !f.producto || f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1;
-      return insumoActivo && insumoPrepActivo && productoActivo;
+
+      const prodName = String(f.producto?.nombre || '').toLowerCase();
+      const catName = String(f.producto?.categoria || '').toLowerCase();
+      const isCombo = /combo/i.test(catName) || /combo/i.test(prodName);
+      const isSpecialDrink = /batido|smoothie|malteada|jugo natural|frapp|limonada|shake|artesanal|preparad|coctel|cóctel|capuchino|café|cafe/i.test(prodName);
+      const isCommonDrink = !isSpecialDrink && /gaseosa|agua\b|pepsi|coca|sprite|quatro|colombiana|postob|hit\b|cerveza/i.test(prodName);
+
+      return insumoActivo && insumoPrepActivo && productoActivo && !isCombo && !isCommonDrink;
     });
 
     return filtered.map((f) => this.formatFicha(f));
@@ -236,6 +243,17 @@ class FichaTecnicaService {
   }
 
   static async getByProductoId(idProducto) {
+    const { Product } = require('../../persistence/models');
+    const prod = await Product.findByPk(idProducto);
+    if (prod) {
+      const prodName = String(prod.nombre || '').toLowerCase();
+      const catName = String(prod.categoria || '').toLowerCase();
+      const isCombo = /combo/i.test(catName) || /combo/i.test(prodName);
+      const isSpecialDrink = /batido|smoothie|malteada|jugo natural|frapp|limonada|shake|artesanal|preparad|coctel|cóctel|capuchino|café|cafe/i.test(prodName);
+      const isCommonDrink = !isSpecialDrink && /gaseosa|agua\b|pepsi|coca|sprite|quatro|colombiana|postob|hit\b|cerveza/i.test(prodName);
+      if (isCombo || isCommonDrink) return null;
+    }
+
     const f = await FichaTecnica.findOne({
       where: { idProducto, estado: 1 },
       include: [
@@ -368,7 +386,7 @@ class FichaTecnicaService {
   static async saveForProducto(idProducto, data) {
     if (!idProducto || !data) return null;
 
-    // Los combos no llevan ficha técnica (la ficha técnica es solo para productos e insumos preparados)
+    // Los combos y las bebidas comerciales (aguas, gaseosas, refrescos) no llevan ficha técnica culinaria
     const { Product } = require('../../persistence/models');
     const prod = await Product.findByPk(idProducto);
     if (prod) {
@@ -382,7 +400,13 @@ class FichaTecnicaService {
       if (!isCombo && prod.categoria && String(prod.categoria).toLowerCase().includes('combo')) {
         isCombo = true;
       }
-      if (isCombo) {
+
+      const prodName = String(prod.nombre || '').toLowerCase();
+      const isSpecialDrink = /batido|smoothie|malteada|jugo natural|frapp|limonada|shake|artesanal|preparad|coctel|cóctel|capuchino|café|cafe/i.test(prodName) ||
+        /batido|smoothie|malteada/i.test(String(prod.descripcion || ''));
+      const isCommonDrink = !isSpecialDrink && /gaseosa|agua\b|pepsi|coca|sprite|quatro|colombiana|postob|hit\b|cerveza/i.test(prodName);
+
+      if (isCombo || isCommonDrink) {
         return null;
       }
     }
