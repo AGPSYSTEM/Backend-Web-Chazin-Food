@@ -5,7 +5,7 @@ class RoleService {
     const roles = await Role.findAll({
       include: [
         { model: Permiso, as: 'permisos', through: { attributes: [] } },
-        { model: User }
+        { model: User, attributes: ['idUsuario'] }
       ]
     });
 
@@ -27,7 +27,7 @@ class RoleService {
     const role = await Role.findByPk(id, {
       include: [
         { model: Permiso, as: 'permisos', through: { attributes: [] } },
-        { model: User }
+        { model: User, attributes: ['idUsuario'] }
       ]
     });
 
@@ -57,24 +57,50 @@ class RoleService {
       throw error;
     }
 
+    const cleanNombre = nombre.trim();
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{3,50}$/.test(cleanNombre)) {
+      const error = new Error('El nombre del rol solo puede contener letras y espacios (sin puntos, números, guiones ni caracteres especiales como @ o -)');
+      error.statusCode = 400;
+      throw error;
+    }
+
     if (!Array.isArray(permisos) || permisos.filter(Boolean).length === 0) {
       const error = new Error('Debes asignar al menos un permiso o privilegio al rol');
       error.statusCode = 400;
       throw error;
     }
 
+    const cleanPermisos = permisos.filter(Boolean);
+
     const role = await Role.create({
-      nombre: nombre.trim(),
+      nombre: cleanNombre,
       descripcion: descripcion ? descripcion.trim() : '',
       estado: 1
     });
 
-    for (const permNombre of permisos.filter(Boolean)) {
-      let permiso = await Permiso.findOne({ where: { nombrePermiso: permNombre } });
-      if (!permiso) {
-        permiso = await Permiso.create({ nombrePermiso: permNombre });
-      }
-      await RolPermiso.create({ idRol: role.idRol, idPermiso: permiso.idPermiso });
+    // Optimización masiva de permisos en lote (reduce de N consultas a 2)
+    const existingPermisos = await Permiso.findAll({
+      where: { nombrePermiso: cleanPermisos }
+    });
+    const existingMap = new Map(existingPermisos.map(p => [p.nombrePermiso, p.idPermiso]));
+
+    const missingPermNames = cleanPermisos.filter(pName => !existingMap.has(pName));
+    if (missingPermNames.length > 0) {
+      const createdPerms = await Permiso.bulkCreate(
+        missingPermNames.map(pName => ({ nombrePermiso: pName }))
+      );
+      createdPerms.forEach(p => existingMap.set(p.nombrePermiso, p.idPermiso));
+    }
+
+    const rolPermisoRecords = cleanPermisos
+      .map(pName => {
+        const idPermiso = existingMap.get(pName);
+        return idPermiso ? { idRol: role.idRol, idPermiso } : null;
+      })
+      .filter(Boolean);
+
+    if (rolPermisoRecords.length > 0) {
+      await RolPermiso.bulkCreate(rolPermisoRecords);
     }
 
     return this.getRoleById(role.idRol);
@@ -96,25 +122,53 @@ class RoleService {
       }
     }
 
-    if (nombre) role.nombre = nombre.trim();
+    if (nombre) {
+      const cleanNombre = nombre.trim();
+      if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{3,50}$/.test(cleanNombre)) {
+        const error = new Error('El nombre del rol solo puede contener letras y espacios (sin puntos, números, guiones ni caracteres especiales como @ o -)');
+        error.statusCode = 400;
+        throw error;
+      }
+      role.nombre = cleanNombre;
+    }
+
     if (descripcion !== undefined) role.descripcion = descripcion ? descripcion.trim() : '';
     if (estado !== undefined) role.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
 
     await role.save();
 
     if (permisos && Array.isArray(permisos)) {
-      if (permisos.filter(Boolean).length === 0) {
+      const cleanPermisos = permisos.filter(Boolean);
+      if (cleanPermisos.length === 0) {
         const error = new Error('El rol debe conservar al menos un permiso asignado');
         error.statusCode = 400;
         throw error;
       }
+
+      // Optimización de rendimiento: consulta en lote (bulk)
+      const existingPermisos = await Permiso.findAll({
+        where: { nombrePermiso: cleanPermisos }
+      });
+      const existingMap = new Map(existingPermisos.map(p => [p.nombrePermiso, p.idPermiso]));
+
+      const missingPermNames = cleanPermisos.filter(pName => !existingMap.has(pName));
+      if (missingPermNames.length > 0) {
+        const createdPerms = await Permiso.bulkCreate(
+          missingPermNames.map(pName => ({ nombrePermiso: pName }))
+        );
+        createdPerms.forEach(p => existingMap.set(p.nombrePermiso, p.idPermiso));
+      }
+
+      const rolPermisoRecords = cleanPermisos
+        .map(pName => {
+          const idPermiso = existingMap.get(pName);
+          return idPermiso ? { idRol: Number(id), idPermiso } : null;
+        })
+        .filter(Boolean);
+
       await RolPermiso.destroy({ where: { idRol: id } });
-      for (const permNombre of permisos.filter(Boolean)) {
-        let permiso = await Permiso.findOne({ where: { nombrePermiso: permNombre } });
-        if (!permiso) {
-          permiso = await Permiso.create({ nombrePermiso: permNombre });
-        }
-        await RolPermiso.create({ idRol: id, idPermiso: permiso.idPermiso });
+      if (rolPermisoRecords.length > 0) {
+        await RolPermiso.bulkCreate(rolPermisoRecords);
       }
     }
 
