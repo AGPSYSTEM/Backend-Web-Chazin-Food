@@ -46,9 +46,8 @@ CREATE TABLE `categoriaproducto` (
   `estado` tinyint(4) DEFAULT 1,
   `icon` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`idCategoriaProducto`),
-  UNIQUE KEY `UK_CategoriaProducto` (`nombre`),
-  UNIQUE KEY `nombre` (`nombre`),
-                                                                                                                      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `UK_CategoriaProducto` (`nombre`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Volcado de datos para la tabla `categoriaproducto`
 INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `icon`) VALUES
