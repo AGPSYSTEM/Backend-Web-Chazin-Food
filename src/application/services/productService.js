@@ -205,7 +205,7 @@ class ProductService {
       }
       const directStock = resolveDirectInsumoStock(prod);
       if (directStock !== null) return directStock;
-      return 50;
+      return 0;
     };
 
     // Cargar historial de ventas por variante para contar ventas reales
@@ -325,6 +325,17 @@ class ProductService {
           eventos: p.eventos || []
         };
       });
+  }
+
+  static async getProductById(id) {
+    const all = await this.getProducts();
+    const found = all.find(p => Number(p.idProducto || p.id) === Number(id));
+    if (!found) {
+      const error = new Error('Producto no encontrado');
+      error.statusCode = 404;
+      throw error;
+    }
+    return found;
   }
 
   static async createProduct(data) {

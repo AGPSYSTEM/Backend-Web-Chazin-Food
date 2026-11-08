@@ -28,6 +28,119 @@ function convertUnits(amount, fromUnit, toUnit) {
   return Number(amount);
 }
 
+function normalizeTextForMatch(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractRemovedIngredients(detailItem, obsProdItem) {
+  const removedNames = new Set();
+  const removedIds = new Set();
+
+  const collectFromList = (list) => {
+    if (!Array.isArray(list)) return;
+    for (const entry of list) {
+      if (entry === null || entry === undefined) continue;
+      if (typeof entry === 'number' || (typeof entry === 'string' && /^\d+$/.test(entry.trim()))) {
+        removedIds.add(Number(entry));
+      } else if (typeof entry === 'string') {
+        const cleaned = normalizeTextForMatch(entry.replace(/^sin\s+/i, ''));
+        if (cleaned) removedNames.add(cleaned);
+      } else if (typeof entry === 'object') {
+        const idCandidate = entry.idInsumo ?? entry.insumoId ?? entry.id;
+        if (idCandidate !== undefined && idCandidate !== null && /^\d+$/.test(String(idCandidate))) {
+          removedIds.add(Number(idCandidate));
+        }
+        const nameCandidate = entry.nombre || entry.name || entry.insumoNombre;
+        if (nameCandidate) {
+          const cleaned = normalizeTextForMatch(String(nameCandidate).replace(/^sin\s+/i, ''));
+          if (cleaned) removedNames.add(cleaned);
+        }
+      }
+    }
+  };
+
+  const collectFromPersonalizaciones = (persObj) => {
+    if (!persObj || typeof persObj !== 'object' || Array.isArray(persObj)) return;
+    for (const [k, val] of Object.entries(persObj)) {
+      if (val === false || val === 0 || val === 'false') {
+        if (/^\d+$/.test(String(k).trim())) {
+          removedIds.add(Number(k));
+        } else {
+          const cleaned = normalizeTextForMatch(String(k).replace(/^sin\s+/i, ''));
+          if (cleaned) removedNames.add(cleaned);
+        }
+      }
+    }
+  };
+
+  const parseSinTokensFromText = (rawText) => {
+    if (!rawText || typeof rawText !== 'string') return;
+    let textToParse = rawText;
+    if (rawText.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(rawText);
+        collectFromList(parsed.ingredientesRemovidos || parsed.removedIngredients || parsed.sinIngredientes);
+        collectFromPersonalizaciones(parsed.personalizaciones);
+        textToParse = [parsed.observaciones, parsed.observacion, parsed.nota, parsed.especificaciones]
+          .filter(Boolean)
+          .join(' | ');
+      } catch (e) {
+        // continuar con texto plano
+      }
+    }
+
+    const segments = textToParse.split(/[,•|;\n]+/);
+    for (const seg of segments) {
+      const matches = seg.matchAll(/\bsin\s+([^,•|;\n()]+)/gi);
+      for (const m of matches) {
+        const candidate = normalizeTextForMatch(m[1]);
+        if (!candidate || candidate === 'azucar' || candidate.startsWith('azucar ')) continue;
+        removedNames.add(candidate);
+      }
+    }
+  };
+
+  for (const src of [detailItem, obsProdItem]) {
+    if (!src || typeof src !== 'object') continue;
+    collectFromList(src.ingredientesRemovidos || src.removedIngredients || src.sinIngredientes);
+    collectFromPersonalizaciones(src.personalizaciones);
+    parseSinTokensFromText(src.observaciones);
+    parseSinTokensFromText(src.observacion);
+    parseSinTokensFromText(src.nota);
+    parseSinTokensFromText(src.especificaciones);
+  }
+
+  return { removedNames: Array.from(removedNames), removedIds };
+}
+
+function isInsumoRemovedByMiseEnPlace(insumo, detailItem, obsProdItem) {
+  if (!insumo) return false;
+  const { removedNames, removedIds } = extractRemovedIngredients(detailItem, obsProdItem);
+
+  const insumoId = Number(insumo.idInsumo || insumo.id);
+  if (insumoId && removedIds.has(insumoId)) {
+    return true;
+  }
+
+  const normInsumoName = normalizeTextForMatch(insumo.nombre);
+  if (!normInsumoName || removedNames.length === 0) return false;
+
+  for (const rem of removedNames) {
+    if (!rem) continue;
+    if (normInsumoName === rem) return true;
+    if (rem.length >= 3 && (normInsumoName.includes(rem) || rem.includes(normInsumoName))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function extractCleanSpecifications(raw) {
   if (!raw) return '';
   if (typeof raw === 'object') {
@@ -183,6 +296,8 @@ class VentaService {
           precioUnitario: pUnit,
           total: pTot,
           observaciones: p.observaciones || p.observacion || p.especificaciones || p.nota || "",
+          ingredientesRemovidos: Array.isArray(p.ingredientesRemovidos) ? p.ingredientesRemovidos : [],
+          personalizaciones: (p.personalizaciones && typeof p.personalizaciones === 'object') ? p.personalizaciones : undefined,
           adiciones: itemAdds
         };
       });
@@ -885,7 +1000,9 @@ class VentaService {
                 cantidad: itQty,
                 precioUnitario: itPrice,
                 total: Number(it.subtotal || it.total) > 0 ? Number(it.subtotal || it.total) : (itPrice + itAdds) * itQty,
-                observaciones: it.observaciones || it.observacion || "",
+                observaciones: it.observacion || it.observaciones || "",
+                ingredientesRemovidos: Array.isArray(it.ingredientesRemovidos) ? it.ingredientesRemovidos : [],
+                personalizaciones: (it.personalizaciones && typeof it.personalizaciones === 'object') ? it.personalizaciones : undefined,
                 adiciones: it.adiciones || it.idAdiciones || []
               };
             }),
@@ -949,7 +1066,9 @@ class VentaService {
     if (rawDetails.length > 0) {
       const { sequelize, DetalleVentaAdicion } = require('../../persistence/models');
 
-      for (const d of rawDetails) {
+      for (let detailIdx = 0; detailIdx < rawDetails.length; detailIdx++) {
+        const d = rawDetails[detailIdx];
+        const obsProdItem = Array.isArray(obsObj.productos) ? obsObj.productos[detailIdx] : null;
         let chosenVarianteId = null;
 
         // 1. Verificar si d.idVariante existe directamente en la tabla `variante`
@@ -1040,13 +1159,26 @@ class VentaService {
         }
 
         if (chosenVarianteId) {
+          const prodDisplayName = String(d.nombre || obsProdItem?.nombre || '').trim();
+          const obsCandidates = [
+            d.observacion,
+            obsProdItem?.observacion,
+            obsProdItem?.observaciones,
+            d.observaciones
+          ]
+            .map(v => (typeof v === 'string' ? v.trim() : ''))
+            .filter(Boolean);
+          const customNote = obsCandidates.find(
+            c => c.toLowerCase() !== prodDisplayName.toLowerCase()
+          ) || obsCandidates[0] || prodDisplayName || null;
+
           const createdDetalle = await DetalleVentaProducto.create({
             idVenta: venta.idVenta,
             idVariante: chosenVarianteId,
             cantidad: d.cantidad || 1,
             precioUnitario: d.precioUnitario || d.precio || 0,
             subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
-            observaciones: d.observaciones || d.observacion || d.nombre || null
+            observaciones: customNote
           });
 
           // Descuento Automático de Insumos según Ficha Técnica del Producto o Variante específica
@@ -1067,7 +1199,7 @@ class VentaService {
 
             if (recipeResult.directInsumoId) {
               const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
-              if (insumo) {
+              if (insumo && !isInsumoRemovedByMiseEnPlace(insumo, d, obsProdItem)) {
                 const totalADescontar = itemQty;
                 const stockActual = Number(insumo.stock || 0);
                 const nuevoStock = Math.max(0, stockActual - totalADescontar);
@@ -1096,6 +1228,10 @@ class VentaService {
                 if (cantPorPlato > 0 && det.idInsumo) {
                   const insumo = await Insumo.findByPk(det.idInsumo);
                   if (insumo) {
+                    // Respetar Mise en Place: si el cliente quitó este ingrediente ("Sin ..."), no se descuenta de inventario
+                    if (isInsumoRemovedByMiseEnPlace(insumo, d, obsProdItem)) {
+                      continue;
+                    }
                     const insumoUnit = insumo.unidadMedida || recipeUnit;
                     const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
                     const totalADescontar = cantConvertida * itemQty;
@@ -1243,7 +1379,9 @@ class VentaService {
         const saleData = await this.getById(id);
         if (saleData && Array.isArray(saleData.detalles)) {
           const { Insumo, Variante } = require('../../persistence/models');
-          for (const d of saleData.detalles) {
+          for (let idx = 0; idx < saleData.detalles.length; idx++) {
+            const d = saleData.detalles[idx];
+            const obsProdItem = Array.isArray(saleData.productos) ? saleData.productos[idx] : null;
             let prodId = d.idProducto;
             if (!prodId && d.idVariante) {
               const varRow = await Variante.findByPk(d.idVariante);
@@ -1255,7 +1393,7 @@ class VentaService {
 
             if (recipeResult.directInsumoId) {
               const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
-              if (insumo) {
+              if (insumo && !isInsumoRemovedByMiseEnPlace(insumo, d, obsProdItem)) {
                 insumo.stock = Number(insumo.stock || 0) + itemQty;
                 await insumo.save();
               }
@@ -1266,6 +1404,9 @@ class VentaService {
                 if (cantPorPlato > 0 && det.idInsumo) {
                   const insumo = await Insumo.findByPk(det.idInsumo);
                   if (insumo) {
+                    if (isInsumoRemovedByMiseEnPlace(insumo, d, obsProdItem)) {
+                      continue;
+                    }
                     const insumoUnit = insumo.unidadMedida || recipeUnit;
                     const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
                     const totalARestaurar = cantConvertida * itemQty;
