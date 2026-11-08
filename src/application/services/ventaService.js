@@ -188,6 +188,18 @@ function extractCleanSpecifications(raw) {
   return '';
 }
 
+function formatColombiaTime(dateInput) {
+  if (!dateInput) return null;
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).format(d);
+}
+
 class VentaService {
   static formatVenta(v) {
     let obsData = {};
@@ -217,7 +229,7 @@ class VentaService {
     if (v.fechaVenta) {
       const d = new Date(v.fechaVenta);
       if (!isNaN(d.getTime())) {
-        horario = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+        horario = formatColombiaTime(d);
         fechaFormatted = d.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' });
       }
     }
@@ -440,8 +452,8 @@ class VentaService {
       ? obsData.historialEstados[obsData.historialEstados.length - 1]
       : null;
 
-    const horaEstado = obsData.horaEstado || ultimoCambio?.hora || horario || "12:30 PM";
     const fechaCambioEstado = obsData.fechaCambioEstado || ultimoCambio?.fecha || v.fechaVenta || null;
+    const horaEstado = formatColombiaTime(obsData.fechaCambioEstado || ultimoCambio?.fecha) || obsData.horaEstado || ultimoCambio?.hora || horario || "12:30 PM";
 
     const origenColumna = String(v.origen || '').toUpperCase();
     const isOnline = origenColumna ? origenColumna === 'ONLINE' : (
@@ -974,7 +986,7 @@ class VentaService {
     );
 
     const now = new Date();
-    const formattedHorario = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    const formattedHorario = formatColombiaTime(now);
 
     const obsObj = {
       horario: data.horario || parsedObs.horario || formattedHorario,
@@ -1025,8 +1037,8 @@ class VentaService {
       origen: origenVenta,
       tiempoEstimadoEntrega: tiempoEstimadoEntregaVenta,
       empaqueParaLlevar,
-      horaEstado: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' }),
-      fechaCambioEstado: new Date().toISOString()
+      horaEstado: formatColombiaTime(now),
+      fechaCambioEstado: now.toISOString()
     };
 
     // Las ventas online no pueden autodeclararse pagadas: quedan pendientes hasta confirmación de Wompi o aprobación manual (Ítem #116)
@@ -1360,14 +1372,25 @@ class VentaService {
       obsData = { nota: v.observaciones || '' };
     }
 
-    const horaActual = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    const ahoraEstado = new Date();
+    const horaActual = formatColombiaTime(ahoraEstado);
     obsData.horaEstado = horaActual;
-    obsData.fechaCambioEstado = new Date().toISOString();
+    obsData.fechaCambioEstado = ahoraEstado.toISOString();
+    if (estadoEnum === 'PREPARANDO') {
+      obsData.fechaInicioPreparacion = obsData.fechaInicioPreparacion || ahoraEstado.toISOString();
+      obsData.horaInicioPreparacion = obsData.horaInicioPreparacion || horaActual;
+    } else if (estadoEnum === 'LISTO') {
+      obsData.fechaListo = ahoraEstado.toISOString();
+      obsData.horaListo = horaActual;
+    } else if (estadoEnum === 'ENTREGADO') {
+      obsData.fechaEntrega = ahoraEstado.toISOString();
+      obsData.horaEntrega = horaActual;
+    }
     if (!Array.isArray(obsData.historialEstados)) obsData.historialEstados = [];
     obsData.historialEstados.push({
       estado: estadoEnum,
       hora: horaActual,
-      fecha: new Date().toISOString()
+      fecha: ahoraEstado.toISOString()
     });
     v.observaciones = JSON.stringify(obsData);
 
@@ -1699,7 +1722,7 @@ class VentaService {
     }
 
     const ahora = new Date();
-    const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    const horaActual = formatColombiaTime(ahora);
     obsData.estadoPago = 'Pagado';
     obsData.estadoAprobacion = 'APROBADO';
     obsData.horaEstado = horaActual;

@@ -406,15 +406,14 @@ class EventoService {
       throw error;
     }
 
-    await e.destroy();
-
-    // Reorder IDs if needed to maintain gapless sequence
-    const all = await Evento.findAll({ order: [['idEvento', 'ASC']] });
-    for (let i = 0; i < all.length; i++) {
-      if (all[i].idEvento !== i + 1) {
-        await Evento.update({ idEvento: i + 1 }, { where: { idEvento: all[i].idEvento } });
-      }
+    try {
+      const { Venta } = require('../../persistence/models');
+      await Venta.update({ idDescuento: null }, { where: { idDescuento: e.idEvento } });
+    } catch (unlinkErr) {
+      // Ignorar si no aplica relación directa en ventas
     }
+
+    await e.destroy();
 
     return { message: 'Evento eliminado correctamente' };
   }

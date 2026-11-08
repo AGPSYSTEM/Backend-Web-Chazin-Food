@@ -15,6 +15,109 @@ const getProductEmoji = (nombre = "") => {
 
 const { Op } = require('sequelize');
 
+function formatColombiaTime(dateInput) {
+  if (!dateInput) return null;
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).format(d);
+}
+
+function formatColombiaDate(dateInput) {
+  const d = dateInput ? (dateInput instanceof Date ? dateInput : new Date(dateInput)) : new Date();
+  if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d);
+}
+
+function inferProductPrepMinutes(nombreProducto = '', ftTiempo = null) {
+  const n = String(nombreProducto || '').toLowerCase();
+  const hasFoodKeyword =
+    n.includes('hamburguesa') ||
+    n.includes('burger') ||
+    n.includes('perro') ||
+    n.includes('salchipapa') ||
+    n.includes('combo') ||
+    n.includes('papa') ||
+    n.includes('casco') ||
+    n.includes('corral') ||
+    n.includes('espiral') ||
+    n.includes('chili') ||
+    n.includes('tocineta');
+
+  const isSimpleDrink =
+    !hasFoodKeyword &&
+    (n.includes('gaseosa') ||
+      n.includes('coca-cola') ||
+      n.includes('coca cola') ||
+      n.includes('postobón') ||
+      n.includes('postobon') ||
+      n.includes('pepsi') ||
+      n.includes('colombiana') ||
+      n.includes('sprite') ||
+      n.includes('quatro') ||
+      n.includes('cuatro') ||
+      n.includes('agua') ||
+      n.includes('cristal') ||
+      n.includes('jugo') ||
+      n.includes('hit') ||
+      n.includes('bebida'));
+
+  const parsedFt = Number(ftTiempo);
+  if (!isNaN(parsedFt) && parsedFt > 0) {
+    if (!isSimpleDrink && parsedFt <= 2) {
+      // Si es un plato cocinado pero tenía 1 min por error, inferir tiempo real de cocción
+    } else {
+      return parsedFt;
+    }
+  }
+
+  if (isSimpleDrink) return 1;
+  if (n.includes('combo') || n.includes('familiar') || n.includes('pareja')) return 14;
+  if (n.includes('doble') || n.includes('salvaje') || n.includes('trufada') || n.includes('fest')) return 12;
+  if (n.includes('hamburguesa') || n.includes('burger') || n.includes('salchipapa')) return 10;
+  if (n.includes('perro')) return 8;
+  if (n.includes('papa') || n.includes('casco') || n.includes('corral') || n.includes('espiral')) return 7;
+  return 10;
+}
+
+function calculateOrderPrepTime(productosList = []) {
+  if (!Array.isArray(productosList) || productosList.length === 0) {
+    return { totalMin: 12, formatted: '12 min' };
+  }
+
+  const withMinutes = productosList.map((p) => {
+    const rawRecetaMin = p.receta?.tiempoPreparacionMin || parseInt(String(p.receta?.tiempoPreparacion || ''), 10);
+    const min = inferProductPrepMinutes(p.nombre, rawRecetaMin);
+    return {
+      ...p,
+      tiempoPreparacionMin: min,
+      qty: Math.max(1, Number(p.cantidad) || 1)
+    };
+  });
+
+  const cookedDishes = withMinutes.filter((p) => p.tiempoPreparacionMin > 2);
+  if (cookedDishes.length > 0) {
+    const maxCookedMin = Math.max(...cookedDishes.map((p) => p.tiempoPreparacionMin));
+    const totalCookedUnits = cookedDishes.reduce((sum, p) => sum + p.qty, 0);
+    // Agregar +2 min por cada unidad cocinada adicional en parrilla/freidora (tope +10 min)
+    const extraBatchMin = Math.min(10, Math.max(0, totalCookedUnits - 1) * 2);
+    const totalMin = maxCookedMin + extraBatchMin;
+    return { totalMin, formatted: `${totalMin} min` };
+  }
+
+  const maxDrinkMin = Math.max(1, ...withMinutes.map((p) => p.tiempoPreparacionMin || 1));
+  return { totalMin: maxDrinkMin, formatted: `${maxDrinkMin} min` };
+}
+
 class ProduccionService {
   static async getAll() {
     try {
@@ -100,18 +203,9 @@ class ProduccionService {
 
         const codigo = obsObj.codigoPedido || obsObj.numeroVenta || `VEN-${String(v.idVenta).padStart(4, '0')}`;
 
-        // Format dates
-        let fechaStr = new Date().toISOString().split("T")[0];
-        let horaStr = "12:00 PM";
-        if (v.fechaVenta) {
-          const d = new Date(v.fechaVenta);
-          fechaStr = d.toISOString().split("T")[0];
-          let h = d.getHours();
-          const m = String(d.getMinutes()).padStart(2, '0');
-          const ampm = h >= 12 ? 'PM' : 'AM';
-          h = h % 12 || 12;
-          horaStr = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
-        }
+        // Format dates strictly in America/Bogota timezone (UTC-5)
+        const fechaStr = formatColombiaDate(v.fechaVenta);
+        const horaStr = formatColombiaTime(v.fechaVenta) || obsObj.horario || "12:00 PM";
 
         // Format items and technical sheet (recipe) data
         const productosList = [];
@@ -238,6 +332,7 @@ class ProduccionService {
 
             // Build recipe / ficha técnica if exists
             let receta = null;
+            const inferredPrepMin = inferProductPrepMinutes(itemNombre, ft?.tiempoPreparacion);
             if (ft) {
               const ingredientes = (ft.detalles || []).map(det => ({
                 idInsumo: det.idInsumo,
@@ -253,7 +348,8 @@ class ProduccionService {
               receta = {
                 idFichaTecnica: ft.idFichaTecnica,
                 idProducto: ft.idProducto,
-                tiempoPreparacion: ft.tiempoPreparacion ? `${ft.tiempoPreparacion} min` : "12 min",
+                tiempoPreparacion: `${inferredPrepMin} min`,
+                tiempoPreparacionMin: inferredPrepMin,
                 rendimiento: ft.rendimiento || "1 porción",
                 especificaciones: ft.especificaciones || "",
                 caracteristicas: ft.caracteristicas || "",
@@ -262,6 +358,21 @@ class ProduccionService {
                 vidaUtil: ft.vidaUtil || "",
                 ingredientes,
                 pasos
+              };
+            } else {
+              receta = {
+                idFichaTecnica: null,
+                idProducto: prod?.idProducto || null,
+                tiempoPreparacion: `${inferredPrepMin} min`,
+                tiempoPreparacionMin: inferredPrepMin,
+                rendimiento: "1 porción",
+                especificaciones: "",
+                caracteristicas: "",
+                informacionNutricional: "",
+                condicionesAlmacenamiento: "",
+                vidaUtil: "",
+                ingredientes: [],
+                pasos: ["Preparar los ingredientes según porciones", "Cocinar y montar según estándares de la casa"]
               };
             }
 
@@ -345,6 +456,21 @@ class ProduccionService {
               displayObsFallback = `🔥 ¡PROMO 2x1!: Preparar ${kitchenQtyFallback} unidades (${qty} pagada + ${kitchenQtyFallback - qty} gratis)${displayObsFallback ? ' • ' + displayObsFallback : ''}`;
             }
 
+            const fallbackPrepMin = inferProductPrepMinutes(p.nombre || "Producto", p.receta?.tiempoPreparacionMin);
+            const fallbackReceta = p.receta ? {
+              ...p.receta,
+              tiempoPreparacion: `${fallbackPrepMin} min`,
+              tiempoPreparacionMin: fallbackPrepMin
+            } : {
+              idFichaTecnica: null,
+              idProducto: p.idProducto || null,
+              tiempoPreparacion: `${fallbackPrepMin} min`,
+              tiempoPreparacionMin: fallbackPrepMin,
+              rendimiento: "1 porción",
+              ingredientes: [],
+              pasos: ["Preparar los ingredientes según porciones", "Cocinar y montar según estándares de la casa"]
+            };
+
             productosList.push({
               id: p.id || p.idVariante || Math.random(),
               idProducto: p.idProducto || null,
@@ -357,7 +483,7 @@ class ProduccionService {
               total: parseFloat(p.total || 0),
               observaciones: displayObsFallback,
               adiciones: p.adiciones || [],
-              receta: p.receta || null
+              receta: fallbackReceta
             });
           }
         }
@@ -383,6 +509,9 @@ class ProduccionService {
 
         const primaryProd = productosList[0];
         const mainEmoji = getProductEmoji(primaryProd?.nombre || platilloNombre);
+
+        // Calculate accurate kitchen preparation time across ALL items in the order
+        const orderPrep = calculateOrderPrepTime(productosList);
 
         // General human observation ONLY (no raw JSON dump)
         let cleanGeneralObs = "";
@@ -450,8 +579,61 @@ class ProduccionService {
           (v.usuario && v.usuario.idRol !== 4 ? `${v.usuario.nombre} ${v.usuario.apellidos || ''}`.trim() : null) ||
           "Chef de Turno";
 
-        const horaEstadoCalculada = obsObj.horaEstado ||
-          (obsObj.fechaCambioEstado ? new Date(obsObj.fechaCambioEstado).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' }) : horaStr);
+        // Synchronized per-stage timestamps in America/Bogota (UTC-5)
+        const historial = Array.isArray(obsObj.historialEstados) ? obsObj.historialEstados : [];
+        const entryPreparando = historial.find(h => {
+          const st = String(h?.estado || '').toUpperCase();
+          return st === 'PREPARANDO' || st === 'EN PREPARACIÓN' || st === 'EN PREPARACION';
+        });
+        const entryListo = [...historial].reverse().find(h => String(h?.estado || '').toUpperCase() === 'LISTO');
+        const entryEntregado = [...historial].reverse().find(h => {
+          const st = String(h?.estado || '').toUpperCase();
+          return st === 'ENTREGADO' || st === 'DESPACHADO' || st === 'COMPLETADA';
+        });
+        const lastHistEntry = historial.length > 0 ? historial[historial.length - 1] : null;
+
+        const fechaInicioPrep =
+          obsObj.fechaInicioPreparacion ||
+          entryPreparando?.fecha ||
+          (estadoStr === 'En Preparación' ? obsObj.fechaCambioEstado : null) ||
+          null;
+        const horaInicioPreparacion =
+          formatColombiaTime(fechaInicioPrep) ||
+          obsObj.horaInicioPreparacion ||
+          null;
+
+        const fechaListoIso =
+          obsObj.fechaListo ||
+          entryListo?.fecha ||
+          (estadoStr === 'Listo' ? obsObj.fechaCambioEstado : null) ||
+          null;
+        const horaListo =
+          formatColombiaTime(fechaListoIso) ||
+          obsObj.horaListo ||
+          null;
+
+        const fechaEntregaIso =
+          obsObj.fechaEntrega ||
+          entryEntregado?.fecha ||
+          ((estadoStr === 'Entregado' || estadoStr === 'Despachado') ? obsObj.fechaCambioEstado : null) ||
+          null;
+        const horaEntrega =
+          formatColombiaTime(fechaEntregaIso) ||
+          obsObj.horaEntrega ||
+          null;
+
+        const horaEstadoCalculada =
+          formatColombiaTime(obsObj.fechaCambioEstado) ||
+          formatColombiaTime(lastHistEntry?.fecha) ||
+          (estadoStr === 'En Preparación' ? horaInicioPreparacion : null) ||
+          (estadoStr === 'Listo' ? horaListo : null) ||
+          ((estadoStr === 'Entregado' || estadoStr === 'Despachado') ? horaEntrega : null) ||
+          horaStr;
+
+        const tiempoEstimadoEntrega =
+          v.tiempoEstimadoEntrega ||
+          obsObj.tiempoEstimadoEntrega ||
+          (finalTipo === 'Domicilio' ? `${orderPrep.totalMin + 20} - ${orderPrep.totalMin + 30} min` : `${orderPrep.totalMin + 3} - ${orderPrep.totalMin + 8} min`);
 
         return {
           id: v.idVenta,
@@ -464,12 +646,19 @@ class ProduccionService {
           responsable: cocineroNombre,
           cocinero: cocineroNombre,
           responsableCocina: cocineroNombre,
-          tiempo: primaryProd?.receta?.tiempoPreparacion || "15 min",
+          tiempo: orderPrep.formatted,
+          tiempoMinutos: orderPrep.totalMin,
+          tiempoEstimadoEntrega,
           fecha: fechaStr,
-          horaInicio: horaStr,
+          horaPedido: horaStr,
+          horaInicio: horaInicioPreparacion || horaStr,
+          horaInicioPreparacion: horaInicioPreparacion || null,
+          horaListo: horaListo || null,
+          horaEntrega: horaEntrega || null,
           horaEstado: horaEstadoCalculada,
-          fechaCambioEstado: obsObj.fechaCambioEstado || null,
-          historialEstados: obsObj.historialEstados || [],
+          fechaInicioPreparacion: fechaInicioPrep || null,
+          fechaCambioEstado: obsObj.fechaCambioEstado || lastHistEntry?.fecha || null,
+          historialEstados: historial,
           fechaVenta: v.fechaVenta,
           estado: estadoStr,
           estadoAprobacion: 'APROBADO',
@@ -522,7 +711,6 @@ class ProduccionService {
   }
 
   static async updateEstado(id, nuevoEstado, extraData = {}) {
-    const { Op } = require('sequelize');
     let v = null;
     let idVentaNum = Number(id);
 
@@ -599,9 +787,20 @@ class ProduccionService {
     // Also keep obsObj JSON in sync for backward compatibility
     obsObj.estadoAprobacion = newAprobacion;
     const ahora = new Date();
-    const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+    const horaActual = formatColombiaTime(ahora);
     obsObj.horaEstado = horaActual;
     obsObj.fechaCambioEstado = ahora.toISOString();
+
+    if (estadoEnum === 'PREPARANDO') {
+      obsObj.fechaInicioPreparacion = obsObj.fechaInicioPreparacion || ahora.toISOString();
+      obsObj.horaInicioPreparacion = obsObj.horaInicioPreparacion || horaActual;
+    } else if (estadoEnum === 'LISTO') {
+      obsObj.fechaListo = ahora.toISOString();
+      obsObj.horaListo = horaActual;
+    } else if (estadoEnum === 'ENTREGADO') {
+      obsObj.fechaEntrega = ahora.toISOString();
+      obsObj.horaEntrega = horaActual;
+    }
 
     // Guardar nombre del cocinero / responsable de cocina en turno (Requisito 9)
     if (extraData?.cocinero || extraData?.responsable || extraData?.usuarioNombre) {
