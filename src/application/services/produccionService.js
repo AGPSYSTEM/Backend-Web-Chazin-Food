@@ -630,10 +630,30 @@ class ProduccionService {
           ((estadoStr === 'Entregado' || estadoStr === 'Despachado') ? horaEntrega : null) ||
           horaStr;
 
+        const savedTiempo = String(v.tiempoEstimadoEntrega || obsObj.tiempoEstimadoEntrega || '').trim();
+        const normSavedTiempo = savedTiempo.toLowerCase().replace(/\s+/g, '');
+        const isGenericDefaultTiempo = !savedTiempo || normSavedTiempo === '15-20min' || normSavedTiempo === '30-45min' || normSavedTiempo === '35-45min';
+        const isManualTiempo = String(obsObj.modoTiempoEntrega || '').toUpperCase() === 'MANUAL' || (!obsObj.modoTiempoEntrega && !isGenericDefaultTiempo);
+
+        let autoTiempoEntrega;
+        if (estadoStr === 'Entregado') {
+          autoTiempoEntrega = 'Entregado';
+        } else if (estadoStr === 'Despachado') {
+          autoTiempoEntrega = finalTipo === 'Domicilio' ? 'En camino' : 'Listo para entrega';
+        } else if (estadoStr === 'Listo') {
+          autoTiempoEntrega = finalTipo === 'Domicilio' ? '15-20 min' : 'Listo para entrega';
+        } else if (finalTipo === 'Domicilio') {
+          autoTiempoEntrega = `${orderPrep.totalMin + 15}-${orderPrep.totalMin + 25} min`;
+        } else if (orderPrep.totalMin <= 2) {
+          autoTiempoEntrega = '2-5 min';
+        } else {
+          autoTiempoEntrega = `${orderPrep.totalMin + 3}-${orderPrep.totalMin + 8} min`;
+        }
+
         const tiempoEstimadoEntrega =
-          v.tiempoEstimadoEntrega ||
-          obsObj.tiempoEstimadoEntrega ||
-          (finalTipo === 'Domicilio' ? `${orderPrep.totalMin + 20} - ${orderPrep.totalMin + 30} min` : `${orderPrep.totalMin + 3} - ${orderPrep.totalMin + 8} min`);
+          estadoStr === 'Entregado'
+            ? 'Entregado'
+            : (isManualTiempo && savedTiempo ? savedTiempo : autoTiempoEntrega);
 
         return {
           id: v.idVenta,
@@ -797,9 +817,18 @@ class ProduccionService {
     } else if (estadoEnum === 'LISTO') {
       obsObj.fechaListo = ahora.toISOString();
       obsObj.horaListo = horaActual;
+      if (obsObj.modoTiempoEntrega !== 'MANUAL') {
+        const esDom = String(obsObj.tipoEntrega || v.tipoVenta || '').toLowerCase().includes('domicilio');
+        const autoListo = esDom ? '15-20 min' : 'Listo para entrega';
+        obsObj.tiempoEstimadoEntrega = autoListo;
+        v.tiempoEstimadoEntrega = autoListo;
+      }
     } else if (estadoEnum === 'ENTREGADO') {
       obsObj.fechaEntrega = ahora.toISOString();
       obsObj.horaEntrega = horaActual;
+      obsObj.tiempoEstimadoEntrega = 'Entregado';
+      obsObj.modoTiempoEntrega = 'AUTO';
+      v.tiempoEstimadoEntrega = 'Entregado';
     }
 
     // Guardar nombre del cocinero / responsable de cocina en turno (Requisito 9)

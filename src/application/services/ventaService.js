@@ -200,6 +200,124 @@ function formatColombiaTime(dateInput) {
   }).format(d);
 }
 
+function inferProductPrepMinutes(nombreProducto = '', ftTiempo = null) {
+  const n = String(nombreProducto || '').toLowerCase();
+  const hasFoodKeyword =
+    n.includes('hamburguesa') ||
+    n.includes('burger') ||
+    n.includes('perro') ||
+    n.includes('salchipapa') ||
+    n.includes('combo') ||
+    n.includes('papa') ||
+    n.includes('casco') ||
+    n.includes('corral') ||
+    n.includes('espiral') ||
+    n.includes('chili') ||
+    n.includes('tocineta');
+
+  const isSimpleDrink =
+    !hasFoodKeyword &&
+    (n.includes('gaseosa') ||
+      n.includes('coca-cola') ||
+      n.includes('coca cola') ||
+      n.includes('postobón') ||
+      n.includes('postobon') ||
+      n.includes('pepsi') ||
+      n.includes('colombiana') ||
+      n.includes('sprite') ||
+      n.includes('quatro') ||
+      n.includes('cuatro') ||
+      n.includes('agua') ||
+      n.includes('cristal') ||
+      n.includes('jugo') ||
+      n.includes('hit') ||
+      n.includes('bebida'));
+
+  const parsedFt = Number(ftTiempo);
+  if (!isNaN(parsedFt) && parsedFt > 0) {
+    if (!isSimpleDrink && parsedFt <= 2) {
+      // Si es plato cocinado pero tenía 1 min, inferir cocción real
+    } else {
+      return parsedFt;
+    }
+  }
+
+  if (isSimpleDrink) return 1;
+  if (n.includes('combo') || n.includes('familiar') || n.includes('pareja')) return 14;
+  if (n.includes('doble') || n.includes('salvaje') || n.includes('trufada') || n.includes('fest')) return 12;
+  if (n.includes('hamburguesa') || n.includes('burger') || n.includes('salchipapa')) return 10;
+  if (n.includes('perro')) return 8;
+  if (n.includes('papa') || n.includes('casco') || n.includes('corral') || n.includes('espiral')) return 7;
+  return 10;
+}
+
+function calculateOrderPrepTime(productosList = []) {
+  if (!Array.isArray(productosList) || productosList.length === 0) {
+    return { totalMin: 12, formatted: '12 min' };
+  }
+  const withMinutes = productosList.map((p) => {
+    const rawRecetaMin = p.receta?.tiempoPreparacionMin || parseInt(String(p.receta?.tiempoPreparacion || p.tiempoPreparacion || ''), 10);
+    const min = inferProductPrepMinutes(p.nombre || p.nombreProducto || p.observaciones, rawRecetaMin);
+    return {
+      ...p,
+      tiempoPreparacionMin: min,
+      qty: Math.max(1, Number(p.cantidad) || 1)
+    };
+  });
+  const cookedDishes = withMinutes.filter((p) => p.tiempoPreparacionMin > 2);
+  if (cookedDishes.length > 0) {
+    const maxCookedMin = Math.max(...cookedDishes.map((p) => p.tiempoPreparacionMin));
+    const totalCookedUnits = cookedDishes.reduce((sum, p) => sum + p.qty, 0);
+    const extraBatchMin = Math.min(10, Math.max(0, totalCookedUnits - 1) * 2);
+    const totalMin = maxCookedMin + extraBatchMin;
+    return { totalMin, formatted: `${totalMin} min` };
+  }
+  const maxDrinkMin = Math.max(1, ...withMinutes.map((p) => p.tiempoPreparacionMin || 1));
+  return { totalMin: maxDrinkMin, formatted: `${maxDrinkMin} min` };
+}
+
+function computeHybridDeliveryEstimate({ productos = [], tipoEntrega = '', estadoEntrega = 'PENDIENTE', savedTiempo = '', savedModo = '' }) {
+  const prep = calculateOrderPrepTime(productos);
+  const esDomicilio = String(tipoEntrega || '').toLowerCase().includes('domicilio');
+  const est = String(estadoEntrega || 'PENDIENTE').toUpperCase();
+
+  let autoEstimate;
+  if (est === 'ENTREGADO' || est === 'COMPLETADA') {
+    autoEstimate = 'Entregado';
+  } else if (est === 'DESPACHADO') {
+    autoEstimate = esDomicilio ? 'En camino' : 'Listo para entrega';
+  } else if (est === 'LISTO') {
+    autoEstimate = esDomicilio ? '15-20 min' : 'Listo para entrega';
+  } else if (esDomicilio) {
+    autoEstimate = `${prep.totalMin + 15}-${prep.totalMin + 25} min`;
+  } else if (prep.totalMin <= 2) {
+    autoEstimate = '2-5 min';
+  } else {
+    autoEstimate = `${prep.totalMin + 3}-${prep.totalMin + 8} min`;
+  }
+
+  if (est === 'ENTREGADO' || est === 'COMPLETADA') {
+    return { effectiveEstimate: 'Entregado', autoEstimate, modo: 'AUTO' };
+  }
+
+  const cleanSaved = String(savedTiempo || '').trim();
+  const normSaved = cleanSaved.toLowerCase().replace(/\s+/g, '');
+  const isGenericDefault =
+    !cleanSaved ||
+    normSaved === '15-20min' ||
+    normSaved === '30-45min' ||
+    normSaved === '35-45min';
+
+  const modoUpper = String(savedModo || '').toUpperCase();
+  const isManual = modoUpper === 'MANUAL' || (!modoUpper && !isGenericDefault);
+
+  if (isManual && cleanSaved) {
+    return { effectiveEstimate: cleanSaved, autoEstimate, modo: 'MANUAL' };
+  }
+
+  return { effectiveEstimate: autoEstimate, autoEstimate, modo: 'AUTO' };
+}
+
 class VentaService {
   static formatVenta(v) {
     let obsData = {};
@@ -469,9 +587,14 @@ class VentaService {
     const origen = isOnline ? 'ONLINE' : 'PUNTO_FISICO';
     const origenNombre = isOnline ? 'Venta Online' : 'Punto Físico';
 
-    const tiempoEstimadoEntrega = v.tiempoEstimadoEntrega || obsData.tiempoEstimadoEntrega || obsData.tiempoEstimado || (
-      tipoEntrega === 'Domicilio' ? '35 - 45 min' : '15 - 20 min'
-    );
+    const hybridEst = computeHybridDeliveryEstimate({
+      productos,
+      tipoEntrega,
+      estadoEntrega: v.estadoEntrega,
+      savedTiempo: v.tiempoEstimadoEntrega || obsData.tiempoEstimadoEntrega || obsData.tiempoEstimado,
+      savedModo: obsData.modoTiempoEntrega
+    });
+    const tiempoEstimadoEntrega = hybridEst.effectiveEstimate;
 
     return {
       id: v.idVenta,
@@ -503,6 +626,8 @@ class VentaService {
       origen,
       origenNombre,
       tiempoEstimadoEntrega,
+      modoTiempoEntrega: hybridEst.modo,
+      tiempoAutomaticoSugerido: hybridEst.autoEstimate,
       empaqueParaLlevar,
       tipoEntrega,
       metodoPago,
@@ -973,11 +1098,21 @@ class VentaService {
       throw error;
     }
 
-    // Ítem #124: tiempo estimado de entrega
-    const tiempoEstimadoEntregaVenta = String(
-      data.tiempoEstimadoEntrega || parsedObs.tiempoEstimadoEntrega ||
-      (origenVenta === 'ONLINE' ? '30 - 45 min' : '15 - 20 min')
-    ).trim().slice(0, 60);
+    // Ítem #124: tiempo estimado de entrega híbrido (Automático según fichas técnicas + modalidad o Manual si se especifica)
+    const initialItemsForPrep = (Array.isArray(data.productos) && data.productos.length > 0)
+      ? data.productos
+      : (Array.isArray(parsedObs.productos) && parsedObs.productos.length > 0)
+        ? parsedObs.productos
+        : rawDetails;
+    const initialTipoEntrega = data.tipoEntrega || parsedObs.tipoEntrega || (origenVenta === 'ONLINE' ? 'Domicilio' : (data.mesa ? 'En Mesa' : 'Recoger'));
+    const initialHybridEst = computeHybridDeliveryEstimate({
+      productos: initialItemsForPrep,
+      tipoEntrega: initialTipoEntrega,
+      estadoEntrega: 'PENDIENTE',
+      savedTiempo: data.tiempoEstimadoEntrega || parsedObs.tiempoEstimadoEntrega || '',
+      savedModo: data.modoTiempoEntrega || parsedObs.modoTiempoEntrega || ''
+    });
+    const tiempoEstimadoEntregaVenta = String(initialHybridEst.effectiveEstimate).trim().slice(0, 60);
 
     // Ítem #11: el empaque para llevar es independiente del tipo de entrega
     const empaqueParaLlevar = Boolean(
@@ -1382,9 +1517,18 @@ class VentaService {
     } else if (estadoEnum === 'LISTO') {
       obsData.fechaListo = ahoraEstado.toISOString();
       obsData.horaListo = horaActual;
+      if (obsData.modoTiempoEntrega !== 'MANUAL') {
+        const esDom = String(obsData.tipoEntrega || v.tipoVenta || '').toLowerCase().includes('domicilio');
+        const autoListo = esDom ? '15-20 min' : 'Listo para entrega';
+        obsData.tiempoEstimadoEntrega = autoListo;
+        v.tiempoEstimadoEntrega = autoListo;
+      }
     } else if (estadoEnum === 'ENTREGADO') {
       obsData.fechaEntrega = ahoraEstado.toISOString();
       obsData.horaEntrega = horaActual;
+      obsData.tiempoEstimadoEntrega = 'Entregado';
+      obsData.modoTiempoEntrega = 'AUTO';
+      v.tiempoEstimadoEntrega = 'Entregado';
     }
     if (!Array.isArray(obsData.historialEstados)) obsData.historialEstados = [];
     obsData.historialEstados.push({
@@ -1623,9 +1767,25 @@ class VentaService {
     } catch (e) {
       obsData = { nota: v.observaciones || '' };
     }
-    obsData.tiempoEstimadoEntrega = raw;
+
+    if (raw.toUpperCase() === 'AUTO' || raw.toUpperCase() === 'AUTOMATICO' || raw.toUpperCase() === 'AUTOMÁTICO') {
+      const hybridEst = computeHybridDeliveryEstimate({
+        productos: Array.isArray(obsData.productos) ? obsData.productos : [],
+        tipoEntrega: obsData.tipoEntrega || (v.tipoVenta === 'DOMICILIO' ? 'Domicilio' : 'En Mesa'),
+        estadoEntrega: v.estadoEntrega || 'PENDIENTE',
+        savedTiempo: '',
+        savedModo: 'AUTO'
+      });
+      obsData.modoTiempoEntrega = 'AUTO';
+      obsData.tiempoEstimadoEntrega = hybridEst.autoEstimate;
+      v.tiempoEstimadoEntrega = hybridEst.autoEstimate;
+    } else {
+      obsData.modoTiempoEntrega = 'MANUAL';
+      obsData.tiempoEstimadoEntrega = raw;
+      v.tiempoEstimadoEntrega = raw;
+    }
+
     v.observaciones = JSON.stringify(obsData);
-    v.tiempoEstimadoEntrega = raw;
     await v.save();
     return this.getById(id);
   }
