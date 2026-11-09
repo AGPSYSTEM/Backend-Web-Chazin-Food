@@ -1416,7 +1416,7 @@ class VentaService {
                 if (cantPorPlato > 0 && det.idInsumo) {
                   const insumo = await Insumo.findByPk(det.idInsumo);
                   if (insumo) {
-                    // Respetar Mise en Place: si el cliente quitó este ingrediente ("Sin ..."), no se descuenta de inventario
+                    // Respetar Mise & Place: si el cliente quitó este ingrediente ("Sin ..."), no se descuenta de inventario
                     if (isInsumoRemovedByMiseEnPlace(insumo, d, obsProdItem)) {
                       continue;
                     }
