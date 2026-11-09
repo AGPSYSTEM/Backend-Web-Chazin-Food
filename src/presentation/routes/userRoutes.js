@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getUsers, getUserById, createUser, updateUser, changeUserPassword, toggleUserStatus, deleteUser } = require('../controllers/userController');
-const { registerUser, loginUser, forgotPassword, resetPassword, getUserProfile, updateUserProfile, googleAuth, verifyActivation, activateAccount } = require('../controllers/authController');
+const { registerUser, loginUser, forgotPassword, resetPassword, getUserProfile, updateUserProfile, googleAuth, verifyEmail, verifyActivation, activateAccount } = require('../controllers/authController');
 const { protect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
 
 const allowSelfOrEditUsers = (req, res, next) => {
@@ -15,6 +15,9 @@ router.post('/login', loginUser);
 router.post('/google', googleAuth);
 router.post('/registro', registerUser);
 router.post('/register', registerUser);
+router.post('/verificar-correo', verifyEmail);
+router.get('/verificar-correo', verifyEmail);
+router.post('/check-email', verifyEmail);
 router.post('/recuperar-contrasena', forgotPassword);
 router.post('/forgot-password', forgotPassword);
 router.post('/restablecer-contrasena', resetPassword);

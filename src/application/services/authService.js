@@ -478,9 +478,40 @@ class AuthService {
   }
 
 
+  static async checkEmail(email) {
+    const targetEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!targetEmail) {
+      const error = new Error('El correo electrónico es requerido');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const { Op } = require('sequelize');
+    const user = await User.findOne({
+      where: {
+        email: { [Op.like]: targetEmail }
+      }
+    });
+
+    if (!user) {
+      return {
+        exists: false,
+        registered: false,
+        message: 'El correo ingresado no se encuentra registrado en el sistema.'
+      };
+    }
+
+    return {
+      exists: true,
+      registered: true,
+      message: 'El correo se encuentra registrado.',
+      nombre: user.nombre
+    };
+  }
+
   static async forgotPassword(data) {
     const { email, correo } = data || {};
-    const targetEmail = email || correo;
+    const targetEmail = (email || correo || '').trim().toLowerCase();
 
     if (!targetEmail) {
       const error = new Error('El correo electrónico es requerido');
@@ -488,10 +519,17 @@ class AuthService {
       throw error;
     }
 
-    const user = await User.findOne({ where: { email: targetEmail } });
+    const { Op } = require('sequelize');
+    const user = await User.findOne({
+      where: {
+        email: { [Op.like]: targetEmail }
+      }
+    });
 
     if (!user) {
-      return { message: 'Si el correo está registrado, recibirás las instrucciones para restablecer tu contraseña.' };
+      const error = new Error('El correo ingresado no se encuentra registrado en el sistema');
+      error.statusCode = 404;
+      throw error;
     }
 
     const jwtSecret = process.env.JWT_SECRET || 'chazin_food_secret_key_2026';

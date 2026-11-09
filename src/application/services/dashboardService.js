@@ -13,18 +13,36 @@ function parseDateRange(filtro = {}) {
   if (periodo === 'hoy') {
     startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  } else if (periodo === '7_dias' || periodo === '7dias') {
+  } else if (periodo === '7_dias' || periodo === '7dias' || periodo === 'semana') {
     startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0);
     endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  } else if (periodo === 'este_mes' || periodo === 'mes') {
+  } else if (periodo === 'este_mes' || periodo === 'mes' || periodo === 'mes_actual' || periodo === 'mes actual') {
     startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
     endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  } else if (periodo === 'este_ano' || periodo === 'año' || periodo === 'ano') {
+  } else if (periodo === 'mes_anterior' || periodo === 'mes anterior') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  } else if (periodo === 'ultimos_3_meses' || periodo === 'últimos 3 meses' || periodo === 'ultimos 3 meses' || periodo === '3_meses' || periodo === '3meses') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  } else if (periodo === 'ultimos_6_meses' || periodo === 'últimos 6 meses' || periodo === 'ultimos 6 meses' || periodo === '6_meses' || periodo === '6meses') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  } else if (periodo === 'este_ano' || periodo === 'año' || periodo === 'ano' || periodo === 'año actual' || periodo === 'ano actual' || periodo === 'ano_actual') {
     startDate = new Date(targetYear, 0, 1, 0, 0, 0);
     endDate = new Date(targetYear, 11, 31, 23, 59, 59);
+  } else if (periodo === 'ano_anterior' || periodo === 'año anterior' || periodo === 'ano anterior') {
+    startDate = new Date(targetYear - 1, 0, 1, 0, 0, 0);
+    endDate = new Date(targetYear - 1, 11, 31, 23, 59, 59);
   } else if (periodo === 'todos' || periodo === 'historico' || periodo === 'all') {
     startDate = null;
     endDate = null;
+  } else if (filtro.startDate || filtro.desde || filtro.fechaInicio) {
+    startDate = new Date(filtro.startDate || filtro.desde || filtro.fechaInicio);
+    if (filtro.endDate || filtro.hasta || filtro.fechaFin) {
+      endDate = new Date(filtro.endDate || filtro.hasta || filtro.fechaFin);
+      endDate.setHours(23, 59, 59, 999);
+    }
   } else if (rawYear && !isNaN(rawYear)) {
     startDate = new Date(rawYear, 0, 1, 0, 0, 0);
     endDate = new Date(rawYear, 11, 31, 23, 59, 59);
@@ -265,7 +283,7 @@ class DashboardService {
             compras: Math.round(comprasH.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
           });
         }
-      } else if (periodo === '7_dias' || periodo === '7dias') {
+      } else if (periodo === '7_dias' || periodo === '7dias' || periodo === 'semana') {
         const diasNombres = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
         for (let i = 6; i >= 0; i--) {
           const d = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000));
@@ -295,7 +313,7 @@ class DashboardService {
             compras: Math.round(comprasDia.reduce((s, c) => s + parseFloat(c.total || c.montoTotal || 0), 0))
           });
         }
-      } else if (periodo === 'este_mes' || periodo === 'mes') {
+      } else if (periodo === 'este_mes' || periodo === 'mes' || periodo === 'mes_actual' || periodo === 'mes actual') {
         // Semanas del mes actual
         const yr = now.getFullYear();
         const mo = now.getMonth();
@@ -370,6 +388,101 @@ class DashboardService {
         return Array.from(yearMap.entries())
           .sort(([a], [b]) => a - b)
           .map(([_, val]) => val);
+      } else if (periodo === 'mes_anterior' || periodo === 'mes anterior') {
+        // Semanas del mes anterior
+        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const yr = prevDate.getFullYear();
+        const mo = prevDate.getMonth();
+        const lastDay = new Date(yr, mo + 1, 0).getDate();
+        const semanas = [
+          { label: "1 - 7", startDay: 1, endDay: 7 },
+          { label: "8 - 14", startDay: 8, endDay: 14 },
+          { label: "15 - 21", startDay: 15, endDay: 21 },
+          { label: `22 - ${lastDay}`, startDay: 22, endDay: lastDay }
+        ];
+
+        for (const s of semanas) {
+          const start = new Date(yr, mo, s.startDay, 0, 0, 0);
+          const end = new Date(yr, mo, s.endDay, 23, 59, 59);
+
+          const ventasSem = await Venta.findAll({
+            where: {
+              fechaVenta: { [Op.between]: [start, end] },
+              estadoEntrega: { [Op.ne]: 'CANCELADO' }
+            },
+            raw: true
+          }).catch(() => []);
+
+          const comprasSem = await Compra.findAll({
+            where: {
+              fechaCompra: { [Op.between]: [start, end] },
+              estado: { [Op.ne]: 'CANCELADA' }
+            },
+            raw: true
+          }).catch(() => []);
+
+          result.push({
+            mes: `Sem ${s.label}`,
+            ventas: Math.round(ventasSem.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
+            compras: Math.round(comprasSem.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
+          });
+        }
+      } else if (periodo === 'ultimos_3_meses' || periodo === 'últimos 3 meses' || periodo === 'ultimos 3 meses' || periodo === '3_meses' || periodo === '3meses') {
+        for (let i = 2; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+
+          const ventasMes = await Venta.findAll({
+            where: {
+              fechaVenta: { [Op.between]: [start, end] },
+              estadoEntrega: { [Op.ne]: 'CANCELADO' }
+            },
+            raw: true
+          }).catch(() => []);
+
+          const comprasMes = await Compra.findAll({
+            where: {
+              fechaCompra: { [Op.between]: [start, end] },
+              estado: { [Op.ne]: 'CANCELADA' }
+            },
+            raw: true
+          }).catch(() => []);
+
+          result.push({
+            mes: mesesNombres[d.getMonth()],
+            ventas: Math.round(ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
+            compras: Math.round(comprasMes.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
+          });
+        }
+      } else if (periodo === 'ultimos_6_meses' || periodo === 'últimos 6 meses' || periodo === 'ultimos 6 meses' || periodo === '6_meses' || periodo === '6meses') {
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+
+          const ventasMes = await Venta.findAll({
+            where: {
+              fechaVenta: { [Op.between]: [start, end] },
+              estadoEntrega: { [Op.ne]: 'CANCELADO' }
+            },
+            raw: true
+          }).catch(() => []);
+
+          const comprasMes = await Compra.findAll({
+            where: {
+              fechaCompra: { [Op.between]: [start, end] },
+              estado: { [Op.ne]: 'CANCELADA' }
+            },
+            raw: true
+          }).catch(() => []);
+
+          result.push({
+            mes: mesesNombres[d.getMonth()],
+            ventas: Math.round(ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
+            compras: Math.round(comprasMes.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
+          });
+        }
       } else {
         // 'este_ano' o año específico (12 meses)
         const targetYear = year;

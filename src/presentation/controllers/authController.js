@@ -101,6 +101,17 @@ const activateAccount = async (req, res, next) => {
   }
 };
 
+const verifyEmail = async (req, res, next) => {
+  try {
+    const email = req.body?.email || req.body?.correo || req.query?.email || req.query?.correo;
+    const result = await AuthService.checkEmail(email);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -111,4 +122,5 @@ module.exports = {
   googleAuth,
   verifyActivation,
   activateAccount,
+  verifyEmail,
 };

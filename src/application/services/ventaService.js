@@ -688,13 +688,23 @@ class VentaService {
       if (normalizedPeriod === 'hoy') {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfDay };
-      } else if (normalizedPeriod === '7dias' || normalizedPeriod === '7_dias') {
+      } else if (normalizedPeriod === '7dias' || normalizedPeriod === '7_dias' || normalizedPeriod === 'semana') {
         const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
         where.fechaVenta = { [Op.gte]: sevenDaysAgo };
-      } else if (normalizedPeriod === 'mes' || normalizedPeriod === 'este_mes') {
+      } else if (normalizedPeriod === 'mes' || normalizedPeriod === 'este_mes' || normalizedPeriod === 'mes actual' || normalizedPeriod === 'mes_actual') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfMonth };
-      } else if (normalizedPeriod === 'ano' || normalizedPeriod === 'este_ano' || normalizedPeriod === 'año') {
+      } else if (normalizedPeriod === 'mes_anterior' || normalizedPeriod === 'mes anterior') {
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        where.fechaVenta = { [Op.between]: [startOfLastMonth, endOfLastMonth] };
+      } else if (normalizedPeriod === '3_meses' || normalizedPeriod === 'ultimos_3_meses' || normalizedPeriod === 'últimos 3 meses' || normalizedPeriod === 'ultimos 3 meses') {
+        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1, 0, 0, 0);
+        where.fechaVenta = { [Op.gte]: threeMonthsAgo };
+      } else if (normalizedPeriod === '6_meses' || normalizedPeriod === 'ultimos_6_meses' || normalizedPeriod === 'últimos 6 meses' || normalizedPeriod === 'ultimos 6 meses') {
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0);
+        where.fechaVenta = { [Op.gte]: sixMonthsAgo };
+      } else if (normalizedPeriod === 'ano' || normalizedPeriod === 'este_ano' || normalizedPeriod === 'año' || normalizedPeriod === 'año actual' || normalizedPeriod === 'ano actual') {
         const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
         where.fechaVenta = { [Op.gte]: startOfYear };
       }
