@@ -172,7 +172,7 @@ async function seed() {
       { nombre: 'Papas a la Francesa Corte Delgado', idCategoriaInsumo: 3, unidadMedida: 'kg', stock: 60.00, stockMinimo: 10.00, precioUnitario: 9800.00, descripcion: 'Papas prefritas congeladas corte fino' },
       { nombre: 'Lechuga Batavia Fresca', idCategoriaInsumo: 3, unidadMedida: 'kg', stock: 18.00, stockMinimo: 3.00, precioUnitario: 4500.00, descripcion: 'Lechuga fresca crujiente' },
       { nombre: 'Tomate Chonto Maduro', idCategoriaInsumo: 3, unidadMedida: 'kg', stock: 20.00, stockMinimo: 4.00, precioUnitario: 5200.00, descripcion: 'Tomates frescos en rodajas' },
-      { nombre: 'Cebolla Cabezona Blanca', idCategoriaInsumo: 3, unidadMedida: 'kg', stock: 22.00, stockMinimo: 4.00, precioUnitario: 3900.00, descripcion: 'Cebolla fresca para caramelizar y aderezos' },
+      { nombre: 'Cebolla Cabezona Blanca', idCategoriaInsumo: 3, unidadMedida: 'kg', stock: 22.00, stockMinimo: 4.00, precioUnitario: 3900.00, descripcion: 'Cebolla fresca para caramelizar y ensaladas' },
       { nombre: 'Jalapeños en Rodajas', idCategoriaInsumo: 3, unidadMedida: 'kg', stock: 10.00, stockMinimo: 2.00, precioUnitario: 14500.00, descripcion: 'Jalapeños encurtidos picantes' },
       { nombre: 'Salsa de Tomate Heinz', idCategoriaInsumo: 4, unidadMedida: 'kg', stock: 15.00, stockMinimo: 3.00, precioUnitario: 12500.00, descripcion: 'Salsa de tomate clásica' },
       { nombre: 'Mostaza Americana', idCategoriaInsumo: 4, unidadMedida: 'kg', stock: 10.00, stockMinimo: 2.00, precioUnitario: 11500.00, descripcion: 'Mostaza amarilla tradicional' },
