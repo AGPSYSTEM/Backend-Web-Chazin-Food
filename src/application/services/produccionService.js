@@ -27,6 +27,19 @@ function formatColombiaTime(dateInput) {
   }).format(d);
 }
 
+function formatColombiaTimeWithSeconds(dateInput) {
+  if (!dateInput) return null;
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(d);
+}
+
 function formatColombiaDate(dateInput) {
   const d = dateInput ? (dateInput instanceof Date ? dateInput : new Date(dateInput)) : new Date();
   if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
@@ -488,14 +501,17 @@ class ProduccionService {
           }
         }
 
-        // Map delivery/production status
+        // Map delivery/production status including intermediate Despachado state
         const est = (v.estadoEntrega || 'PENDIENTE').toUpperCase();
+        const subEst = String(obsObj.estadoCocina || '').toUpperCase();
         let estadoStr = "En Cola";
         if (est === 'PREPARANDO' || est === 'EN PREPARACIÓN') {
           estadoStr = "En Preparación";
+        } else if (est === 'LISTO' && subEst === 'DESPACHADO') {
+          estadoStr = "Despachado";
         } else if (est === 'LISTO') {
           estadoStr = "Listo";
-        } else if (est === 'DESPACHADO') {
+        } else if (est === 'DESPACHADO' || est === 'EN_CAMINO') {
           estadoStr = "Despachado";
         } else if (est === 'ENTREGADO' || est === 'COMPLETADA') {
           estadoStr = "Entregado";
@@ -581,54 +597,181 @@ class ProduccionService {
 
         // Synchronized per-stage timestamps in America/Bogota (UTC-5)
         const historial = Array.isArray(obsObj.historialEstados) ? obsObj.historialEstados : [];
-        const entryPreparando = historial.find(h => {
+        const savedTiempos = (obsObj.tiemposEstados && typeof obsObj.tiemposEstados === 'object') ? obsObj.tiemposEstados : {};
+
+        const entryPreparando = [...historial].reverse().find(h => {
           const st = String(h?.estado || '').toUpperCase();
-          return st === 'PREPARANDO' || st === 'EN PREPARACIÓN' || st === 'EN PREPARACION';
+          return st === 'PREPARANDO' || st === 'EN PREPARACIÓN' || st === 'EN PREPARACION' || st === 'EN_PREPARACION';
         });
-        const entryListo = [...historial].reverse().find(h => String(h?.estado || '').toUpperCase() === 'LISTO');
+        const entryListo = [...historial].reverse().find(h => {
+          const st = String(h?.estado || '').toUpperCase();
+          return st === 'LISTO' || st === 'LISTOS';
+        });
+        const entryDespachado = [...historial].reverse().find(h => {
+          const st = String(h?.estado || '').toUpperCase();
+          return st === 'DESPACHADO' || st === 'EN_CAMINO';
+        });
         const entryEntregado = [...historial].reverse().find(h => {
           const st = String(h?.estado || '').toUpperCase();
-          return st === 'ENTREGADO' || st === 'DESPACHADO' || st === 'COMPLETADA';
+          return st === 'ENTREGADO' || st === 'COMPLETADA';
         });
         const lastHistEntry = historial.length > 0 ? historial[historial.length - 1] : null;
 
-        const fechaInicioPrep =
+        const baseVentaDate = v.fechaVenta ? new Date(v.fechaVenta) : new Date();
+        const baseMs = !isNaN(baseVentaDate.getTime()) ? baseVentaDate.getTime() : Date.now();
+        const addMinIso = (ms, mins) => new Date(ms + mins * 60000).toISOString();
+
+        // 1. En Cola
+        const fechaEnColaIso = savedTiempos.enCola?.fecha || (v.fechaVenta ? baseVentaDate.toISOString() : null);
+        const horaEnCola = savedTiempos.enCola?.hora || formatColombiaTime(fechaEnColaIso) || horaStr;
+        const horaEnColaExacta = savedTiempos.enCola?.horaExacta || formatColombiaTimeWithSeconds(fechaEnColaIso) || horaEnCola;
+
+        // 2. En Preparación
+        let fechaInicioPrep =
+          savedTiempos.enPreparacion?.fecha ||
           obsObj.fechaInicioPreparacion ||
           entryPreparando?.fecha ||
           (estadoStr === 'En Preparación' ? obsObj.fechaCambioEstado : null) ||
           null;
+        if (!fechaInicioPrep && ['En Preparación', 'Listo', 'Despachado', 'Entregado'].includes(estadoStr)) {
+          fechaInicioPrep = addMinIso(baseMs, 1);
+        } else if (
+          fechaInicioPrep &&
+          formatColombiaTime(fechaInicioPrep) === horaEnCola &&
+          !savedTiempos.enPreparacion &&
+          !entryPreparando &&
+          ['En Preparación', 'Listo', 'Despachado', 'Entregado'].includes(estadoStr)
+        ) {
+          fechaInicioPrep = addMinIso(baseMs, 1);
+        }
         const horaInicioPreparacion =
+          savedTiempos.enPreparacion?.hora ||
           formatColombiaTime(fechaInicioPrep) ||
           obsObj.horaInicioPreparacion ||
           null;
+        const horaInicioPrepExacta =
+          savedTiempos.enPreparacion?.horaExacta ||
+          entryPreparando?.horaExacta ||
+          formatColombiaTimeWithSeconds(fechaInicioPrep) ||
+          horaInicioPreparacion;
 
-        const fechaListoIso =
+        // 3. Listo
+        const prepMinutos = Math.max(1, Number(orderPrep.totalMin) || 10);
+        const prepStartMs = fechaInicioPrep && !isNaN(new Date(fechaInicioPrep).getTime())
+          ? new Date(fechaInicioPrep).getTime()
+          : baseMs + 60000;
+
+        let fechaListoIso =
+          savedTiempos.listo?.fecha ||
           obsObj.fechaListo ||
           entryListo?.fecha ||
           (estadoStr === 'Listo' ? obsObj.fechaCambioEstado : null) ||
           null;
+        if (!fechaListoIso && ['Listo', 'Despachado', 'Entregado'].includes(estadoStr)) {
+          fechaListoIso = addMinIso(prepStartMs, prepMinutos);
+        } else if (
+          fechaListoIso &&
+          formatColombiaTime(fechaListoIso) === horaEnCola &&
+          !savedTiempos.listo &&
+          !entryListo &&
+          ['Listo', 'Despachado', 'Entregado'].includes(estadoStr)
+        ) {
+          fechaListoIso = addMinIso(prepStartMs, prepMinutos);
+        }
         const horaListo =
+          savedTiempos.listo?.hora ||
           formatColombiaTime(fechaListoIso) ||
           obsObj.horaListo ||
           null;
+        const horaListoExacta =
+          savedTiempos.listo?.horaExacta ||
+          entryListo?.horaExacta ||
+          formatColombiaTimeWithSeconds(fechaListoIso) ||
+          horaListo;
 
-        const fechaEntregaIso =
+        // 4. Despachado
+        const listoMs = fechaListoIso && !isNaN(new Date(fechaListoIso).getTime())
+          ? new Date(fechaListoIso).getTime()
+          : prepStartMs + prepMinutos * 60000;
+
+        let fechaDespachadoIso =
+          savedTiempos.despachado?.fecha ||
+          obsObj.fechaDespachado ||
+          entryDespachado?.fecha ||
+          (estadoStr === 'Despachado' ? obsObj.fechaCambioEstado : null) ||
+          null;
+        if (!fechaDespachadoIso && ['Despachado', 'Entregado'].includes(estadoStr)) {
+          fechaDespachadoIso = addMinIso(listoMs, 1);
+        } else if (
+          fechaDespachadoIso &&
+          formatColombiaTime(fechaDespachadoIso) === horaEnCola &&
+          !savedTiempos.despachado &&
+          !entryDespachado &&
+          ['Despachado', 'Entregado'].includes(estadoStr)
+        ) {
+          fechaDespachadoIso = addMinIso(listoMs, 1);
+        }
+        const horaDespachado =
+          savedTiempos.despachado?.hora ||
+          formatColombiaTime(fechaDespachadoIso) ||
+          obsObj.horaDespachado ||
+          null;
+        const horaDespachadoExacta =
+          savedTiempos.despachado?.horaExacta ||
+          entryDespachado?.horaExacta ||
+          formatColombiaTimeWithSeconds(fechaDespachadoIso) ||
+          horaDespachado;
+
+        // 5. Entregado
+        const despachadoMs = fechaDespachadoIso && !isNaN(new Date(fechaDespachadoIso).getTime())
+          ? new Date(fechaDespachadoIso).getTime()
+          : listoMs + 60000;
+
+        let fechaEntregaIso =
+          savedTiempos.entregado?.fecha ||
           obsObj.fechaEntrega ||
           entryEntregado?.fecha ||
-          ((estadoStr === 'Entregado' || estadoStr === 'Despachado') ? obsObj.fechaCambioEstado : null) ||
+          (estadoStr === 'Entregado' ? obsObj.fechaCambioEstado : null) ||
           null;
+        if (!fechaEntregaIso && estadoStr === 'Entregado') {
+          fechaEntregaIso = addMinIso(despachadoMs, finalTipo === 'Domicilio' ? 15 : 2);
+        } else if (
+          fechaEntregaIso &&
+          formatColombiaTime(fechaEntregaIso) === horaEnCola &&
+          !savedTiempos.entregado &&
+          !entryEntregado &&
+          estadoStr === 'Entregado'
+        ) {
+          fechaEntregaIso = addMinIso(despachadoMs, finalTipo === 'Domicilio' ? 15 : 2);
+        }
         const horaEntrega =
+          savedTiempos.entregado?.hora ||
           formatColombiaTime(fechaEntregaIso) ||
           obsObj.horaEntrega ||
           null;
+        const horaEntregaExacta =
+          savedTiempos.entregado?.horaExacta ||
+          entryEntregado?.horaExacta ||
+          formatColombiaTimeWithSeconds(fechaEntregaIso) ||
+          horaEntrega;
 
         const horaEstadoCalculada =
-          formatColombiaTime(obsObj.fechaCambioEstado) ||
-          formatColombiaTime(lastHistEntry?.fecha) ||
+          (estadoStr === 'En Cola' ? horaEnCola : null) ||
           (estadoStr === 'En Preparación' ? horaInicioPreparacion : null) ||
           (estadoStr === 'Listo' ? horaListo : null) ||
-          ((estadoStr === 'Entregado' || estadoStr === 'Despachado') ? horaEntrega : null) ||
+          (estadoStr === 'Despachado' ? horaDespachado : null) ||
+          (estadoStr === 'Entregado' ? horaEntrega : null) ||
+          formatColombiaTime(obsObj.fechaCambioEstado) ||
+          formatColombiaTime(lastHistEntry?.fecha) ||
           horaStr;
+
+        const tiemposEstados = {
+          enCola: { estado: 'En Cola', hora: horaEnCola, horaExacta: horaEnColaExacta, fecha: fechaEnColaIso },
+          ...(horaInicioPreparacion ? { enPreparacion: { estado: 'En Preparación', hora: horaInicioPreparacion, horaExacta: horaInicioPrepExacta, fecha: fechaInicioPrep } } : {}),
+          ...(horaListo ? { listo: { estado: 'Listo', hora: horaListo, horaExacta: horaListoExacta, fecha: fechaListoIso } } : {}),
+          ...(horaDespachado ? { despachado: { estado: 'Despachado', hora: horaDespachado, horaExacta: horaDespachadoExacta, fecha: fechaDespachadoIso } } : {}),
+          ...(horaEntrega ? { entregado: { estado: 'Entregado', hora: horaEntrega, horaExacta: horaEntregaExacta, fecha: fechaEntregaIso } } : {})
+        };
 
         const savedTiempo = String(v.tiempoEstimadoEntrega || obsObj.tiempoEstimadoEntrega || '').trim();
         const normSavedTiempo = savedTiempo.toLowerCase().replace(/\s+/g, '');
@@ -669,15 +812,22 @@ class ProduccionService {
           tiempo: orderPrep.formatted,
           tiempoMinutos: orderPrep.totalMin,
           tiempoEstimadoEntrega,
+          modoTiempoEntrega: isManualTiempo ? 'MANUAL' : 'AUTO',
+          tiempoAutomaticoSugerido: autoTiempoEntrega,
           fecha: fechaStr,
-          horaPedido: horaStr,
-          horaInicio: horaInicioPreparacion || horaStr,
+          horaPedido: horaEnCola,
+          horaInicio: horaInicioPreparacion || horaEnCola,
           horaInicioPreparacion: horaInicioPreparacion || null,
           horaListo: horaListo || null,
+          horaDespachado: horaDespachado || null,
           horaEntrega: horaEntrega || null,
           horaEstado: horaEstadoCalculada,
           fechaInicioPreparacion: fechaInicioPrep || null,
+          fechaListo: fechaListoIso || null,
+          fechaDespachado: fechaDespachadoIso || null,
+          fechaEntrega: fechaEntregaIso || null,
           fechaCambioEstado: obsObj.fechaCambioEstado || lastHistEntry?.fecha || null,
+          tiemposEstados,
           historialEstados: historial,
           fechaVenta: v.fechaVenta,
           estado: estadoStr,
@@ -774,30 +924,42 @@ class ProduccionService {
 
     let estadoEnum = v.estadoEntrega || 'PENDIENTE';
     let newAprobacion = v.estadoAprobacion || 'PENDIENTE';
+    let estadoCocinaInterno = obsObj.estadoCocina || 'EN_COLA';
     const norm = String(nuevoEstado || '').toUpperCase();
 
     if (norm === 'APROBAR' || norm === 'APROBADO') {
       newAprobacion = 'APROBADO';
       if (estadoEnum === 'PENDIENTE') {
         estadoEnum = 'PREPARANDO';
+        estadoCocinaInterno = 'EN_PREPARACION';
       }
     } else if (norm === 'RECHAZAR' || norm === 'RECHAZADO') {
       newAprobacion = 'RECHAZADO';
       estadoEnum = 'CANCELADO';
+      estadoCocinaInterno = 'CANCELADO';
     } else if (norm === 'EN PREPARACIÓN' || norm === 'EN PREPARACION' || norm === 'PREPARANDO') {
       newAprobacion = 'APROBADO';
       estadoEnum = 'PREPARANDO';
+      estadoCocinaInterno = 'EN_PREPARACION';
     } else if (norm === 'LISTO' || norm === 'LISTOS') {
       newAprobacion = 'APROBADO';
       estadoEnum = 'LISTO';
-    } else if (norm === 'DESPACHADO' || norm === 'ENTREGADO' || norm === 'COMPLETADA') {
+      estadoCocinaInterno = 'LISTO';
+    } else if (norm === 'DESPACHADO' || norm === 'EN_CAMINO') {
+      newAprobacion = 'APROBADO';
+      estadoEnum = 'LISTO';
+      estadoCocinaInterno = 'DESPACHADO';
+    } else if (norm === 'ENTREGADO' || norm === 'COMPLETADA') {
       newAprobacion = 'APROBADO';
       estadoEnum = 'ENTREGADO';
+      estadoCocinaInterno = 'ENTREGADO';
     } else if (norm === 'ANULADA' || norm === 'CANCELADO' || norm === 'CANCELADA') {
       newAprobacion = 'RECHAZADO';
       estadoEnum = 'CANCELADO';
+      estadoCocinaInterno = 'CANCELADO';
     } else {
       estadoEnum = 'PENDIENTE';
+      estadoCocinaInterno = 'EN_COLA';
     }
 
     // Write to real DB columns (source of truth)
@@ -806,26 +968,76 @@ class ProduccionService {
 
     // Also keep obsObj JSON in sync for backward compatibility
     obsObj.estadoAprobacion = newAprobacion;
+    obsObj.estadoCocina = estadoCocinaInterno;
+
     const ahora = new Date();
     const horaActual = formatColombiaTime(ahora);
+    const horaActualConSegundos = formatColombiaTimeWithSeconds(ahora);
     obsObj.horaEstado = horaActual;
+    obsObj.horaExactaEstado = horaActualConSegundos;
     obsObj.fechaCambioEstado = ahora.toISOString();
 
-    if (estadoEnum === 'PREPARANDO') {
-      obsObj.fechaInicioPreparacion = obsObj.fechaInicioPreparacion || ahora.toISOString();
-      obsObj.horaInicioPreparacion = obsObj.horaInicioPreparacion || horaActual;
-    } else if (estadoEnum === 'LISTO') {
+    if (!obsObj.tiemposEstados || typeof obsObj.tiemposEstados !== 'object') {
+      const baseFechaIso = v.fechaVenta ? new Date(v.fechaVenta).toISOString() : ahora.toISOString();
+      const baseHora = formatColombiaTime(v.fechaVenta) || obsObj.horario || horaActual;
+      obsObj.tiemposEstados = {
+        enCola: {
+          estado: 'En Cola',
+          hora: baseHora,
+          horaExacta: formatColombiaTimeWithSeconds(v.fechaVenta) || baseHora,
+          fecha: baseFechaIso
+        }
+      };
+    }
+
+    if (estadoCocinaInterno === 'EN_PREPARACION') {
+      obsObj.fechaInicioPreparacion = ahora.toISOString();
+      obsObj.horaInicioPreparacion = horaActual;
+      obsObj.tiemposEstados.enPreparacion = {
+        estado: 'En Preparación',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahora.toISOString()
+      };
+    } else if (estadoCocinaInterno === 'LISTO') {
       obsObj.fechaListo = ahora.toISOString();
       obsObj.horaListo = horaActual;
+      obsObj.tiemposEstados.listo = {
+        estado: 'Listo',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahora.toISOString()
+      };
       if (obsObj.modoTiempoEntrega !== 'MANUAL') {
         const esDom = String(obsObj.tipoEntrega || v.tipoVenta || '').toLowerCase().includes('domicilio');
         const autoListo = esDom ? '15-20 min' : 'Listo para entrega';
         obsObj.tiempoEstimadoEntrega = autoListo;
         v.tiempoEstimadoEntrega = autoListo;
       }
-    } else if (estadoEnum === 'ENTREGADO') {
+    } else if (estadoCocinaInterno === 'DESPACHADO') {
+      obsObj.fechaDespachado = ahora.toISOString();
+      obsObj.horaDespachado = horaActual;
+      obsObj.tiemposEstados.despachado = {
+        estado: 'Despachado',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahora.toISOString()
+      };
+      if (obsObj.modoTiempoEntrega !== 'MANUAL') {
+        const esDom = String(obsObj.tipoEntrega || v.tipoVenta || '').toLowerCase().includes('domicilio');
+        const autoDesp = esDom ? 'En camino' : 'Listo para entrega';
+        obsObj.tiempoEstimadoEntrega = autoDesp;
+        v.tiempoEstimadoEntrega = autoDesp;
+      }
+    } else if (estadoCocinaInterno === 'ENTREGADO') {
       obsObj.fechaEntrega = ahora.toISOString();
       obsObj.horaEntrega = horaActual;
+      obsObj.tiemposEstados.entregado = {
+        estado: 'Entregado',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahora.toISOString()
+      };
       obsObj.tiempoEstimadoEntrega = 'Entregado';
       obsObj.modoTiempoEntrega = 'AUTO';
       v.tiempoEstimadoEntrega = 'Entregado';
@@ -898,8 +1110,10 @@ class ProduccionService {
 
     if (!Array.isArray(obsObj.historialEstados)) obsObj.historialEstados = [];
     obsObj.historialEstados.push({
-      estado: estadoEnum,
+      estado: estadoCocinaInterno === 'DESPACHADO' ? 'DESPACHADO' : estadoEnum,
+      etiqueta: nuevoEstado,
       hora: horaActual,
+      horaExacta: horaActualConSegundos,
       fecha: ahora.toISOString(),
       ...(obsObj.pedidoCompleto !== undefined ? { pedidoCompleto: obsObj.pedidoCompleto } : {})
     });
@@ -912,8 +1126,13 @@ class ProduccionService {
       idVenta: v.idVenta,
       estado: nuevoEstado,
       estadoEntrega: estadoEnum,
+      estadoCocina: estadoCocinaInterno,
       estadoAprobacion: newAprobacion,
       horaEstado: horaActual,
+      horaExactaEstado: horaActualConSegundos,
+      fechaCambioEstado: obsObj.fechaCambioEstado,
+      tiemposEstados: obsObj.tiemposEstados,
+      historialEstados: obsObj.historialEstados,
       checklistPreparacion: obsObj.checklistPreparacion || null,
       pedidoCompleto: obsObj.pedidoCompleto !== undefined ? obsObj.pedidoCompleto : null,
       observacionCocina: obsObj.observacionCocina || "",

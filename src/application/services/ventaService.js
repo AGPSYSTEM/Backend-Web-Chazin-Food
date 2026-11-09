@@ -200,6 +200,19 @@ function formatColombiaTime(dateInput) {
   }).format(d);
 }
 
+function formatColombiaTimeWithSeconds(dateInput) {
+  if (!dateInput) return null;
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(d);
+}
+
 function inferProductPrepMinutes(nombreProducto = '', ftTiempo = null) {
   const n = String(nombreProducto || '').toLowerCase();
   const hasFoodKeyword =
@@ -603,6 +616,8 @@ class VentaService {
       tipoVenta: v.tipoVenta || (tipoEntrega === 'Domicilio' ? 'DOMICILIO' : 'PUNTO_DE_VENTA'),
       numeroVenta,
       codigoPedido: numeroVenta,
+      codigo: numeroVenta,
+      numeroOrden: numeroVenta,
       clienteNombre,
       cliente: clienteNombre,
       idCliente: v.idCliente,
@@ -622,6 +637,7 @@ class VentaService {
       horaEstado,
       horaCambioEstado: horaEstado,
       fechaCambioEstado,
+      tiemposEstados: obsData.tiemposEstados || null,
       historialEstados: obsData.historialEstados || [],
       origen,
       origenNombre,
@@ -1122,6 +1138,7 @@ class VentaService {
 
     const now = new Date();
     const formattedHorario = formatColombiaTime(now);
+    const formattedHorarioExacto = formatColombiaTimeWithSeconds(now);
 
     const obsObj = {
       horario: data.horario || parsedObs.horario || formattedHorario,
@@ -1172,8 +1189,27 @@ class VentaService {
       origen: origenVenta,
       tiempoEstimadoEntrega: tiempoEstimadoEntregaVenta,
       empaqueParaLlevar,
-      horaEstado: formatColombiaTime(now),
-      fechaCambioEstado: now.toISOString()
+      estadoCocina: 'EN_COLA',
+      horaEstado: formattedHorario,
+      horaExactaEstado: formattedHorarioExacto,
+      fechaCambioEstado: now.toISOString(),
+      tiemposEstados: {
+        enCola: {
+          estado: 'En Cola',
+          hora: formattedHorario,
+          horaExacta: formattedHorarioExacto,
+          fecha: now.toISOString()
+        }
+      },
+      historialEstados: [
+        {
+          estado: 'PENDIENTE',
+          etiqueta: 'En Cola',
+          hora: formattedHorario,
+          horaExacta: formattedHorarioExacto,
+          fecha: now.toISOString()
+        }
+      ]
     };
 
     // Las ventas online no pueden autodeclararse pagadas: quedan pendientes hasta confirmación de Wompi o aprobación manual (Ítem #116)
@@ -1509,14 +1545,43 @@ class VentaService {
 
     const ahoraEstado = new Date();
     const horaActual = formatColombiaTime(ahoraEstado);
+    const horaActualConSegundos = formatColombiaTimeWithSeconds(ahoraEstado);
     obsData.horaEstado = horaActual;
+    obsData.horaExactaEstado = horaActualConSegundos;
     obsData.fechaCambioEstado = ahoraEstado.toISOString();
+
+    if (!obsData.tiemposEstados || typeof obsData.tiemposEstados !== 'object') {
+      const baseHora = formatColombiaTime(v.fechaVenta) || obsData.horario || horaActual;
+      obsData.tiemposEstados = {
+        enCola: {
+          estado: 'En Cola',
+          hora: baseHora,
+          horaExacta: formatColombiaTimeWithSeconds(v.fechaVenta) || baseHora,
+          fecha: v.fechaVenta ? new Date(v.fechaVenta).toISOString() : ahoraEstado.toISOString()
+        }
+      };
+    }
+
     if (estadoEnum === 'PREPARANDO') {
-      obsData.fechaInicioPreparacion = obsData.fechaInicioPreparacion || ahoraEstado.toISOString();
-      obsData.horaInicioPreparacion = obsData.horaInicioPreparacion || horaActual;
+      obsData.estadoCocina = 'EN_PREPARACION';
+      obsData.fechaInicioPreparacion = ahoraEstado.toISOString();
+      obsData.horaInicioPreparacion = horaActual;
+      obsData.tiemposEstados.enPreparacion = {
+        estado: 'En Preparación',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahoraEstado.toISOString()
+      };
     } else if (estadoEnum === 'LISTO') {
+      obsData.estadoCocina = 'LISTO';
       obsData.fechaListo = ahoraEstado.toISOString();
       obsData.horaListo = horaActual;
+      obsData.tiemposEstados.listo = {
+        estado: 'Listo',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahoraEstado.toISOString()
+      };
       if (obsData.modoTiempoEntrega !== 'MANUAL') {
         const esDom = String(obsData.tipoEntrega || v.tipoVenta || '').toLowerCase().includes('domicilio');
         const autoListo = esDom ? '15-20 min' : 'Listo para entrega';
@@ -1524,8 +1589,15 @@ class VentaService {
         v.tiempoEstimadoEntrega = autoListo;
       }
     } else if (estadoEnum === 'ENTREGADO') {
+      obsData.estadoCocina = 'ENTREGADO';
       obsData.fechaEntrega = ahoraEstado.toISOString();
       obsData.horaEntrega = horaActual;
+      obsData.tiemposEstados.entregado = {
+        estado: 'Entregado',
+        hora: horaActual,
+        horaExacta: horaActualConSegundos,
+        fecha: ahoraEstado.toISOString()
+      };
       obsData.tiempoEstimadoEntrega = 'Entregado';
       obsData.modoTiempoEntrega = 'AUTO';
       v.tiempoEstimadoEntrega = 'Entregado';
@@ -1533,7 +1605,9 @@ class VentaService {
     if (!Array.isArray(obsData.historialEstados)) obsData.historialEstados = [];
     obsData.historialEstados.push({
       estado: estadoEnum,
+      etiqueta: estado,
       hora: horaActual,
+      horaExacta: horaActualConSegundos,
       fecha: ahoraEstado.toISOString()
     });
     v.observaciones = JSON.stringify(obsData);
