@@ -97,7 +97,7 @@ const updateEstadoVenta = async (req, res, next) => {
 
 const updateTiempoEntregaVenta = async (req, res, next) => {
   try {
-    const venta = await VentaService.updateTiempoEntrega(req.params.id, req.body.tiempoEstimadoEntrega || req.body.tiempoEstimado);
+    const venta = await VentaService.updateTiempoEntrega(req.params.id, req.body.tiempoEstimadoEntrega || req.body.tiempoEstimado, req.body.modoTiempoEntrega || req.body.modo);
     res.json(venta);
   } catch (error) {
     next(error);

@@ -315,16 +315,21 @@ function computeHybridDeliveryEstimate({ productos = [], tipoEntrega = '', estad
 
   const cleanSaved = String(savedTiempo || '').trim();
   const normSaved = cleanSaved.toLowerCase().replace(/\s+/g, '');
+  const isAutoLiteral =
+    normSaved === 'auto' ||
+    normSaved === 'automatico' ||
+    normSaved === 'automático';
   const isGenericDefault =
     !cleanSaved ||
+    isAutoLiteral ||
     normSaved === '15-20min' ||
     normSaved === '30-45min' ||
     normSaved === '35-45min';
 
-  const modoUpper = String(savedModo || '').toUpperCase();
+  const modoUpper = isAutoLiteral ? 'AUTO' : String(savedModo || '').toUpperCase();
   const isManual = modoUpper === 'MANUAL' || (!modoUpper && !isGenericDefault);
 
-  if (isManual && cleanSaved) {
+  if (isManual && cleanSaved && !isAutoLiteral) {
     return { effectiveEstimate: cleanSaved, autoEstimate, modo: 'MANUAL' };
   }
 
@@ -1820,7 +1825,7 @@ class VentaService {
     return { ficha: null, targetProductId: finalProdId };
   }
 
-  static async updateTiempoEntrega(id, tiempoEstimadoEntrega) {
+  static async updateTiempoEntrega(id, tiempoEstimadoEntrega, modoTiempoEntrega = null) {
     const v = await Venta.findByPk(id);
     if (!v) {
       const error = new Error('Venta no encontrada');
@@ -1828,7 +1833,14 @@ class VentaService {
       throw error;
     }
     const raw = String(tiempoEstimadoEntrega || '').trim();
-    if (!raw || raw.length > 50 || /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(raw) || /[^a-zA-Z0-9\s.,\-áéíóúñÁÉÍÓÚÑ]/i.test(raw) || /\.{2,}|-{2,}/.test(raw)) {
+    const rawModo = String(modoTiempoEntrega || '').trim().toUpperCase();
+    const isAutoLiteral =
+      raw.toUpperCase() === 'AUTO' ||
+      raw.toUpperCase() === 'AUTOMATICO' ||
+      raw.toUpperCase() === 'AUTOMÁTICO';
+    const isAutoSwitch = rawModo === 'AUTO' || isAutoLiteral;
+
+    if (!isAutoSwitch && (!raw || raw.length > 50 || /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(raw) || /[^a-zA-Z0-9\s.,\-áéíóúñÁÉÍÓÚÑ]/i.test(raw) || /\.{2,}|-{2,}/.test(raw))) {
       const error = new Error('Formato de tiempo de entrega no válido.');
       error.statusCode = 400;
       throw error;
@@ -1842,7 +1854,7 @@ class VentaService {
       obsData = { nota: v.observaciones || '' };
     }
 
-    if (raw.toUpperCase() === 'AUTO' || raw.toUpperCase() === 'AUTOMATICO' || raw.toUpperCase() === 'AUTOMÁTICO') {
+    if (isAutoSwitch) {
       const hybridEst = computeHybridDeliveryEstimate({
         productos: Array.isArray(obsData.productos) ? obsData.productos : [],
         tipoEntrega: obsData.tipoEntrega || (v.tipoVenta === 'DOMICILIO' ? 'Domicilio' : 'En Mesa'),
@@ -1850,9 +1862,10 @@ class VentaService {
         savedTiempo: '',
         savedModo: 'AUTO'
       });
+      const finalAutoTime = (!isAutoLiteral && raw) ? raw : hybridEst.autoEstimate;
       obsData.modoTiempoEntrega = 'AUTO';
-      obsData.tiempoEstimadoEntrega = hybridEst.autoEstimate;
-      v.tiempoEstimadoEntrega = hybridEst.autoEstimate;
+      obsData.tiempoEstimadoEntrega = finalAutoTime;
+      v.tiempoEstimadoEntrega = finalAutoTime;
     } else {
       obsData.modoTiempoEntrega = 'MANUAL';
       obsData.tiempoEstimadoEntrega = raw;
