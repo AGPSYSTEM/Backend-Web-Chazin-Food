@@ -433,7 +433,7 @@ class CompraService {
         console.log(`[COMPRA STOCK] ${operacion} insumo #${idIns} compra #${idCompra}: stock=${stockActual} ${signo > 0 ? "+" : "-"}${cantidadAjuste} = ${nuevoStock}`);
 
         await Insumo.update(
-          { stock: nuevoStock },
+          { stock: nuevoStock, ...(signo > 0 && nuevoStock > 0 ? { estado: 1 } : {}) },
           { where: { idInsumo: idIns } }
         );
 
@@ -532,9 +532,17 @@ class CompraService {
     let parsedDetalles = [];
     if (detallesCancelacion) {
       try {
-        parsedDetalles = typeof detallesCancelacion === 'string'
+        const rawParsed = typeof detallesCancelacion === 'string'
           ? JSON.parse(detallesCancelacion)
           : detallesCancelacion;
+        // Si es el objeto enriquecido nuevo {tipoOperacion, items, ...}, extraer items
+        if (Array.isArray(rawParsed)) {
+          parsedDetalles = rawParsed;
+        } else if (rawParsed && typeof rawParsed === 'object' && Array.isArray(rawParsed.items)) {
+          parsedDetalles = rawParsed.items;
+        } else {
+          parsedDetalles = [];
+        }
       } catch (_) {
         parsedDetalles = [];
       }
@@ -553,7 +561,7 @@ class CompraService {
     }
 
     // Validar motivo individual en cada insumo devuelto (Ítem #89)
-    parsedDetalles = (parsedDetalles || []).map(item => {
+    parsedDetalles = (Array.isArray(parsedDetalles) ? parsedDetalles : []).map(item => {
       const itemMotivo = String(item.motivo || motivo || 'Devolución de insumo').trim();
       return {
         ...item,
@@ -666,7 +674,25 @@ class CompraService {
     }
 
     c.motivoCancelacion = motivo || 'Devolución de insumos';
-    c.detallesCancelacion = JSON.stringify(parsedDetalles);
+    if (detallesCancelacion && typeof detallesCancelacion === 'object' && !Array.isArray(detallesCancelacion)) {
+      c.detallesCancelacion = JSON.stringify({
+        ...detallesCancelacion,
+        items: parsedDetalles
+      });
+    } else if (typeof detallesCancelacion === 'string') {
+      try {
+        const rawObj = JSON.parse(detallesCancelacion);
+        if (rawObj && typeof rawObj === 'object' && !Array.isArray(rawObj)) {
+          c.detallesCancelacion = JSON.stringify({ ...rawObj, items: parsedDetalles });
+        } else {
+          c.detallesCancelacion = JSON.stringify(parsedDetalles);
+        }
+      } catch (_) {
+        c.detallesCancelacion = JSON.stringify(parsedDetalles);
+      }
+    } else {
+      c.detallesCancelacion = JSON.stringify(parsedDetalles);
+    }
     if (usuarioId) c.usuarioCancelacionId = usuarioId;
     c.fechaCancelacion = fechaCancelacion ? new Date(fechaCancelacion) : new Date();
     c.estado = nuevoEstado;
@@ -723,7 +749,7 @@ class CompraService {
 
         console.log(`[COMPRA STOCK] DIF ${operacion} insumo #${idIns} compra #${idCompra}: stock=${stockActual} + diff=${diff} = ${nuevoStock}`);
         await Insumo.update(
-          { stock: nuevoStock },
+          { stock: nuevoStock, ...(signo > 0 && nuevoStock > 0 ? { estado: 1 } : {}) },
           { where: { idInsumo: idIns } }
         );
       } catch (err) {

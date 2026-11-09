@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getInsumos,
+  checkVencimientos,
   getInsumosPapelera,
   getInsumoById,
   createInsumo,
@@ -14,6 +15,7 @@ const { protect, requirePrivilege } = require('../../infrastructure/middlewares/
 
 router.use(protect);
 
+router.get('/check-vencimientos', checkVencimientos);
 router.get('/papelera', getInsumosPapelera);
 router.get('/deleted', getInsumosPapelera);
 

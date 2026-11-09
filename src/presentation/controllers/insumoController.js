@@ -85,8 +85,19 @@ const hardDeleteInsumo = async (req, res, next) => {
   }
 };
 
+const checkVencimientos = async (req, res, next) => {
+  try {
+    const inactivados = await InsumoService.checkVencimientos();
+    res.json({ success: true, inactivados });
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   getInsumos,
+  checkVencimientos,
   getInsumosPapelera,
   getInsumoById,
   createInsumo,

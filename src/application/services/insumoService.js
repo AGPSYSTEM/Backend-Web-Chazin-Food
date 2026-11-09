@@ -43,7 +43,76 @@ function formatInsumo(i) {
 }
 
 class InsumoService {
+  static async checkVencimientos() {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const Op = database.Sequelize.Op;
+
+      // 1. Lotes con fecha de vencimiento cumplida o pasada que sigan activos
+      const lotesVencidos = await LoteInsumo.findAll({
+        where: {
+          fechaVencimiento: { [Op.lte]: today },
+          estado: 'ACTIVO'
+        },
+        include: [{ model: Insumo, as: 'insumo' }]
+      });
+
+      const affectedInsumosMap = new Map();
+
+      for (const lote of lotesVencidos) {
+        await lote.update({ estado: 'VENCIDO' });
+        if (lote.insumo) {
+          affectedInsumosMap.set(lote.idInsumo, lote.insumo);
+        }
+      }
+
+      // 2. Insumos con fecha de vencimiento directa cumplida y estado activo
+      const directVencidos = await Insumo.findAll({
+        where: {
+          eliminado: 0,
+          estado: 1,
+          fechaVencimiento: { [Op.lte]: today }
+        }
+      });
+      for (const ins of directVencidos) {
+        affectedInsumosMap.set(ins.idInsumo, ins);
+      }
+
+      // 3. Inactivar insumos hasta su reabastecimiento en compras
+      const inactivados = [];
+      for (const [idInsumo, insumo] of affectedInsumosMap.entries()) {
+        if (Number(insumo.estado) === 1 || insumo.estado === 'Activo' || insumo.estado === '1') {
+          await Insumo.update({ estado: 0 }, { where: { idInsumo } });
+          inactivados.push({
+            idInsumo,
+            id: idInsumo,
+            nombre: insumo.nombre,
+            stock: parseFloat(insumo.stock || 0),
+            unidadMedida: insumo.unidadMedida
+          });
+
+          await Trazabilidad.create({
+            tipo: 'Inactivación por Vencimiento',
+            entidadNombre: insumo.nombre,
+            detalle: `El insumo "${insumo.nombre}" fue inactivado automáticamente por cumplimiento de fecha de vencimiento de lote. Requiere reabastecimiento en el módulo de compras.`,
+            idInsumo,
+            tipoMovimiento: 'Ajuste',
+            cantidad: 0,
+            motivo: 'Lote vencido',
+            skipStockUpdate: true
+          }).catch(() => {});
+        }
+      }
+
+      return inactivados;
+    } catch (err) {
+      console.warn('[InsumoService.checkVencimientos] Error:', err.message);
+      return [];
+    }
+  }
+
   static async getAll() {
+    await this.checkVencimientos();
     const insumos = await Insumo.findAll({
       where: { eliminado: 0 },
       include: [
