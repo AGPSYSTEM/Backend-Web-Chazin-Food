@@ -2,6 +2,8 @@
 -- Chazin Food DB Dump - 100% Compatible con TiDB Cloud Serverless
 -- Generado: 2026-10-30T13:56:48.907Z
 -- ==========================================
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
 USE chazinfood;
 SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
