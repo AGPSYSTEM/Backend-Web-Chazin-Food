@@ -20,6 +20,7 @@ const {
   ensureEventoColumnsSchema,
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
+  ensureCategoriaInsumoIconSchema,
   ensureConfiguracionComboSchema,
   ensureVarianteImagenSchema,
   ensureVentaAprobacionSchema,
@@ -47,6 +48,7 @@ async function initializeDatabaseSchema() {
     await ensureFichaTecnicaInsumoVariantZero();
     await ensureEventoColumnsSchema();
     await ensureCategoriaProductoIconSchema();
+    await ensureCategoriaInsumoIconSchema();
     await ensureConfiguracionComboSchema();
     await ensureVentaAprobacionSchema();
     await syncVentasTotals();

@@ -10,6 +10,8 @@ class CategoryService {
         idCategoriaInsumo: cat.id,
         nombre: cat.nombre,
         descripcion: cat.descripcion || '',
+      icon: cat.icon || null,
+        icon: cat.icon || null,
         estado: cat.estado === 1 || cat.estado === 'Activo' ? 'Activo' : 'Inactivo',
         cantidad
       };
@@ -30,12 +32,13 @@ class CategoryService {
       idCategoriaInsumo: cat.id,
       nombre: cat.nombre,
       descripcion: cat.descripcion || '',
+      icon: cat.icon || null,
       estado: cat.estado === 1 || cat.estado === 'Activo' ? 'Activo' : 'Inactivo',
       cantidad
     };
   }
 
-  static async createCategory({ nombre, descripcion }) {
+  static async createCategory({ nombre, descripcion, icon, estado }) {
     const trimmedNombre = String(nombre || '').trim();
     if (!trimmedNombre) {
       const error = new Error('El nombre de la categoría es obligatorio');
@@ -59,7 +62,8 @@ class CategoryService {
     const category = await CategoriaInsumo.create({
       nombre: trimmedNombre,
       descripcion: descripcion || '',
-      estado: 1
+      icon: icon || null,
+      estado: estado === 'Inactivo' || estado === 0 ? 0 : 1
     });
 
     return this.getCategoryById(category.id);
@@ -94,6 +98,7 @@ class CategoryService {
       cat.nombre = trimmedNombre;
     }
     if (data.descripcion !== undefined) cat.descripcion = data.descripcion;
+    if (data.icon !== undefined) cat.icon = data.icon;
     if (data.estado !== undefined) {
       cat.estado = data.estado === 'Activo' || data.estado === 1 ? 1 : 0;
     }

@@ -343,6 +343,20 @@ async function ensureCategoriaProductoIconSchema() {
   }
 }
 
+async function ensureCategoriaInsumoIconSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM `categoriainsumo` LIKE 'icon'");
+    if (cols.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `categoriainsumo` ADD COLUMN `icon` VARCHAR(255) NULL AFTER `descripcion`"
+      );
+    }
+  } catch (err) {
+    console.warn("Error ensuring categoriainsumo icon schema:", err.message);
+  }
+}
+
 async function ensureConfiguracionComboSchema() {
   try {
     const sequelize = connectDB.sequelize;
@@ -828,6 +842,7 @@ module.exports = {
   ensureEventoColumnsSchema,
   syncVentasTotals,
   ensureCategoriaProductoIconSchema,
+  ensureCategoriaInsumoIconSchema,
   ensureConfiguracionComboSchema,
   ensureVarianteImagenSchema,
   ensureVentaAprobacionSchema,

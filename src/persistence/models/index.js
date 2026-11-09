@@ -141,6 +141,9 @@ const CategoriaInsumo = sequelize.define('categoriainsumo', {
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
+  },
+  icon: {
+    type: DataTypes.STRING(255)
   }
 }, { tableName: 'categoriainsumo', timestamps: false });
 
