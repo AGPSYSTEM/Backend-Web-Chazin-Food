@@ -91,16 +91,30 @@ class InsumoService {
         affectedInsumosMap.set(ins.idInsumo, ins);
       }
 
-      // 3. Inactivar insumos hasta su reabastecimiento en compras
+      // 3. Inactivar insumos solo si no tienen lotes vigentes y su stock es <= 0
       const inactivados = [];
       for (const [idInsumo, insumo] of affectedInsumosMap.entries()) {
+        const remainingStock = Math.max(0, Number(insumo.stock || 0));
+        const activeLotesCount = await LoteInsumo.count({
+          where: {
+            idInsumo,
+            estado: 'ACTIVO',
+            fechaVencimiento: { [Op.gt]: today },
+            cantidadDisponible: { [Op.gt]: 0 }
+          }
+        }).catch(() => 0);
+
+        if (remainingStock > 0 || activeLotesCount > 0) {
+          continue;
+        }
+
         if (Number(insumo.estado) === 1 || insumo.estado === 'Activo' || insumo.estado === '1') {
           await Insumo.update({ estado: 0 }, { where: { idInsumo } });
           inactivados.push({
             idInsumo,
             id: idInsumo,
             nombre: insumo.nombre,
-            stock: parseFloat(insumo.stock || 0),
+            stock: remainingStock,
             unidadMedida: insumo.unidadMedida
           });
 

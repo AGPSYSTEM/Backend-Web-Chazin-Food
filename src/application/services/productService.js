@@ -165,8 +165,9 @@ class ProductService {
 
       if (directInsumoId && insumoByIdMap.has(directInsumoId)) {
         const ins = insumoByIdMap.get(directInsumoId);
-        if (ins.estado === 0) return 0;
-        return Math.max(0, Math.floor(Number(ins.stock || 0)));
+        const directStock = Math.max(0, Math.floor(Number(ins.stock || 0)));
+        if (ins.estado === 0 && directStock <= 0) return 0;
+        return directStock;
       }
 
       const matchedByName = allInsumos.find(ins => {
@@ -174,8 +175,9 @@ class ProductService {
         return iName && rawName && (iName === rawName || rawName.includes(iName) || iName.includes(rawName));
       });
       if (matchedByName) {
-        if (matchedByName.estado === 0) return 0;
-        return Math.max(0, Math.floor(Number(matchedByName.stock || 0)));
+        const directStock = Math.max(0, Math.floor(Number(matchedByName.stock || 0)));
+        if (matchedByName.estado === 0 && directStock <= 0) return 0;
+        return directStock;
       }
       return null;
     };
@@ -189,7 +191,8 @@ class ProductService {
           const insumo = det.insumo;
           const cantReq = Number(det.cantidad || 0);
           if (insumo && cantReq > 0) {
-            if (insumo.estado === 0) {
+            const stockInsumo = Math.max(0, Number(insumo.stock || 0));
+            if (stockInsumo <= 0) {
               minPortions = 0;
               break;
             }

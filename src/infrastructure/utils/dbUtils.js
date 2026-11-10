@@ -1107,6 +1107,20 @@ async function ensurePreciosRealesInsumosYStock() {
       );
     }
 
+    // Insumos complementarios de cocina y salsas
+    const extras = [
+      { id: 44, minStock: 20 },
+      { id: 45, minStock: 15 },
+      { id: 43, minStock: 30 },
+      { id: 40, minStock: 20 },
+      { id: 38, minStock: 30 }
+    ];
+    for (const s of extras) {
+      await sequelize.query('UPDATE insumo SET stock = ' + s.minStock + ', estado = 1 WHERE idInsumo = ' + s.id + ' AND (stock <= 0 OR stock IS NULL)');
+    }
+    await sequelize.query('UPDATE insumo SET estado = 1 WHERE eliminado = 0 AND (stock > 0 OR stock IS NULL)');
+    await sequelize.query('UPDATE insumo SET fechaVencimiento = NULL WHERE fechaVencimiento IS NOT NULL AND fechaVencimiento <= CURDATE()');
+
     console.log('[DB] ✅ Precios reales de Medellín (43 insumos) y stock de producción garantizados.');
   } catch (err) {
     console.warn('[DB Migration] ⚠️ Error asegurando precios reales de insumos:', err.message);
