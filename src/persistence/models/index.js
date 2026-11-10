@@ -1268,6 +1268,79 @@ Product.hasMany(ComboProducto, { foreignKey: 'idCombo', as: 'itemsCombo', onDele
 ComboProducto.belongsTo(Product, { foreignKey: 'idCombo', as: 'combo' });
 ComboProducto.belongsTo(Product, { foreignKey: 'idProducto', as: 'productoComponente' });
 
+// Modelo Empleado para Subproceso Gestión de Empleados
+const Empleado = sequelize.define('empleado', {
+  idEmpleado: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  nombre: {
+    type: DataTypes.STRING(100),
+    allowNull: false
+  },
+  apellidos: {
+    type: DataTypes.STRING(100),
+    allowNull: false
+  },
+  tipoDocumento: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'C.C.'
+  },
+  numeroDocumento: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    unique: true
+  },
+  telefono: {
+    type: DataTypes.STRING(30)
+  },
+  correo: {
+    type: DataTypes.STRING(150)
+  },
+  direccion: {
+    type: DataTypes.STRING(255)
+  },
+  cargo: {
+    type: DataTypes.STRING(100),
+    allowNull: false
+  },
+  fechaContratacion: {
+    type: DataTypes.DATEONLY
+  },
+  tipoContrato: {
+    type: DataTypes.STRING(50),
+    defaultValue: 'Término Fijo'
+  },
+  salario: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00
+  },
+  turno: {
+    type: DataTypes.STRING(50),
+    defaultValue: 'Completo'
+  },
+  estado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
+  },
+  eliminado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
+  },
+  idUsuario: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  foto: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  }
+}, { tableName: 'empleado', timestamps: false });
+
+Empleado.belongsTo(User, { foreignKey: 'idUsuario', as: 'usuario' });
+User.hasOne(Empleado, { foreignKey: 'idUsuario', as: 'empleadoInfo' });
+
 module.exports = {
   sequelize,
   Role,
@@ -1275,6 +1348,7 @@ module.exports = {
   RolPermiso,
   User,
   Cliente,
+  Empleado,
   CategoriaInsumo,
   TipoProveedor,
   TipoDocumento,

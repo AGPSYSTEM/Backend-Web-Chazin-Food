@@ -1734,6 +1734,39 @@ ALTER TABLE `venta`
   ADD CONSTRAINT `venta_ibfk_179` FOREIGN KEY (`idUsuario`) REFERENCES `usuario` (`idUsuario`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_180` FOREIGN KEY (`idDescuento`) REFERENCES `descuento` (`idDescuento`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
+-- --------------------------------------------------------
+-- Tabla: `empleado`
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `empleado`;
+CREATE TABLE `empleado` (
+  `idEmpleado` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) NOT NULL,
+  `apellidos` varchar(100) NOT NULL,
+  `tipoDocumento` varchar(20) NOT NULL DEFAULT 'C.C.',
+  `numeroDocumento` varchar(50) NOT NULL,
+  `telefono` varchar(30) DEFAULT NULL,
+  `correo` varchar(150) DEFAULT NULL,
+  `direccion` varchar(255) DEFAULT NULL,
+  `cargo` varchar(100) NOT NULL,
+  `fechaContratacion` date DEFAULT NULL,
+  `tipoContrato` varchar(50) DEFAULT 'Término Fijo',
+  `salario` decimal(12,2) DEFAULT 0.00,
+  `turno` varchar(50) DEFAULT 'Completo',
+  `estado` tinyint(4) DEFAULT 1,
+  `eliminado` tinyint(4) DEFAULT 0,
+  `idUsuario` int(11) DEFAULT NULL,
+  `foto` text DEFAULT NULL,
+  PRIMARY KEY (`idEmpleado`),
+  UNIQUE KEY `UK_Empleado_Documento` (`numeroDocumento`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Volcado de datos para la tabla `empleado`
+INSERT INTO `empleado` (`idEmpleado`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `cargo`, `fechaContratacion`, `tipoContrato`, `salario`, `turno`, `estado`, `eliminado`) VALUES
+(1, 'Carlos Andrés', 'Martínez Gómez', 'C.C.', '1020304050', '3109876543', 'carlos.martinez@chazinfood.com', 'Calle 45 # 12-34', 'Cocinero Principal', '2026-01-15', 'Término Indefinido', 1600000.00, 'Tarde - Noche', 1, 0),
+(2, 'Laura Marcela', 'Ospina Ramos', 'C.C.', '1030405060', '3158765432', 'laura.ospina@chazinfood.com', 'Carrera 78 # 45-12', 'Cajera / Vendedora', '2026-02-01', 'Término Fijo', 1400000.00, 'Mañana - Tarde', 1, 0),
+(3, 'Julián David', 'Restrepo Castro', 'C.C.', '1040506070', '3207654321', 'julian.restrepo@chazinfood.com', 'Diagonal 23 # 56-78', 'Auxiliar de Cocina', '2026-03-10', 'Término Fijo', 1350000.00, 'Tarde - Noche', 1, 0),
+(4, 'Santiago', 'Vásquez Pérez', 'C.C.', '1050607080', '3006543210', 'santiago.vasquez@chazinfood.com', 'Transversal 89 # 10-20', 'Domiciliario', '2026-04-05', 'Prestación de Servicios', 1300000.00, 'Rotativo', 1, 0);
+
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
 

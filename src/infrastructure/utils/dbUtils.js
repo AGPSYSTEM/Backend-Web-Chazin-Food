@@ -832,6 +832,52 @@ async function ensureActaRevisionSchema() {
   }
 }
 
+/**
+ * Asegura la creación y esquema de la tabla empleado para el subproceso de Gestión de Empleados
+ */
+async function ensureEmpleadoSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`empleado\` (
+        \`idEmpleado\` INT(11) NOT NULL AUTO_INCREMENT,
+        \`nombre\` VARCHAR(100) NOT NULL,
+        \`apellidos\` VARCHAR(100) NOT NULL,
+        \`tipoDocumento\` VARCHAR(20) NOT NULL DEFAULT 'C.C.',
+        \`numeroDocumento\` VARCHAR(50) NOT NULL,
+        \`telefono\` VARCHAR(30) DEFAULT NULL,
+        \`correo\` VARCHAR(150) DEFAULT NULL,
+        \`direccion\` VARCHAR(255) DEFAULT NULL,
+        \`cargo\` VARCHAR(100) NOT NULL,
+        \`fechaContratacion\` DATE DEFAULT NULL,
+        \`tipoContrato\` VARCHAR(50) DEFAULT 'Término Fijo',
+        \`salario\` DECIMAL(12,2) DEFAULT '0.00',
+        \`turno\` VARCHAR(50) DEFAULT 'Completo',
+        \`estado\` TINYINT(4) DEFAULT 1,
+        \`eliminado\` TINYINT(4) DEFAULT 0,
+        \`idUsuario\` INT(11) DEFAULT NULL,
+        \`foto\` TEXT DEFAULT NULL,
+        PRIMARY KEY (\`idEmpleado\`),
+        UNIQUE KEY \`UK_Empleado_Documento\` (\`numeroDocumento\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    const [rows] = await sequelize.query("SELECT COUNT(*) as count FROM `empleado`");
+    if (rows && rows[0] && Number(rows[0].count) === 0) {
+      await sequelize.query(`
+        INSERT INTO \`empleado\` (\`nombre\`, \`apellidos\`, \`tipoDocumento\`, \`numeroDocumento\`, \`telefono\`, \`correo\`, \`direccion\`, \`cargo\`, \`fechaContratacion\`, \`tipoContrato\`, \`salario\`, \`turno\`, \`estado\`, \`eliminado\`) VALUES
+        ('Carlos Andrés', 'Martínez Gómez', 'C.C.', '1020304050', '3109876543', 'carlos.martinez@chazinfood.com', 'Calle 45 # 12-34', 'Cocinero Principal', '2026-01-15', 'Término Indefinido', 1600000.00, 'Tarde - Noche', 1, 0),
+        ('Laura Marcela', 'Ospina Ramos', 'C.C.', '1030405060', '3158765432', 'laura.ospina@chazinfood.com', 'Carrera 78 # 45-12', 'Cajera / Vendedora', '2026-02-01', 'Término Fijo', 1400000.00, 'Mañana - Tarde', 1, 0),
+        ('Julián David', 'Restrepo Castro', 'C.C.', '1040506070', '3207654321', 'julian.restrepo@chazinfood.com', 'Diagonal 23 # 56-78', 'Auxiliar de Cocina', '2026-03-10', 'Término Fijo', 1350000.00, 'Tarde - Noche', 1, 0),
+        ('Santiago', 'Vásquez Pérez', 'C.C.', '1050607080', '3006543210', 'santiago.vasquez@chazinfood.com', 'Transversal 89 # 10-20', 'Domiciliario', '2026-04-05', 'Prestación de Servicios', 1300000.00, 'Rotativo', 1, 0);
+      `);
+      console.log('[DB] ✅ Tabla empleado inicializada con datos semilla.');
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando tabla empleado:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -854,5 +900,6 @@ module.exports = {
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema,
   ensureCompraLotesYCancelacionSchema,
-  ensureActaRevisionSchema
+  ensureActaRevisionSchema,
+  ensureEmpleadoSchema
 };
