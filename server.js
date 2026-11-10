@@ -35,7 +35,8 @@ const {
   ensureActaRevisionSchema,
   ensureEmpleadoSchema,
   ensureDevolucionSchema,
-  ensureInsumoIvaManualSchema
+  ensureInsumoIvaManualSchema,
+  ensurePreciosRealesInsumosYStock
 } = require('./src/infrastructure/utils/dbUtils');
 
 async function initializeDatabaseSchema() {
@@ -63,6 +64,7 @@ async function initializeDatabaseSchema() {
     await ensureEmpleadoSchema();
     await ensureDevolucionSchema();
     await ensureInsumoIvaManualSchema();
+    await ensurePreciosRealesInsumosYStock();
     try {
       const [results] = await sequelize.query(
         "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta' AND COLUMN_NAME = 'tipoVenta'"

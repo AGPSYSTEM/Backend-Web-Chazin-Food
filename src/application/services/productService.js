@@ -15,7 +15,7 @@ function convertToInsumoUnit(recetaCantidad, recetaUnidad, insumoUnidad) {
   if ((rUni === 'g' || rUni === 'gr' || rUni.includes('gram')) && (iUni === 'kg' || iUni.includes('kilo'))) {
     return rCant / 1000;
   }
-  if ((rUni === 'kg' || rUni.includes('kilo')) && (rUni === 'g' || iUni.includes('gram'))) {
+  if ((rUni === 'kg' || rUni.includes('kilo')) && (iUni === 'g' || iUni === 'gr' || iUni.includes('gram'))) {
     return rCant * 1000;
   }
   if ((rUni === 'g' || rUni === 'gr') && (iUni === 'lb' || iUni.includes('libra'))) {

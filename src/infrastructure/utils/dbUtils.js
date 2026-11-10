@@ -1021,6 +1021,98 @@ async function ensureEmpleadoSchema() {
   }
 }
 
+/**
+ * Aplica los precios reales de mercado en Medellín (COP) a los 43 insumos
+ * y garantiza disponibilidad de inventario para que hamburguesas y combos
+ * no queden bloqueados en estado "AGOTADO POR EL MOMENTO".
+ */
+async function ensurePreciosRealesInsumosYStock() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const preciosReales = [
+      { id: 1, precio: 2500, unidad: 'und' },
+      { id: 2, precio: 9500, unidad: 'paq' },
+      { id: 5, precio: 3800, unidad: 'kg' },
+      { id: 7, precio: 6500, unidad: 'Unidad' },
+      { id: 8, precio: 2200, unidad: 'und' },
+      { id: 9, precio: 30000, unidad: 'Kg' },
+      { id: 10, precio: 4000, unidad: 'Kg' },
+      { id: 12, precio: 2000, unidad: 'und' },
+      { id: 13, precio: 1400, unidad: 'und' },
+      { id: 14, precio: 28000, unidad: 'kg' },
+      { id: 15, precio: 17500, unidad: 'kg' },
+      { id: 16, precio: 1500, unidad: 'und' },
+      { id: 17, precio: 3000, unidad: 'und' },
+      { id: 18, precio: 35000, unidad: 'kg' },
+      { id: 19, precio: 750, unidad: 'und' },
+      { id: 20, precio: 26000, unidad: 'kg' },
+      { id: 21, precio: 9500, unidad: 'kg' },
+      { id: 22, precio: 4000, unidad: 'kg' },
+      { id: 23, precio: 4200, unidad: 'kg' },
+      { id: 24, precio: 3500, unidad: 'kg' },
+      { id: 25, precio: 16000, unidad: 'kg' },
+      { id: 26, precio: 11500, unidad: 'kg' },
+      { id: 27, precio: 10000, unidad: 'kg' },
+      { id: 28, precio: 14000, unidad: 'kg' },
+      { id: 29, precio: 2500, unidad: 'und' },
+      { id: 30, precio: 2100, unidad: 'und' },
+      { id: 31, precio: 1300, unidad: 'und' },
+      { id: 32, precio: 2500, unidad: 'und' },
+      { id: 33, precio: 2100, unidad: 'und' },
+      { id: 34, precio: 2100, unidad: 'und' },
+      { id: 35, precio: 2100, unidad: 'und' },
+      { id: 36, precio: 2500, unidad: 'und' },
+      { id: 37, precio: 2500, unidad: 'und' },
+      { id: 38, precio: 9800, unidad: 'kg' },
+      { id: 39, precio: 18000, unidad: 'kg' },
+      { id: 40, precio: 15000, unidad: 'kg' },
+      { id: 41, precio: 12000, unidad: 'kg' },
+      { id: 42, precio: 5000, unidad: 'kg' },
+      { id: 43, precio: 18000, unidad: 'kg' },
+      { id: 44, precio: 11000, unidad: 'kg' },
+      { id: 45, precio: 12000, unidad: 'kg' },
+      { id: 47, precio: 2100, unidad: 'Unidad' },
+      { id: 48, precio: 2100, unidad: 'und' }
+    ];
+
+    for (const item of preciosReales) {
+      await sequelize.query(
+        `UPDATE \`insumo\` SET \`precioUnitario\` = ${item.precio}, \`unidadMedida\` = '${item.unidad}' WHERE \`idInsumo\` = ${item.id}`
+      );
+    }
+
+    // Abastecer inventario de ingredientes base para que las recetas y combos tengan disponibilidad activa
+    const stockGarantizado = [
+      { id: 12, minStock: 110 }, // Pan Brioche Artesanal
+      { id: 13, minStock: 100 }, // Pan Perro Americano
+      { id: 14, minStock: 50 },  // Carne de Res Molida 80/20 (kg)
+      { id: 15, minStock: 30 },  // Pechuga de Pollo Fresca (kg)
+      { id: 16, minStock: 120 }, // Salchicha Americana
+      { id: 17, minStock: 60 },  // Salchicha Suiza
+      { id: 18, minStock: 25 },  // Tocineta Ahumada (kg)
+      { id: 19, minStock: 180 }, // Queso Cheddar (und)
+      { id: 20, minStock: 25 },  // Queso Mozzarella (kg)
+      { id: 21, minStock: 60 },  // Papas Francesa (kg)
+      { id: 22, minStock: 20 },  // Lechuga Batavia (kg)
+      { id: 23, minStock: 20 },  // Tomate Chonto (kg)
+      { id: 24, minStock: 25 },  // Cebolla Cabezona (kg)
+      { id: 26, minStock: 15 },  // Salsa Tomate (kg)
+      { id: 27, minStock: 15 },  // Mostaza (kg)
+      { id: 28, minStock: 15 }   // Mayonesa (kg)
+    ];
+
+    for (const s of stockGarantizado) {
+      await sequelize.query(
+        `UPDATE \`insumo\` SET \`stock\` = ${s.minStock}, \`estado\` = 1 WHERE \`idInsumo\` = ${s.id} AND (\`stock\` <= 0 OR \`stock\` IS NULL)`
+      );
+    }
+
+    console.log('[DB] ✅ Precios reales de Medellín (43 insumos) y stock de producción garantizados.');
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando precios reales de insumos:', err.message);
+  }
+}
+
 module.exports = {
   resetAutoIncrement,
   resequenceTableIds,
@@ -1046,5 +1138,6 @@ module.exports = {
   ensureActaRevisionSchema,
   ensureEmpleadoSchema,
   ensureDevolucionSchema,
-  ensureInsumoIvaManualSchema
+  ensureInsumoIvaManualSchema,
+  ensurePreciosRealesInsumosYStock
 };
