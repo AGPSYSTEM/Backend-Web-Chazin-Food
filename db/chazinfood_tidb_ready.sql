@@ -1761,11 +1761,10 @@ CREATE TABLE `empleado` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Volcado de datos para la tabla `empleado`
-INSERT INTO `empleado` (`idEmpleado`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `cargo`, `fechaContratacion`, `tipoContrato`, `salario`, `turno`, `estado`, `eliminado`) VALUES
-(1, 'Carlos Andrés', 'Martínez Gómez', 'C.C.', '1020304050', '3109876543', 'carlos.martinez@chazinfood.com', 'Calle 45 # 12-34', 'Cocinero Principal', '2026-01-15', 'Término Indefinido', 1600000.00, 'Tarde - Noche', 1, 0),
-(2, 'Laura Marcela', 'Ospina Ramos', 'C.C.', '1030405060', '3158765432', 'laura.ospina@chazinfood.com', 'Carrera 78 # 45-12', 'Cajera / Vendedora', '2026-02-01', 'Término Fijo', 1400000.00, 'Mañana - Tarde', 1, 0),
-(3, 'Julián David', 'Restrepo Castro', 'C.C.', '1040506070', '3207654321', 'julian.restrepo@chazinfood.com', 'Diagonal 23 # 56-78', 'Auxiliar de Cocina', '2026-03-10', 'Término Fijo', 1350000.00, 'Tarde - Noche', 1, 0),
-(4, 'Santiago', 'Vásquez Pérez', 'C.C.', '1050607080', '3006543210', 'santiago.vasquez@chazinfood.com', 'Transversal 89 # 10-20', 'Domiciliario', '2026-04-05', 'Prestación de Servicios', 1300000.00, 'Rotativo', 1, 0);
+INSERT INTO `empleado` (`idEmpleado`, `idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `cargo`, `fechaContratacion`, `tipoContrato`, `salario`, `turno`, `estado`, `eliminado`) VALUES
+(1, 4, 'Admin', 'Sistema', 'C.C.', '1020304050', '3190000001', 'admin@chazinfood.com', 'Sede Principal Chazin Food', 'Administrador', '2026-01-01', 'Término Indefinido', 2500000.00, 'Completo', 1, 0),
+(2, 27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', 'Calle 10 # 45-20', 'Cocinero', '2026-01-15', 'Término Fijo', 1600000.00, 'Mañana - Tarde', 1, 0),
+(3, 24, 'Vendedor Principal', 'Chazin', 'C.C.', '1030405060', '3001234567', 'vendedor@chazinfood.com', 'Carrera 50 # 32-15', 'Vendedor', '2026-02-01', 'Término Fijo', 1400000.00, 'Tarde - Noche', 1, 0);
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;

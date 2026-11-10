@@ -1,4 +1,4 @@
-const { Empleado, User } = require('../../persistence/models');
+const { Empleado, User, Role } = require('../../persistence/models');
 const { Op } = require('sequelize');
 
 /**
@@ -41,11 +41,19 @@ const getEmpleados = async (req, res, next) => {
         {
           model: User,
           as: 'usuario',
-          attributes: ['idUsuario', 'nombre', 'email', 'estado'],
+          attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'estado', 'idRol'],
+          include: [
+            {
+              model: Role,
+              as: 'rolInfo',
+              attributes: ['idRol', 'nombre'],
+              required: false
+            }
+          ],
           required: false
         }
       ],
-      order: [['idEmpleado', 'DESC']]
+      order: [['idEmpleado', 'ASC']]
     });
 
     res.json(empleados);
@@ -65,7 +73,15 @@ const getEmpleadoById = async (req, res, next) => {
         {
           model: User,
           as: 'usuario',
-          attributes: ['idUsuario', 'nombre', 'email', 'estado'],
+          attributes: ['idUsuario', 'nombre', 'apellidos', 'email', 'estado', 'idRol'],
+          include: [
+            {
+              model: Role,
+              as: 'rolInfo',
+              attributes: ['idRol', 'nombre'],
+              required: false
+            }
+          ],
           required: false
         }
       ]
