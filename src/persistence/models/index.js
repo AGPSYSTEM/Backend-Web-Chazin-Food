@@ -180,6 +180,10 @@ const Proveedor = sequelize.define('proveedor', {
   idTipoProveedor: {
     type: DataTypes.INTEGER
   },
+  clasificacion: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
   idTipoDocumento: {
     type: DataTypes.INTEGER
   },
@@ -250,6 +254,10 @@ const Insumo = sequelize.define('insumo', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0
   },
+  costoPreparacion: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
   idProveedor: {
     type: DataTypes.INTEGER
   },
@@ -268,6 +276,16 @@ const Insumo = sequelize.define('insumo', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0
   },
+  porcionMinimaCantidad: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: null
+  },
+  porcionMinimaUnidad: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: null
+  },
   imagen: {
     type: DataTypes.STRING(255),
     allowNull: true
@@ -285,6 +303,10 @@ const Insumo = sequelize.define('insumo', {
   incluyeIva: {
     type: DataTypes.TINYINT,
     defaultValue: 0
+  },
+  porcentajeIva: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0.00
   }
 }, { tableName: 'insumo', timestamps: false });
 
@@ -327,6 +349,21 @@ const InsumoPreparado = sequelize.define('insumopreparado', {
   },
   costoTotal: {
     type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
+  porcionMinimaCantidad: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: 1
+  },
+  porcionMinimaUnidad: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: 'und'
+  },
+  porcionMinimaPrecio: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
     defaultValue: 0
   },
   fechaCreacion: {
@@ -516,6 +553,12 @@ const Venta = sequelize.define('venta', {
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false
+  },
+  iva: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return 0.00;
+    }
   },
   descuentoAplicado: {
     type: DataTypes.DECIMAL(12, 2),
@@ -774,6 +817,18 @@ const DetalleCompraInsumo = sequelize.define('detallecomprainsumo', {
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false
+  },
+  iva: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00
+  },
+  porcentajeIva: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0.00
+  },
+  incluyeIva: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
   },
   lotes: {
     type: DataTypes.TEXT
@@ -1086,23 +1141,57 @@ const Devolucion = sequelize.define('devolucion', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
+  idCliente: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   motivo: {
     type: DataTypes.STRING(255),
     allowNull: false
   },
-  descripcion: {
-    type: DataTypes.TEXT
+  tipoResolucion: {
+    type: DataTypes.STRING(50),
+    defaultValue: 'CAMBIO_PRODUCTO'
+  },
+  productosDevueltos: {
+    type: DataTypes.TEXT,
+    allowNull: true
   },
   valorDevuelto: {
-    type: DataTypes.DECIMAL(12, 2)
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0
+  },
+  descripcion: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  evidencia: {
+    type: DataTypes.STRING(500),
+    allowNull: true
   },
   fecha: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
   },
   estado: {
-    type: DataTypes.ENUM('PENDIENTE', 'ACEPTADA', 'RECHAZADA'),
+    type: DataTypes.STRING(50),
     defaultValue: 'PENDIENTE'
+  },
+  motivoRechazo: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  accionRealizada: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  fechaResolucion: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  usuarioResolucionId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
   }
 }, { tableName: 'devolucion', timestamps: false });
 
@@ -1217,6 +1306,9 @@ Venta.hasMany(Pago, { foreignKey: 'idVenta', as: 'pagos' });
 
 Devolucion.belongsTo(Venta, { foreignKey: 'idVenta', as: 'venta' });
 Venta.hasMany(Devolucion, { foreignKey: 'idVenta', as: 'devoluciones' });
+Devolucion.belongsTo(Cliente, { foreignKey: 'idCliente', as: 'cliente' });
+Cliente.hasMany(Devolucion, { foreignKey: 'idCliente', as: 'devoluciones' });
+Devolucion.belongsTo(User, { foreignKey: 'usuarioResolucionId', as: 'usuarioResolucion' });
 
 DetalleVentaAdicion.belongsTo(DetalleVentaProducto, { foreignKey: 'idDetalleVenta', as: 'detalleVenta' });
 DetalleVentaProducto.hasMany(DetalleVentaAdicion, { foreignKey: 'idDetalleVenta', as: 'adiciones' });

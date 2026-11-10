@@ -10,7 +10,7 @@ async function resetAutoIncrement(tableName, primaryKeyColumn = 'id') {
     const sequelize = connectDB.sequelize;
     const [results] = await sequelize.query(`SELECT COUNT(*) as total FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` > 0`);
     const total = results && results[0] ? parseInt(results[0].total || 0, 10) : 0;
-    
+
     if (total === 0) {
       await sequelize.query(`ALTER TABLE \`${tableName}\` AUTO_INCREMENT = 1;`);
     } else if (primaryKeyColumn) {
@@ -34,9 +34,9 @@ async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables =
     const sequelize = connectDB.sequelize;
     // Skip reserved ID=0 rows (used by placeholder records)
     const [rows] = await sequelize.query(`SELECT \`${primaryKeyColumn}\` FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` > 0 ORDER BY \`${primaryKeyColumn}\` ASC`);
-    
+
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-    
+
     let newId = 1;
     for (const r of rows) {
       const oldId = r[primaryKeyColumn];
@@ -50,7 +50,7 @@ async function resequenceTableIds(tableName, primaryKeyColumn = 'id', fkTables =
       }
       newId++;
     }
-    
+
     await sequelize.query(`ALTER TABLE \`${tableName}\` AUTO_INCREMENT = ${newId};`);
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
   } catch (err) {
@@ -192,9 +192,9 @@ async function ensureFichaTecnicaInsumoVariantZero() {
     await transaction.commit();
   } catch (error) {
     if (originalSqlMode !== undefined) {
-      await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction }).catch(() => {});
+      await sequelize.query('SET SESSION sql_mode = ?', { replacements: [originalSqlMode], transaction }).catch(() => { });
     }
-    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction }).catch(() => {});
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction }).catch(() => { });
     await transaction.rollback();
     throw error;
   }
@@ -286,7 +286,7 @@ async function syncVentasTotals() {
             obsData = typeof v.observaciones === 'string' && v.observaciones.startsWith('{')
               ? JSON.parse(v.observaciones)
               : {};
-          } catch (e) {}
+          } catch (e) { }
         }
 
         let calcSubtotal = 0;
@@ -772,14 +772,55 @@ async function ensureActaRevisionSchema() {
   }
 
   try {
-    // 4. proveedor.eliminado
+    // 4. proveedor.eliminado y proveedor.clasificacion (Mayorista, Proveedor, Fabricante)
     const [provCols] = await sequelize.query("SHOW COLUMNS FROM `proveedor` LIKE 'eliminado'");
     if (!provCols || provCols.length === 0) {
       await sequelize.query("ALTER TABLE `proveedor` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`");
       console.log('[DB Migration] ✅ Columna proveedor.eliminado agregada.');
     }
+    const [clasifCols] = await sequelize.query("SHOW COLUMNS FROM `proveedor` LIKE 'clasificacion'");
+    if (!clasifCols || clasifCols.length === 0) {
+      await sequelize.query("ALTER TABLE `proveedor` ADD COLUMN `clasificacion` VARCHAR(255) NULL AFTER `idTipoProveedor`");
+      console.log('[DB Migration] ✅ Columna proveedor.clasificacion agregada.');
+    }
   } catch (err) {
-    console.warn('[DB Migration] ⚠️ Error asegurando proveedor.eliminado:', err.message);
+    console.warn('[DB Migration] ⚠️ Error asegurando columnas de proveedor:', err.message);
+  }
+
+  try {
+    // 4.1 insumopreparado: porcion minima de adicion (cantidad, unidad, precio)
+    const [pmCantCols] = await sequelize.query("SHOW COLUMNS FROM `insumopreparado` LIKE 'porcionMinimaCantidad'");
+    if (!pmCantCols || pmCantCols.length === 0) {
+      await sequelize.query("ALTER TABLE `insumopreparado` ADD COLUMN `porcionMinimaCantidad` DECIMAL(10, 2) NULL DEFAULT 1 AFTER `precioVenta`");
+    }
+    const [pmUniCols] = await sequelize.query("SHOW COLUMNS FROM `insumopreparado` LIKE 'porcionMinimaUnidad'");
+    if (!pmUniCols || pmUniCols.length === 0) {
+      await sequelize.query("ALTER TABLE `insumopreparado` ADD COLUMN `porcionMinimaUnidad` VARCHAR(50) NULL DEFAULT 'und' AFTER `porcionMinimaCantidad`");
+    }
+    const [pmPrecioCols] = await sequelize.query("SHOW COLUMNS FROM `insumopreparado` LIKE 'porcionMinimaPrecio'");
+    if (!pmPrecioCols || pmPrecioCols.length === 0) {
+      await sequelize.query("ALTER TABLE `insumopreparado` ADD COLUMN `porcionMinimaPrecio` DECIMAL(10, 2) NULL DEFAULT 0 AFTER `porcionMinimaUnidad`");
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando columnas de insumopreparado:', err.message);
+  }
+
+  try {
+    // 4.2 insumo: porcion minima de adicion y costoPreparacion
+    const [insPmCant] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'porcionMinimaCantidad'");
+    if (!insPmCant || insPmCant.length === 0) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `porcionMinimaCantidad` DECIMAL(10, 2) NULL DEFAULT 1 AFTER `precioAdicion`");
+    }
+    const [insPmUni] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'porcionMinimaUnidad'");
+    if (!insPmUni || insPmUni.length === 0) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `porcionMinimaUnidad` VARCHAR(50) NULL DEFAULT 'und' AFTER `porcionMinimaCantidad`");
+    }
+    const [insCostoPrep] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'costoPreparacion'");
+    if (!insCostoPrep || insCostoPrep.length === 0) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `costoPreparacion` DECIMAL(10, 2) NULL DEFAULT 0 AFTER `precioUnitario`");
+    }
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando columnas de insumo:', err.message);
   }
 
   try {
@@ -829,6 +870,109 @@ async function ensureActaRevisionSchema() {
     await sequelize.query("INSERT IGNORE INTO `tipodocumento` (`nombre`) VALUES ('PPT'), ('TI')");
   } catch (err) {
     console.warn('[DB Migration] ⚠️ Error asegurando tipodocumento PPT/TI:', err.message);
+  }
+}
+
+/**
+ * Asegura la creación y esquema de la tabla devolucion para el módulo de devoluciones
+ */
+async function ensureDevolucionSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    // Asegurar columnas de tabla devolucion para el módulo de devoluciones
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`devolucion\` (
+        \`idDevolucion\` INT(11) NOT NULL AUTO_INCREMENT,
+        \`idVenta\` INT(11) NOT NULL,
+        \`idCliente\` INT(11) DEFAULT NULL,
+        \`motivo\` VARCHAR(255) NOT NULL,
+        \`tipoResolucion\` VARCHAR(50) NOT NULL DEFAULT 'CAMBIO_PRODUCTO',
+        \`productosDevueltos\` LONGTEXT DEFAULT NULL,
+        \`valorDevuelto\` DECIMAL(12, 2) DEFAULT 0.00,
+        \`descripcion\` TEXT DEFAULT NULL,
+        \`evidencia\` VARCHAR(500) DEFAULT NULL,
+        \`estado\` VARCHAR(50) DEFAULT 'PENDIENTE',
+        \`motivoRechazo\` TEXT DEFAULT NULL,
+        \`accionRealizada\` TEXT DEFAULT NULL,
+        \`fecha\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        \`fechaResolucion\` DATETIME DEFAULT NULL,
+        \`usuarioResolucionId\` INT(11) DEFAULT NULL,
+        PRIMARY KEY (\`idDevolucion\`),
+        KEY \`idx_devolucion_venta\` (\`idVenta\`),
+        KEY \`idx_devolucion_cliente\` (\`idCliente\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    const [dTipoRes] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'tipoResolucion'");
+    if (!dTipoRes || dTipoRes.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `tipoResolucion` VARCHAR(50) NOT NULL DEFAULT 'CAMBIO_PRODUCTO' AFTER `motivo`");
+    }
+    const [dCli] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'idCliente'");
+    if (!dCli || dCli.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `idCliente` INT(11) NULL AFTER `idVenta`");
+    }
+    const [dProds] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'productosDevueltos'");
+    if (!dProds || dProds.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `productosDevueltos` LONGTEXT NULL AFTER `tipoResolucion`");
+    }
+    const [dEvi] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'evidencia'");
+    if (!dEvi || dEvi.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `evidencia` VARCHAR(500) NULL AFTER `descripcion`");
+    }
+    const [dRechazo] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'motivoRechazo'");
+    if (!dRechazo || dRechazo.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `motivoRechazo` TEXT NULL AFTER `estado`");
+    }
+    const [dAccion] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'accionRealizada'");
+    if (!dAccion || dAccion.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `accionRealizada` TEXT NULL AFTER `motivoRechazo`");
+    }
+    const [dFResol] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'fechaResolucion'");
+    if (!dFResol || dFResol.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `fechaResolucion` DATETIME NULL AFTER `fecha`");
+    }
+    const [dUserResol] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'usuarioResolucionId'");
+    if (!dUserResol || dUserResol.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `usuarioResolucionId` INT(11) NULL AFTER `fechaResolucion`");
+    }
+    await sequelize.query("ALTER TABLE `devolucion` MODIFY COLUMN `estado` VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE'");
+    console.log('[DB] ✅ Tabla y columnas de devolucion verificadas/aseguradas.');
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando columnas de devolucion:', err.message);
+  }
+}
+
+async function ensureInsumoIvaManualSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    // 1. Columna porcentajeIva en tabla insumo
+    const [insIvaCols] = await sequelize.query("SHOW COLUMNS FROM `insumo` LIKE 'porcentajeIva'");
+    if (!insIvaCols || insIvaCols.length === 0) {
+      await sequelize.query("ALTER TABLE `insumo` ADD COLUMN `porcentajeIva` DECIMAL(5, 2) DEFAULT 0.00 AFTER `incluyeIva`");
+      console.log('[DB Migration] ✅ Columna insumo.porcentajeIva agregada.');
+    }
+    // Inicializar insumos existentes que tengan incluyeIva = 1 con porcentajeIva = 19
+    await sequelize.query("UPDATE `insumo` SET `porcentajeIva` = 19.00 WHERE `incluyeIva` = 1 AND (`porcentajeIva` IS NULL OR `porcentajeIva` = 0.00)");
+
+    // 2. Columnas iva, porcentajeIva, incluyeIva en tabla detallecomprainsumo
+    const [detIvaCols] = await sequelize.query("SHOW COLUMNS FROM `detallecomprainsumo` LIKE 'iva'");
+    if (!detIvaCols || detIvaCols.length === 0) {
+      await sequelize.query("ALTER TABLE `detallecomprainsumo` ADD COLUMN `iva` DECIMAL(12, 2) DEFAULT 0.00 AFTER `subtotal`");
+      console.log('[DB Migration] ✅ Columna detallecomprainsumo.iva agregada.');
+    }
+    const [detPctCols] = await sequelize.query("SHOW COLUMNS FROM `detallecomprainsumo` LIKE 'porcentajeIva'");
+    if (!detPctCols || detPctCols.length === 0) {
+      await sequelize.query("ALTER TABLE `detallecomprainsumo` ADD COLUMN `porcentajeIva` DECIMAL(5, 2) DEFAULT 0.00 AFTER `iva`");
+      console.log('[DB Migration] ✅ Columna detallecomprainsumo.porcentajeIva agregada.');
+    }
+    const [detIncCols] = await sequelize.query("SHOW COLUMNS FROM `detallecomprainsumo` LIKE 'incluyeIva'");
+    if (!detIncCols || detIncCols.length === 0) {
+      await sequelize.query("ALTER TABLE `detallecomprainsumo` ADD COLUMN `incluyeIva` TINYINT(1) DEFAULT 0 AFTER `porcentajeIva`");
+      console.log('[DB Migration] ✅ Columna detallecomprainsumo.incluyeIva agregada.');
+    }
+    console.log('[DB] ✅ Esquema de IVA manual para insumos y compras verificado.');
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando esquema de IVA manual:', err.message);
   }
 }
 
@@ -900,5 +1044,7 @@ module.exports = {
   ensureProductoAdicionesDefaultSchema,
   ensureCompraLotesYCancelacionSchema,
   ensureActaRevisionSchema,
-  ensureEmpleadoSchema
+  ensureEmpleadoSchema,
+  ensureDevolucionSchema,
+  ensureInsumoIvaManualSchema
 };

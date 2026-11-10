@@ -49,15 +49,44 @@ class ProveedorService {
   static _mapProveedor(p) {
     const docNombre = p.tipoDocumento ? p.tipoDocumento.nombre : (p.idTipoDocumento === 3 ? 'NIT' : 'CC');
     const isJuridica = p.idTipoDocumento === 3 || docNombre === 'NIT';
-    const tipoProvNombre = p.tipoProveedor ? p.tipoProveedor.nombre : (p.idTipoProveedor === 2 ? 'Distribuidor' : p.idTipoProveedor === 3 ? 'Fabricante' : 'Mayorista');
+
+    let clasificacionArr = [];
+    if (p.clasificacion) {
+      try {
+        if (typeof p.clasificacion === 'string' && (p.clasificacion.startsWith('[') || p.clasificacion.startsWith('{'))) {
+          clasificacionArr = JSON.parse(p.clasificacion);
+        } else if (typeof p.clasificacion === 'string') {
+          clasificacionArr = p.clasificacion.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      } catch (_) {
+        clasificacionArr = [String(p.clasificacion).trim()];
+      }
+    }
+    if (!Array.isArray(clasificacionArr) || clasificacionArr.length === 0) {
+      const defaultTipo = p.tipoProveedor ? p.tipoProveedor.nombre : (p.idTipoProveedor === 2 ? 'Proveedor' : p.idTipoProveedor === 3 ? 'Fabricante' : 'Mayorista');
+      clasificacionArr = [defaultTipo];
+    }
+    clasificacionArr = [...new Set(clasificacionArr.map(c => {
+      const low = String(c).toLowerCase();
+      if (low.includes('distrib') || low.includes('prov')) return 'Proveedor';
+      if (low.includes('fabri')) return 'Fabricante';
+      return 'Mayorista';
+    }))];
+
+    const tipoProvNombre = clasificacionArr.join(', ');
 
     return {
       idProveedor: p.idProveedor,
       id: p.idProveedor,
       nombre: p.nombre,
       idTipoProveedor: p.idTipoProveedor || 1,
+      clasificacion: clasificacionArr,
+      tiposProveedor: clasificacionArr,
       tipoProveedor: tipoProvNombre,
       tipoProveedorNombre: tipoProvNombre,
+      esMayorista: clasificacionArr.includes('Mayorista'),
+      esProveedor: clasificacionArr.includes('Proveedor'),
+      esFabricante: clasificacionArr.includes('Fabricante'),
       idTipoDocumento: p.idTipoDocumento || (isJuridica ? 3 : 1),
       tipoDocumento: docNombre,
       tipoPersona: isJuridica ? 'Jurídica' : 'Natural',
@@ -156,9 +185,18 @@ class ProveedorService {
 
     const estadoInt = (estado === undefined || estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
 
+    const rawClasif = data.tiposProveedor || data.clasificacion;
+    let clasificacionStr = null;
+    if (Array.isArray(rawClasif) && rawClasif.length > 0) {
+      clasificacionStr = JSON.stringify(rawClasif);
+    } else if (typeof rawClasif === 'string' && rawClasif.trim()) {
+      clasificacionStr = JSON.stringify(rawClasif.split(',').map(s => s.trim()).filter(Boolean));
+    }
+
     const proveedor = await Proveedor.create({
       nombre: nombre.trim(),
       idTipoProveedor: parsedTipoProv,
+      clasificacion: clasificacionStr,
       idTipoDocumento: parsedTipoDoc,
       numeroDocumento: finalNumeroDocumento,
       telefono: telefono || '',
@@ -244,11 +282,20 @@ class ProveedorService {
     if (direccion !== undefined) p.direccion = direccion || '';
     if (finalNombreContacto !== undefined) p.nombreContacto = finalNombreContacto || '';
 
-    // Actualizar tipo de proveedor
+    // Actualizar tipo de proveedor y clasificacion
+    const rawClasif = data.tiposProveedor || data.clasificacion;
+    if (rawClasif !== undefined) {
+      if (Array.isArray(rawClasif) && rawClasif.length > 0) {
+        p.clasificacion = JSON.stringify(rawClasif);
+      } else if (typeof rawClasif === 'string' && rawClasif.trim()) {
+        p.clasificacion = JSON.stringify(rawClasif.split(',').map(s => s.trim()).filter(Boolean));
+      }
+    }
+
     if (idTipoProveedor !== undefined) {
       p.idTipoProveedor = Number(idTipoProveedor) || p.idTipoProveedor;
     } else if (tipoProveedor !== undefined) {
-      if (tipoProveedor === 'Distribuidor') p.idTipoProveedor = 2;
+      if (tipoProveedor === 'Distribuidor' || tipoProveedor === 'Proveedor') p.idTipoProveedor = 2;
       else if (tipoProveedor === 'Fabricante') p.idTipoProveedor = 3;
       else if (tipoProveedor === 'Mayorista') p.idTipoProveedor = 1;
     }

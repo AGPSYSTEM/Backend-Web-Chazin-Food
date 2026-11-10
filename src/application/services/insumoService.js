@@ -1,7 +1,7 @@
-const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo, Trazabilidad, DetalleInsumoPreparadoInsumo, LoteInsumo } = require('../../persistence/models');
+const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo, Trazabilidad, DetalleInsumoPreparadoInsumo, LoteInsumo, DetalleCompraInsumo } = require('../../persistence/models');
 const database = require('../../persistence/config/db');
 
-function formatInsumo(i) {
+function formatInsumo(i, options = {}) {
   const catNombre = i.categoria ? i.categoria.nombre : 'Sin categoría';
   const provNombre = i.proveedor ? i.proveedor.nombre : 'Sin Proveedor';
   const lotesList = (i.lotes || []).map(l => ({
@@ -15,12 +15,18 @@ function formatInsumo(i) {
     estado: l.estado || 'ACTIVO'
   }));
 
+  const stockNum = parseFloat(i.stock || 0);
+  const countCompras = options.comprasMap ? (options.comprasMap.get(Number(i.idInsumo)) || 0) : 0;
+  const tieneCompras = countCompras > 0;
+  const tieneStockActivo = stockNum > 0;
+  const puedeEliminarse = !tieneStockActivo && !tieneCompras;
+
   return {
     idInsumo: i.idInsumo,
     id: i.idInsumo,
     nombre: i.nombre,
     idCategoriaInsumo: i.idCategoriaInsumo,
-    stock: parseFloat(i.stock || 0),
+    stock: stockNum,
     stockMinimo: parseFloat(i.stockMinimo || 0),
     stockMaximo: parseFloat(i.stockMaximo !== undefined && i.stockMaximo !== null ? i.stockMaximo : 100),
     fechaExpedicion: i.fechaExpedicion || null,
@@ -34,11 +40,18 @@ function formatInsumo(i) {
     precioAdicion: parseFloat(i.precioAdicion || 0),
     imagen: i.imagen || '',
     incluyeIva: i.incluyeIva ? 1 : 0,
+    porcentajeIva: (i.incluyeIva && (i.porcentajeIva === undefined || i.porcentajeIva === null || Number(i.porcentajeIva) === 0))
+      ? 19.00
+      : parseFloat(i.porcentajeIva || 0),
     categoria: catNombre,
     categoriaNombre: catNombre,
     proveedor: provNombre,
     proveedorNombre: provNombre,
-    lotes: lotesList
+    lotes: lotesList,
+    tieneCompras,
+    totalCompras: countCompras,
+    tieneStockActivo,
+    puedeEliminarse
   };
 }
 
@@ -46,7 +59,7 @@ class InsumoService {
   static async checkVencimientos() {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const Op = database.Sequelize.Op;
+      const { Op } = require('sequelize');
 
       // 1. Lotes con fecha de vencimiento cumplida o pasada que sigan activos
       const lotesVencidos = await LoteInsumo.findAll({
@@ -100,7 +113,7 @@ class InsumoService {
             cantidad: 0,
             motivo: 'Lote vencido',
             skipStockUpdate: true
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
 
@@ -111,41 +124,68 @@ class InsumoService {
     }
   }
 
+  static async getComprasMap() {
+    try {
+      const detalleCounts = await DetalleCompraInsumo.findAll({
+        attributes: ['idInsumo', [database.sequelize.fn('COUNT', database.sequelize.col('idDetalleCompra')), 'totalCompras']],
+        group: ['idInsumo'],
+        raw: true
+      });
+      const comprasMap = new Map();
+      (detalleCounts || []).forEach(dc => {
+        comprasMap.set(Number(dc.idInsumo), Number(dc.totalCompras || 0));
+      });
+      return comprasMap;
+    } catch {
+      return new Map();
+    }
+  }
+
   static async getAll() {
     await this.checkVencimientos();
-    const insumos = await Insumo.findAll({
-      where: { eliminado: 0 },
-      include: [
-        { model: CategoriaInsumo, as: 'categoria', required: false },
-        { model: Proveedor, as: 'proveedor', required: false },
-        { model: LoteInsumo, as: 'lotes', required: false }
-      ]
-    });
+    const [insumos, comprasMap] = await Promise.all([
+      Insumo.findAll({
+        where: { eliminado: 0 },
+        include: [
+          { model: CategoriaInsumo, as: 'categoria', required: false },
+          { model: Proveedor, as: 'proveedor', required: false },
+          { model: LoteInsumo, as: 'lotes', required: false }
+        ]
+      }),
+      this.getComprasMap()
+    ]);
 
-    return insumos.map(formatInsumo);
+    return insumos.map(i => formatInsumo(i, { comprasMap }));
   }
 
   static async getDeleted() {
-    const insumos = await Insumo.findAll({
-      where: { eliminado: 1 },
-      include: [
-        { model: CategoriaInsumo, as: 'categoria', required: false },
-        { model: Proveedor, as: 'proveedor', required: false },
-        { model: LoteInsumo, as: 'lotes', required: false }
-      ]
-    });
+    const [insumos, comprasMap] = await Promise.all([
+      Insumo.findAll({
+        where: { eliminado: 1 },
+        include: [
+          { model: CategoriaInsumo, as: 'categoria', required: false },
+          { model: Proveedor, as: 'proveedor', required: false },
+          { model: LoteInsumo, as: 'lotes', required: false }
+        ]
+      }),
+      this.getComprasMap()
+    ]);
 
-    return insumos.map(formatInsumo);
+    return insumos.map(i => formatInsumo(i, { comprasMap }));
   }
 
   static async getById(idInsumo) {
-    const i = await Insumo.findByPk(idInsumo, {
-      include: [
-        { model: CategoriaInsumo, as: 'categoria', required: false },
-        { model: Proveedor, as: 'proveedor', required: false },
-        { model: LoteInsumo, as: 'lotes', required: false }
-      ]
-    });
+    const id = parseInt(idInsumo, 10);
+    const [i, count] = await Promise.all([
+      Insumo.findByPk(id, {
+        include: [
+          { model: CategoriaInsumo, as: 'categoria', required: false },
+          { model: Proveedor, as: 'proveedor', required: false },
+          { model: LoteInsumo, as: 'lotes', required: false }
+        ]
+      }),
+      DetalleCompraInsumo.count({ where: { idInsumo: id } }).catch(() => 0)
+    ]);
 
     if (!i) {
       const error = new Error('Insumo no encontrado');
@@ -153,7 +193,8 @@ class InsumoService {
       throw error;
     }
 
-    return formatInsumo(i);
+    const comprasMap = new Map([[id, count]]);
+    return formatInsumo(i, { comprasMap });
   }
 
   static async create(insumoData) {
@@ -230,6 +271,11 @@ class InsumoService {
         precioAdicion: insumoData.precioAdicion !== undefined && insumoData.precioAdicion !== null ? parseFloat(insumoData.precioAdicion) : 0,
         imagen: insumoData.imagen || null,
         incluyeIva: insumoData.incluyeIva ? 1 : 0,
+        porcentajeIva: insumoData.incluyeIva
+          ? (insumoData.porcentajeIva !== undefined && insumoData.porcentajeIva !== null && insumoData.porcentajeIva !== ""
+            ? parseFloat(insumoData.porcentajeIva)
+            : 19.00)
+          : 0.00,
         estado: normalizedEstado
       }, { transaction });
 
@@ -273,27 +319,15 @@ class InsumoService {
       }
 
       let {
-        nombre, idCategoriaInsumo, stock, stockMinimo, stockMaximo,
-        fechaExpedicion, fechaVencimiento, unidadMedida,
-        precioUnitario, idProveedor, descripcion, estado,
-        categoria, proveedor, fichaTecnica
+        stockMinimo, stockMaximo, descripcion, estado, fichaTecnica
       } = insumoData;
 
-      if (!idCategoriaInsumo && categoria) {
-        const cat = await CategoriaInsumo.findOne({ where: { nombre: categoria } });
-        if (cat) idCategoriaInsumo = cat.idCategoriaInsumo;
+      // ── Campos editables: Stock Mínimo, Stock Máximo, Descripción y Estado (#78) ──
+      // Los datos maestros (nombre, categoría, unidad, precio/costo, stock e IVA) son inmutables
+      if (stockMinimo !== undefined && stockMinimo !== null && stockMinimo !== '') {
+        insumo.stockMinimo = parseFloat(stockMinimo);
       }
-
-      if (!idProveedor && proveedor) {
-        const prov = await Proveedor.findOne({ where: { nombre: proveedor } });
-        if (prov) idProveedor = prov.idProveedor;
-      }
-
-      if (nombre !== undefined) insumo.nombre = nombre.trim();
-      if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null;
-      if (stock !== undefined) insumo.stock = parseFloat(stock);
-      if (stockMinimo !== undefined) insumo.stockMinimo = parseFloat(stockMinimo);
-      if (stockMaximo !== undefined) {
+      if (stockMaximo !== undefined && stockMaximo !== null && stockMaximo !== '') {
         const minVal = stockMinimo !== undefined ? parseFloat(stockMinimo) : parseFloat(insumo.stockMinimo || 0);
         const maxVal = parseFloat(stockMaximo);
         if (maxVal < minVal) {
@@ -303,25 +337,35 @@ class InsumoService {
         }
         insumo.stockMaximo = maxVal;
       }
-      if (fechaExpedicion !== undefined) insumo.fechaExpedicion = (fechaExpedicion && String(fechaExpedicion).trim() !== '') ? fechaExpedicion : null;
-      if (fechaVencimiento !== undefined) insumo.fechaVencimiento = (fechaVencimiento && String(fechaVencimiento).trim() !== '') ? fechaVencimiento : null;
-      if (unidadMedida !== undefined) insumo.unidadMedida = unidadMedida;
-      if (precioUnitario !== undefined) insumo.precioUnitario = parseFloat(precioUnitario);
-      if (idProveedor !== undefined) {
-        let provVal = null;
-        if (idProveedor) {
-          const provExists = await Proveedor.findByPk(parseInt(idProveedor));
-          if (provExists) provVal = provExists.idProveedor;
-        }
-        insumo.idProveedor = provVal;
+      if (descripcion !== undefined) {
+        insumo.descripcion = descripcion;
       }
-      if (descripcion !== undefined) insumo.descripcion = descripcion;
-      if (insumoData.esAdicion !== undefined) insumo.esAdicion = insumoData.esAdicion ? 1 : 0;
-      if (insumoData.precioAdicion !== undefined) insumo.precioAdicion = parseFloat(insumoData.precioAdicion || 0);
-      if (insumoData.imagen !== undefined) insumo.imagen = insumoData.imagen || null;
-      if (insumoData.incluyeIva !== undefined) insumo.incluyeIva = insumoData.incluyeIva ? 1 : 0;
       if (estado !== undefined) {
         insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+      }
+
+      // En caso de actualización completa administrativa interna (ej. migraciones o scripts autorizados)
+      if (options.allowFullUpdate) {
+        let {
+          nombre, idCategoriaInsumo, stock, unidadMedida, precioUnitario,
+          fechaExpedicion, fechaVencimiento, idProveedor
+        } = insumoData;
+        if (nombre !== undefined) insumo.nombre = nombre.trim();
+        if (idCategoriaInsumo !== undefined) insumo.idCategoriaInsumo = idCategoriaInsumo ? parseInt(idCategoriaInsumo) : null;
+        if (stock !== undefined) insumo.stock = parseFloat(stock);
+        if (fechaExpedicion !== undefined) insumo.fechaExpedicion = (fechaExpedicion && String(fechaExpedicion).trim() !== '') ? fechaExpedicion : null;
+        if (fechaVencimiento !== undefined) insumo.fechaVencimiento = (fechaVencimiento && String(fechaVencimiento).trim() !== '') ? fechaVencimiento : null;
+        if (unidadMedida !== undefined) insumo.unidadMedida = unidadMedida;
+        if (precioUnitario !== undefined) insumo.precioUnitario = parseFloat(precioUnitario);
+        if (idProveedor !== undefined) insumo.idProveedor = idProveedor ? parseInt(idProveedor) : null;
+        if (insumoData.esAdicion !== undefined) insumo.esAdicion = insumoData.esAdicion ? 1 : 0;
+        if (insumoData.precioAdicion !== undefined) insumo.precioAdicion = parseFloat(insumoData.precioAdicion || 0);
+        if (insumoData.imagen !== undefined) insumo.imagen = insumoData.imagen || null;
+        if (insumoData.incluyeIva !== undefined) {
+          const llevaIva = insumoData.incluyeIva ? 1 : 0;
+          insumo.incluyeIva = llevaIva;
+          insumo.porcentajeIva = llevaIva ? (parseFloat(insumoData.porcentajeIva) || 19.00) : 0.00;
+        }
       }
 
       await insumo.save({ transaction });
@@ -361,6 +405,29 @@ class InsumoService {
       if (!insumo) {
         const error = new Error('Insumo no encontrado');
         error.statusCode = 404;
+        throw error;
+      }
+
+      // ── Validar stock activo: No se puede eliminar si tiene stock > 0 ──
+      if (Number(insumo.stock || 0) > 0) {
+        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque cuenta con un stock activo de ${insumo.stock} ${insumo.unidadMedida || 'und'}. Para eliminarlo, su stock debe ser 0.`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // ── Validar compras asociadas: No se puede eliminar si ya fue comprado ──
+      const comprasCount = await DetalleCompraInsumo.count({ where: { idInsumo }, transaction });
+      if (comprasCount > 0) {
+        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque ya ha sido registrado en ${comprasCount} compra(s). Por trazabilidad contable no es posible eliminarlo.`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // ── Validar lotes asociados ──
+      const lotesCount = await LoteInsumo.count({ where: { idInsumo }, transaction });
+      if (lotesCount > 0) {
+        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque cuenta con ${lotesCount} lote(s) en su historial.`);
+        error.statusCode = 400;
         throw error;
       }
 
@@ -434,6 +501,20 @@ class InsumoService {
       throw error;
     }
 
+    // ── Validar stock activo y compras ──
+    if (Number(insumo.stock || 0) > 0) {
+      const error = new Error(`No se puede eliminar definitivamente el insumo "${insumo.nombre}" porque cuenta con un stock activo de ${insumo.stock} ${insumo.unidadMedida || 'und'}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const comprasCount = await DetalleCompraInsumo.count({ where: { idInsumo: id } });
+    if (comprasCount > 0) {
+      const error = new Error(`No se puede eliminar definitivamente el insumo "${insumo.nombre}" porque ya ha sido registrado en ${comprasCount} compra(s).`);
+      error.statusCode = 400;
+      throw error;
+    }
+
     const nombreInsumo = insumo.nombre;
 
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
@@ -452,12 +533,12 @@ class InsumoService {
 
     // Eliminar referencias en detalle de insumos preparados si las hubiera
     if (DetalleInsumoPreparadoInsumo) {
-      await DetalleInsumoPreparadoInsumo.destroy({ where: { idInsumo: id } }).catch(() => {});
+      await DetalleInsumoPreparadoInsumo.destroy({ where: { idInsumo: id } }).catch(() => { });
     }
 
     // Eliminar registros de trazabilidad asociados a este insumo
     if (Trazabilidad) {
-      await Trazabilidad.destroy({ where: { idInsumo: id } }).catch(() => {});
+      await Trazabilidad.destroy({ where: { idInsumo: id } }).catch(() => { });
     }
 
     await insumo.destroy();
@@ -468,7 +549,7 @@ class InsumoService {
       entidadNombre: nombreInsumo,
       detalle: `Se eliminó permanentemente el insumo: ${nombreInsumo}`,
       motivo: 'Eliminación física definitiva'
-    }).catch(() => {});
+    }).catch(() => { });
 
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('insumo', 'idInsumo');

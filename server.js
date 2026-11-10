@@ -33,7 +33,9 @@ const {
   ensureProductoAdicionesDefaultSchema,
   ensureCompraLotesYCancelacionSchema,
   ensureActaRevisionSchema,
-  ensureEmpleadoSchema
+  ensureEmpleadoSchema,
+  ensureDevolucionSchema,
+  ensureInsumoIvaManualSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
 async function initializeDatabaseSchema() {
@@ -59,6 +61,8 @@ async function initializeDatabaseSchema() {
     await ensureProductoAdicionesDefaultSchema();
     await ensureCompraLotesYCancelacionSchema();
     await ensureEmpleadoSchema();
+    await ensureDevolucionSchema();
+    await ensureInsumoIvaManualSchema();
     try {
       const [results] = await sequelize.query(
         "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta' AND COLUMN_NAME = 'tipoVenta'"
@@ -182,6 +186,7 @@ app.use('/api/categorias-producto', require('./src/presentation/routes/categoria
 app.use('/api/categorias-productos', require('./src/presentation/routes/categoriaProductoRoutes'));
 app.use('/api/compras', require('./src/presentation/routes/compraRoutes'));
 app.use('/api/ventas', require('./src/presentation/routes/ventaRoutes'));
+app.use('/api/devoluciones', require('./src/presentation/routes/devolucionRoutes'));
 app.use('/api/fichas-tecnicas', require('./src/presentation/routes/fichaTecnicaRoutes'));
 app.use('/api/produccion', require('./src/presentation/routes/produccionRoutes'));
 app.use('/api/empleados', require('./src/presentation/routes/empleadoRoutes'));

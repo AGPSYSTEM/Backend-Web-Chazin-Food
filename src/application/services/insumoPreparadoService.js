@@ -351,6 +351,12 @@ class InsumoPreparadoService {
       throw error;
     }
 
+    if (Number(p.stock || 0) > 0) {
+      const error = new Error(`No se puede eliminar el insumo preparado "${p.nombre}" porque cuenta con un stock activo de ${p.stock} ${p.unidadMedida || 'und'}. Para eliminarlo, su stock debe ser 0.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
     p.eliminado = 1;
     await p.save();
 
@@ -394,6 +400,12 @@ class InsumoPreparadoService {
     if (!p) {
       const error = new Error('Insumo preparado no encontrado');
       error.statusCode = 404;
+      throw error;
+    }
+
+    if (Number(p.stock || 0) > 0) {
+      const error = new Error(`No se puede eliminar definitivamente el insumo preparado "${p.nombre}" porque cuenta con un stock activo de ${p.stock} ${p.unidadMedida || 'und'}.`);
+      error.statusCode = 400;
       throw error;
     }
 

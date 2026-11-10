@@ -95,7 +95,7 @@ class CompraService {
               lotesParsed = typeof d.lotes === 'string' && (d.lotes.startsWith('[') || d.lotes.startsWith('{'))
                 ? JSON.parse(d.lotes)
                 : d.lotes;
-            } catch (_) {}
+            } catch (_) { }
           }
           return {
             idDetalleCompra: d.idDetalleCompra,
@@ -103,6 +103,9 @@ class CompraService {
             cantidad: d.cantidad,
             precioUnitario: d.precioUnitario,
             subtotal: d.subtotal,
+            iva: parseFloat(d.iva || 0),
+            porcentajeIva: parseFloat(d.porcentajeIva || 0),
+            incluyeIva: d.incluyeIva ? 1 : 0,
             numeroLote: d.numeroLote || null,
             fechaVencimiento: d.fechaVencimiento || null,
             lotes: Array.isArray(lotesParsed) ? lotesParsed : [],
@@ -179,7 +182,7 @@ class CompraService {
             lotesParsed = typeof d.lotes === 'string' && (d.lotes.startsWith('[') || d.lotes.startsWith('{'))
               ? JSON.parse(d.lotes)
               : d.lotes;
-          } catch (_) {}
+          } catch (_) { }
         }
         return {
           idDetalleCompra: d.idDetalleCompra,
@@ -187,6 +190,9 @@ class CompraService {
           cantidad: d.cantidad,
           precioUnitario: d.precioUnitario,
           subtotal: d.subtotal,
+          iva: parseFloat(d.iva || 0),
+          porcentajeIva: parseFloat(d.porcentajeIva || 0),
+          incluyeIva: d.incluyeIva ? 1 : 0,
           numeroLote: d.numeroLote || null,
           fechaVencimiento: d.fechaVencimiento || null,
           lotes: Array.isArray(lotesParsed) ? lotesParsed : [],
@@ -259,23 +265,59 @@ class CompraService {
       throw error;
     }
 
+    // Calcular subtotales e IVAs individuales por insumo adquirido
+    let subtotalGeneralCalculado = 0;
+    let totalIvaCalculado = 0;
+
+    const detallesProcesados = data.detalles.map((d) => {
+      const cant = parseFloat(d.cantidad) || 0;
+      const pUnit = parseFloat(d.precioUnitario) || 0;
+      const sub = d.subtotal !== undefined ? parseFloat(d.subtotal) : (cant * pUnit);
+      subtotalGeneralCalculado += sub;
+
+      const itemIncluyeIva = d.incluyeIva !== undefined
+        ? (d.incluyeIva ? 1 : 0)
+        : (d.iva && parseFloat(d.iva) > 0 ? 1 : 0);
+      const itemPctIva = itemIncluyeIva
+        ? (d.porcentajeIva !== undefined && d.porcentajeIva !== null && d.porcentajeIva !== '' ? parseFloat(d.porcentajeIva) : 19.00)
+        : 0.00;
+      const itemIva = d.iva !== undefined
+        ? parseFloat(d.iva)
+        : (itemIncluyeIva ? Math.round(sub * (itemPctIva / 100)) : 0);
+      totalIvaCalculado += itemIva;
+
+      return {
+        ...d,
+        cant,
+        pUnit,
+        sub,
+        itemIncluyeIva,
+        itemPctIva,
+        itemIva
+      };
+    });
+
+    const finalSubtotal = subtotalGeneralCalculado > 0 ? subtotalGeneralCalculado : (parseFloat(data.subtotal) || 0);
+    const finalIva = totalIvaCalculado > 0 ? totalIvaCalculado : (parseFloat(data.iva) || 0);
+    const finalTotal = (finalSubtotal + finalIva) > 0 ? (finalSubtotal + finalIva) : (parseFloat(data.total) || 0);
+
     const compra = await Compra.create({
       idProveedor: idProv,
       numeroFactura: numFactura,
       fechaFactura: data.fechaFactura,
       fechaCompra: data.fechaCompra || new Date(),
-      subtotal: parseFloat(data.subtotal) || parseFloat(data.total) || 0,
-      iva: parseFloat(data.iva) || 0,
-      total: parseFloat(data.total) || 0,
-      incluyeIva: data.incluyeIva ? 1 : 0,
+      subtotal: finalSubtotal,
+      iva: finalIva,
+      total: finalTotal,
+      incluyeIva: finalIva > 0 ? 1 : 0,
       estado: ESTADO_RECIBIDA
     });
 
-    if (data.detalles && data.detalles.length > 0) {
-      const detallesParaGuardar = data.detalles.map((d, index) => {
+    if (detallesProcesados.length > 0) {
+      const detallesParaGuardar = detallesProcesados.map((d, index) => {
         let lotesArr = Array.isArray(d.lotes) && d.lotes.length > 0
           ? d.lotes
-          : (d.numeroLote ? [{ numeroLote: d.numeroLote, fechaVencimiento: d.fechaVencimiento, cantidad: d.cantidad }] : []);
+          : (d.numeroLote ? [{ numeroLote: d.numeroLote, fechaVencimiento: d.fechaVencimiento, cantidad: d.cant }] : []);
 
         // Ítem #79: Generar número de lote automáticamente de forma sugerida si viene vacío
         if (lotesArr.length === 0) {
@@ -283,29 +325,28 @@ class CompraService {
           lotesArr = [{
             numeroLote: autoLote,
             fechaVencimiento: d.fechaVencimiento || null,
-            cantidad: d.cantidad
+            cantidad: d.cant
           }];
         }
 
         const primerLote = lotesArr[0];
-        const numLote = (d.numeroLote && String(d.numeroLote).trim()) 
-          || (primerLote && primerLote.numeroLote && String(primerLote.numeroLote).trim()) 
+        const numLote = (d.numeroLote && String(d.numeroLote).trim())
+          || (primerLote && primerLote.numeroLote && String(primerLote.numeroLote).trim())
           || `LOT-${compra.idCompra}-${d.idInsumo}`;
-        const rawVenc = (d.fechaVencimiento && String(d.fechaVencimiento).trim()) 
-          || (primerLote && primerLote.fechaVencimiento && String(primerLote.fechaVencimiento).trim()) 
+        const rawVenc = (d.fechaVencimiento && String(d.fechaVencimiento).trim())
+          || (primerLote && primerLote.fechaVencimiento && String(primerLote.fechaVencimiento).trim())
           || null;
         const fVenc = (rawVenc && rawVenc !== '') ? rawVenc : null;
-
-        const cant = parseFloat(d.cantidad) || 0;
-        const pUnit = parseFloat(d.precioUnitario) || 0;
-        const sub = d.subtotal !== undefined ? parseFloat(d.subtotal) : (cant * pUnit);
 
         return {
           idCompra: compra.idCompra,
           idInsumo: parseInt(d.idInsumo),
-          cantidad: cant,
-          precioUnitario: pUnit,
-          subtotal: sub,
+          cantidad: d.cant,
+          precioUnitario: d.pUnit,
+          subtotal: d.sub,
+          iva: d.itemIva,
+          porcentajeIva: d.itemPctIva,
+          incluyeIva: d.itemIncluyeIva,
           lotes: JSON.stringify(lotesArr),
           numeroLote: numLote,
           fechaVencimiento: fVenc
@@ -485,7 +526,7 @@ class CompraService {
       await c.save({ transaction: t });
       await t.commit();
     } catch (err) {
-      try { if (!t.finished) await t.rollback(); } catch (_) {}
+      try { if (!t.finished) await t.rollback(); } catch (_) { }
       console.error(`[COMPRA UPDATE_ESTADO] #${id}: ERROR en transacción:`, err.message);
       throw err;
     }
