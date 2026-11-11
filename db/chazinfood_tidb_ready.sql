@@ -1749,10 +1749,12 @@ CREATE TABLE `empleado` (
   `direccion` varchar(255) DEFAULT NULL,
   `cargo` varchar(100) NOT NULL,
   `fechaContratacion` date DEFAULT NULL,
+  `fechaInicio` date DEFAULT NULL,
+  `fechaFin` date DEFAULT NULL,
   `tipoContrato` varchar(50) DEFAULT 'Término Fijo',
   `salario` decimal(12,2) DEFAULT 0.00,
   `turno` varchar(50) DEFAULT 'Completo',
-  `estado` tinyint(4) DEFAULT 1,
+  `estado` varchar(20) DEFAULT 'Activo',
   `eliminado` tinyint(4) DEFAULT 0,
   `idUsuario` int(11) DEFAULT NULL,
   `foto` text DEFAULT NULL,
@@ -1761,10 +1763,10 @@ CREATE TABLE `empleado` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Volcado de datos para la tabla `empleado`
-INSERT INTO `empleado` (`idEmpleado`, `idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `cargo`, `fechaContratacion`, `tipoContrato`, `salario`, `turno`, `estado`, `eliminado`) VALUES
-(1, 4, 'Admin', 'Sistema', 'C.C.', '1020304050', '3190000001', 'admin@chazinfood.com', 'Sede Principal Chazin Food', 'Administrador', '2026-01-01', 'Término Indefinido', 2500000.00, 'Completo', 1, 0),
-(2, 27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', 'Calle 10 # 45-20', 'Cocinero', '2026-01-15', 'Término Fijo', 1600000.00, 'Mañana - Tarde', 1, 0),
-(3, 24, 'Vendedor Principal', 'Chazin', 'C.C.', '1030405060', '3001234567', 'vendedor@chazinfood.com', 'Carrera 50 # 32-15', 'Vendedor', '2026-02-01', 'Término Fijo', 1400000.00, 'Tarde - Noche', 1, 0);
+INSERT INTO `empleado` (`idEmpleado`, `idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `cargo`, `fechaContratacion`, `fechaInicio`, `fechaFin`, `tipoContrato`, `salario`, `turno`, `estado`, `eliminado`) VALUES
+(1, 4, 'Admin', 'Sistema', 'C.C.', '1020304050', '3190000001', 'admin@chazinfood.com', 'Sede Principal Chazin Food', 'Administrador', '2026-01-01', '2026-01-01', NULL, 'Término Indefinido', 2500000.00, 'Completo', 'Activo', 0),
+(2, 27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', 'Calle 10 # 45-20', 'Cocinero', '2026-01-15', '2026-01-15', '2026-12-31', 'Término Fijo', 1600000.00, 'Mañana - Tarde', 'Activo', 0),
+(3, 24, 'Vendedor Principal', 'Chazin', 'C.C.', '1030405060', '3001234567', 'vendedor@chazinfood.com', 'Carrera 50 # 32-15', 'Vendedor', '2026-02-01', '2026-02-01', '2026-12-31', 'Término Fijo', 1400000.00, 'Tarde - Noche', 'Activo', 0);
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;

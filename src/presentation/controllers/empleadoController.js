@@ -2,11 +2,23 @@ const { Empleado, User, Role } = require('../../persistence/models');
 const { Op } = require('sequelize');
 
 /**
- * Listar empleados (soporta búsqueda, filtrado por estado, cargo, y papelera)
+ * Normaliza cualquier formato de estado a 'Activo', 'Inactivo' o 'Incapacitado'
+ */
+const normalizeEstadoValue = (val) => {
+  if (val === undefined || val === null || val === '') return 'Activo';
+  const str = String(val).trim();
+  const lower = str.toLowerCase();
+  if (lower === 'incapacitado' || str === '2') return 'Incapacitado';
+  if (lower === 'inactivo' || str === '0' || val === false) return 'Inactivo';
+  return 'Activo';
+};
+
+/**
+ * Listar empleados (soporta búsqueda, filtrado por estado, rol/cargo, y papelera)
  */
 const getEmpleados = async (req, res, next) => {
   try {
-    const { search, estado, cargo, papelera } = req.query;
+    const { search, estado, cargo, rol, papelera } = req.query;
     const where = {};
 
     if (papelera === 'true') {
@@ -16,11 +28,20 @@ const getEmpleados = async (req, res, next) => {
     }
 
     if (estado !== undefined && estado !== '' && estado !== 'Todos') {
-      where.estado = estado === 'Activo' || estado === '1' ? 1 : 0;
+      if (estado === 'Activo' || estado === '1') {
+        where.estado = { [Op.in]: ['Activo', 1, '1'] };
+      } else if (estado === 'Inactivo' || estado === '0') {
+        where.estado = { [Op.in]: ['Inactivo', 0, '0'] };
+      } else if (estado === 'Incapacitado' || estado === '2') {
+        where.estado = { [Op.in]: ['Incapacitado', 2, '2'] };
+      } else {
+        where.estado = estado;
+      }
     }
 
-    if (cargo && cargo !== 'Todos') {
-      where.cargo = cargo;
+    const filtroRol = (rol || cargo || '').trim();
+    if (filtroRol && filtroRol !== 'Todos') {
+      where.cargo = filtroRol;
     }
 
     if (search && search.trim()) {
@@ -111,49 +132,79 @@ const createEmpleado = async (req, res, next) => {
       correo,
       direccion,
       cargo,
+      rol,
+      fechaInicio,
+      fechaFin,
       fechaContratacion,
       tipoContrato = 'Término Fijo',
       salario = 0,
       turno = 'Completo',
-      estado = 1,
+      estado = 'Activo',
       idUsuario,
       foto
     } = req.body;
 
-    if (!nombre || !apellidos || !numeroDocumento || !cargo) {
+    const rolFinal = (rol || cargo || '').trim();
+
+    if (!nombre || !apellidos || !numeroDocumento || !rolFinal) {
       return res.status(400).json({
-        message: 'Los campos Nombre, Apellidos, Número de Documento y Cargo son obligatorios'
+        message: 'Los campos Número de Documento, Nombres, Apellidos y Rol son obligatorios'
+      });
+    }
+
+    const docTrim = String(numeroDocumento).trim();
+    if (docTrim.length < 5) {
+      return res.status(400).json({
+        message: 'El número de documento debe tener al menos 5 dígitos'
+      });
+    }
+
+    const fInicio = fechaInicio || fechaContratacion || new Date().toISOString().split('T')[0];
+    const fFin = fechaFin ? String(fechaFin).split('T')[0] : null;
+
+    if (fFin && fInicio && fFin < fInicio) {
+      return res.status(400).json({
+        message: 'La fecha de finalización no puede ser anterior a la fecha de inicio de contratación'
       });
     }
 
     // Validar que el número de documento sea único
     const existe = await Empleado.findOne({
       where: {
-        numeroDocumento: numeroDocumento.trim(),
+        numeroDocumento: docTrim,
         eliminado: 0
       }
     });
 
     if (existe) {
       return res.status(400).json({
-        message: `Ya existe un empleado registrado con el documento ${numeroDocumento}`
+        message: `Ya existe un empleado registrado con el documento ${docTrim}`
       });
+    }
+
+    // Regla de estado automático: Si hoy es posterior a fechaFin, el contrato finalizó
+    let estadoFinal = normalizeEstadoValue(estado);
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (fFin && todayStr > fFin && estadoFinal === 'Activo') {
+      estadoFinal = 'Inactivo';
     }
 
     const nuevoEmpleado = await Empleado.create({
       nombre: nombre.trim(),
       apellidos: apellidos.trim(),
       tipoDocumento: tipoDocumento || 'C.C.',
-      numeroDocumento: numeroDocumento.trim(),
+      numeroDocumento: docTrim,
       telefono: telefono ? telefono.trim() : null,
       correo: correo ? correo.trim() : null,
       direccion: direccion ? direccion.trim() : null,
-      cargo: cargo.trim(),
-      fechaContratacion: fechaContratacion || new Date(),
+      cargo: rolFinal,
+      fechaContratacion: fInicio,
+      fechaInicio: fInicio,
+      fechaFin: fFin,
       tipoContrato: tipoContrato || 'Término Fijo',
       salario: Number(salario) || 0,
       turno: turno || 'Completo',
-      estado: estado === 0 || estado === false ? 0 : 1,
+      estado: estadoFinal,
       eliminado: 0,
       idUsuario: idUsuario ? Number(idUsuario) : null,
       foto: foto || null
@@ -186,6 +237,9 @@ const updateEmpleado = async (req, res, next) => {
       correo,
       direccion,
       cargo,
+      rol,
+      fechaInicio,
+      fechaFin,
       fechaContratacion,
       tipoContrato,
       salario,
@@ -195,20 +249,38 @@ const updateEmpleado = async (req, res, next) => {
       foto
     } = req.body;
 
+    const rolFinal = (rol !== undefined ? rol : cargo !== undefined ? cargo : empleado.cargo || '').trim();
+
     // Si cambió el documento, validar que no choque con otro
     if (numeroDocumento && numeroDocumento.trim() !== empleado.numeroDocumento) {
+      const docTrim = numeroDocumento.trim();
       const existe = await Empleado.findOne({
         where: {
-          numeroDocumento: numeroDocumento.trim(),
+          numeroDocumento: docTrim,
           idEmpleado: { [Op.ne]: id },
           eliminado: 0
         }
       });
       if (existe) {
         return res.status(400).json({
-          message: `El documento ${numeroDocumento} ya está en uso por otro empleado`
+          message: `El documento ${docTrim} ya está en uso por otro empleado`
         });
       }
+    }
+
+    const fInicio = fechaInicio !== undefined ? fechaInicio : (fechaContratacion !== undefined ? fechaContratacion : empleado.fechaInicio || empleado.fechaContratacion);
+    const fFin = fechaFin !== undefined ? (fechaFin ? String(fechaFin).split('T')[0] : null) : empleado.fechaFin;
+
+    if (fFin && fInicio && fFin < fInicio) {
+      return res.status(400).json({
+        message: 'La fecha de finalización no puede ser anterior a la fecha de inicio de contratación'
+      });
+    }
+
+    let estadoFinal = estado !== undefined ? normalizeEstadoValue(estado) : empleado.estado;
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (fFin && todayStr > fFin && estadoFinal === 'Activo') {
+      estadoFinal = 'Inactivo';
     }
 
     await empleado.update({
@@ -219,12 +291,14 @@ const updateEmpleado = async (req, res, next) => {
       telefono: telefono !== undefined ? telefono.trim() : empleado.telefono,
       correo: correo !== undefined ? correo.trim() : empleado.correo,
       direccion: direccion !== undefined ? direccion.trim() : empleado.direccion,
-      cargo: cargo !== undefined ? cargo.trim() : empleado.cargo,
-      fechaContratacion: fechaContratacion !== undefined ? fechaContratacion : empleado.fechaContratacion,
+      cargo: rolFinal || empleado.cargo,
+      fechaContratacion: fInicio,
+      fechaInicio: fInicio,
+      fechaFin: fFin,
       tipoContrato: tipoContrato !== undefined ? tipoContrato : empleado.tipoContrato,
       salario: salario !== undefined ? Number(salario) : empleado.salario,
       turno: turno !== undefined ? turno : empleado.turno,
-      estado: estado !== undefined ? (estado === 0 || estado === false ? 0 : 1) : empleado.estado,
+      estado: estadoFinal,
       idUsuario: idUsuario !== undefined ? (idUsuario ? Number(idUsuario) : null) : empleado.idUsuario,
       foto: foto !== undefined ? foto : empleado.foto
     });
@@ -247,11 +321,12 @@ const toggleEstadoEmpleado = async (req, res, next) => {
       return res.status(404).json({ message: 'Empleado no encontrado' });
     }
 
-    const nuevoEstado = empleado.estado === 1 ? 0 : 1;
+    const esActivo = empleado.estado === 'Activo' || empleado.estado === 1 || empleado.estado === '1';
+    const nuevoEstado = esActivo ? 'Inactivo' : 'Activo';
     await empleado.update({ estado: nuevoEstado });
 
     res.json({
-      message: `Empleado ${nuevoEstado === 1 ? 'activado' : 'desactivado'} exitosamente`,
+      message: `Empleado ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} exitosamente`,
       idEmpleado: empleado.idEmpleado,
       estado: nuevoEstado
     });
@@ -295,7 +370,7 @@ const restoreEmpleado = async (req, res, next) => {
       return res.status(404).json({ message: 'Empleado no encontrado' });
     }
 
-    await empleado.update({ eliminado: 0, estado: 1 });
+    await empleado.update({ eliminado: 0, estado: 'Activo' });
 
     res.json({
       message: 'Empleado restaurado exitosamente',

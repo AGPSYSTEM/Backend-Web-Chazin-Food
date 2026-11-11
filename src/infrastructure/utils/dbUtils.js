@@ -994,10 +994,12 @@ async function ensureEmpleadoSchema() {
         \`direccion\` VARCHAR(255) DEFAULT NULL,
         \`cargo\` VARCHAR(100) NOT NULL,
         \`fechaContratacion\` DATE DEFAULT NULL,
+        \`fechaInicio\` DATE DEFAULT NULL,
+        \`fechaFin\` DATE DEFAULT NULL,
         \`tipoContrato\` VARCHAR(50) DEFAULT 'Término Fijo',
         \`salario\` DECIMAL(12,2) DEFAULT '0.00',
         \`turno\` VARCHAR(50) DEFAULT 'Completo',
-        \`estado\` TINYINT(4) DEFAULT 1,
+        \`estado\` VARCHAR(20) DEFAULT 'Activo',
         \`eliminado\` TINYINT(4) DEFAULT 0,
         \`idUsuario\` INT(11) DEFAULT NULL,
         \`foto\` TEXT DEFAULT NULL,
@@ -1006,13 +1008,37 @@ async function ensureEmpleadoSchema() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // Migraciones seguras si la tabla ya existía
+    try {
+      const [cols] = await sequelize.query("SHOW COLUMNS FROM `empleado`");
+      const colNames = (cols || []).map((c) => c.Field || c.field || c.COLUMN_NAME);
+
+      if (!colNames.includes('fechaInicio')) {
+        await sequelize.query("ALTER TABLE `empleado` ADD COLUMN `fechaInicio` DATE DEFAULT NULL AFTER `fechaContratacion`");
+        await sequelize.query("UPDATE `empleado` SET `fechaInicio` = `fechaContratacion` WHERE `fechaInicio` IS NULL");
+      }
+
+      if (!colNames.includes('fechaFin')) {
+        await sequelize.query("ALTER TABLE `empleado` ADD COLUMN `fechaFin` DATE DEFAULT NULL AFTER `fechaInicio`");
+      }
+
+      const estadoCol = (cols || []).find((c) => (c.Field || c.field) === 'estado');
+      if (estadoCol && String(estadoCol.Type || estadoCol.type).toLowerCase().includes('tinyint')) {
+        await sequelize.query("ALTER TABLE `empleado` MODIFY COLUMN `estado` VARCHAR(20) DEFAULT 'Activo'");
+        await sequelize.query("UPDATE `empleado` SET `estado` = 'Activo' WHERE `estado` = '1'");
+        await sequelize.query("UPDATE `empleado` SET `estado` = 'Inactivo' WHERE `estado` = '0'");
+      }
+    } catch (migErr) {
+      console.warn('[DB Migration] Nota asegurando columnas fechaFin/estado en empleado:', migErr.message);
+    }
+
     const [rows] = await sequelize.query("SELECT COUNT(*) as count FROM `empleado`");
     if (rows && rows[0] && Number(rows[0].count) === 0) {
       await sequelize.query(`
-        INSERT INTO \`empleado\` (\`idUsuario\`, \`nombre\`, \`apellidos\`, \`tipoDocumento\`, \`numeroDocumento\`, \`telefono\`, \`correo\`, \`direccion\`, \`cargo\`, \`fechaContratacion\`, \`tipoContrato\`, \`salario\`, \`turno\`, \`estado\`, \`eliminado\`) VALUES
-        (4, 'Admin', 'Sistema', 'C.C.', '1020304050', '3190000001', 'admin@chazinfood.com', 'Sede Principal Chazin Food', 'Administrador', '2026-01-01', 'Término Indefinido', 2500000.00, 'Completo', 1, 0),
-        (27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', 'Calle 10 # 45-20', 'Cocinero', '2026-01-15', 'Término Fijo', 1600000.00, 'Mañana - Tarde', 1, 0),
-        (24, 'Vendedor Principal', 'Chazin', 'C.C.', '1030405060', '3001234567', 'vendedor@chazinfood.com', 'Carrera 50 # 32-15', 'Vendedor', '2026-02-01', 'Término Fijo', 1400000.00, 'Tarde - Noche', 1, 0);
+        INSERT INTO \`empleado\` (\`idUsuario\`, \`nombre\`, \`apellidos\`, \`tipoDocumento\`, \`numeroDocumento\`, \`telefono\`, \`correo\`, \`direccion\`, \`cargo\`, \`fechaContratacion\`, \`fechaInicio\`, \`fechaFin\`, \`tipoContrato\`, \`salario\`, \`turno\`, \`estado\`, \`eliminado\`) VALUES
+        (4, 'Admin', 'Sistema', 'C.C.', '1020304050', '3190000001', 'admin@chazinfood.com', 'Sede Principal Chazin Food', 'Administrador', '2026-01-01', '2026-01-01', NULL, 'Término Indefinido', 2500000.00, 'Completo', 'Activo', 0),
+        (27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', 'Calle 10 # 45-20', 'Cocinero', '2026-01-15', '2026-01-15', '2026-12-31', 'Término Fijo', 1600000.00, 'Mañana - Tarde', 'Activo', 0),
+        (24, 'Vendedor Principal', 'Chazin', 'C.C.', '1030405060', '3001234567', 'vendedor@chazinfood.com', 'Carrera 50 # 32-15', 'Vendedor', '2026-02-01', '2026-02-01', '2026-12-31', 'Término Fijo', 1400000.00, 'Tarde - Noche', 'Activo', 0);
       `);
       console.log('[DB] ✅ Tabla empleado inicializada con datos semilla.');
     }

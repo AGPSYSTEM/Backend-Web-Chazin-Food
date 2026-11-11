@@ -1400,6 +1400,12 @@ const Empleado = sequelize.define('empleado', {
   fechaContratacion: {
     type: DataTypes.DATEONLY
   },
+  fechaInicio: {
+    type: DataTypes.DATEONLY
+  },
+  fechaFin: {
+    type: DataTypes.DATEONLY
+  },
   tipoContrato: {
     type: DataTypes.STRING(50),
     defaultValue: 'Término Fijo'
@@ -1413,8 +1419,8 @@ const Empleado = sequelize.define('empleado', {
     defaultValue: 'Completo'
   },
   estado: {
-    type: DataTypes.TINYINT,
-    defaultValue: 1
+    type: DataTypes.STRING(20),
+    defaultValue: 'Activo'
   },
   eliminado: {
     type: DataTypes.TINYINT,
