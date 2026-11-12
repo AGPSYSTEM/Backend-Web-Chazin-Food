@@ -1,4 +1,5 @@
 const { Proveedor, TipoProveedor, TipoDocumento, Insumo, Compra } = require('../../persistence/models');
+const { Sequelize, Op } = require('sequelize');
 
 class ProveedorService {
   static async getTipos() {
@@ -10,25 +11,71 @@ class ProveedorService {
   }
 
   static async getAll() {
-    const proveedores = await Proveedor.findAll({
-      where: { eliminado: 0 },
-      include: [
-        { model: TipoProveedor, as: 'tipoProveedor' },
-        { model: TipoDocumento, as: 'tipoDocumento' }
-      ]
-    });
-    return proveedores.map(p => this._mapProveedor(p));
+    const [proveedores, comprasCounts, insumosCounts] = await Promise.all([
+      Proveedor.findAll({
+        where: { eliminado: 0 },
+        include: [
+          { model: TipoProveedor, as: 'tipoProveedor' },
+          { model: TipoDocumento, as: 'tipoDocumento' }
+        ]
+      }),
+      Compra.findAll({
+        attributes: ['idProveedor', [Sequelize.fn('COUNT', Sequelize.col('idCompra')), 'count']],
+        group: ['idProveedor'],
+        raw: true
+      }).catch(() => []),
+      Insumo.findAll({
+        attributes: ['idProveedor', [Sequelize.fn('COUNT', Sequelize.col('idInsumo')), 'count']],
+        group: ['idProveedor'],
+        raw: true
+      }).catch(() => [])
+    ]);
+
+    const comprasMap = {};
+    comprasCounts.forEach(c => { comprasMap[c.idProveedor] = parseInt(c.count) || 0; });
+    const insumosMap = {};
+    insumosCounts.forEach(i => { insumosMap[i.idProveedor] = parseInt(i.count) || 0; });
+
+    return proveedores.map(p => ({
+      ...this._mapProveedor(p),
+      comprasCount: comprasMap[p.idProveedor] || 0,
+      tieneCompras: (comprasMap[p.idProveedor] || 0) > 0,
+      insumosCount: insumosMap[p.idProveedor] || 0
+    }));
   }
 
   static async getPapelera() {
-    const proveedores = await Proveedor.findAll({
-      where: { eliminado: 1 },
-      include: [
-        { model: TipoProveedor, as: 'tipoProveedor' },
-        { model: TipoDocumento, as: 'tipoDocumento' }
-      ]
-    });
-    return proveedores.map(p => this._mapProveedor(p));
+    const [proveedores, comprasCounts, insumosCounts] = await Promise.all([
+      Proveedor.findAll({
+        where: { eliminado: 1 },
+        include: [
+          { model: TipoProveedor, as: 'tipoProveedor' },
+          { model: TipoDocumento, as: 'tipoDocumento' }
+        ]
+      }),
+      Compra.findAll({
+        attributes: ['idProveedor', [Sequelize.fn('COUNT', Sequelize.col('idCompra')), 'count']],
+        group: ['idProveedor'],
+        raw: true
+      }).catch(() => []),
+      Insumo.findAll({
+        attributes: ['idProveedor', [Sequelize.fn('COUNT', Sequelize.col('idInsumo')), 'count']],
+        group: ['idProveedor'],
+        raw: true
+      }).catch(() => [])
+    ]);
+
+    const comprasMap = {};
+    comprasCounts.forEach(c => { comprasMap[c.idProveedor] = parseInt(c.count) || 0; });
+    const insumosMap = {};
+    insumosCounts.forEach(i => { insumosMap[i.idProveedor] = parseInt(i.count) || 0; });
+
+    return proveedores.map(p => ({
+      ...this._mapProveedor(p),
+      comprasCount: comprasMap[p.idProveedor] || 0,
+      tieneCompras: (comprasMap[p.idProveedor] || 0) > 0,
+      insumosCount: insumosMap[p.idProveedor] || 0
+    }));
   }
 
   static async getById(idProveedor) {
@@ -43,7 +90,26 @@ class ProveedorService {
       error.statusCode = 404;
       throw error;
     }
-    return this._mapProveedor(p);
+    const [comprasCount, insumosCount, ultimasCompras] = await Promise.all([
+      Compra.count({ where: { idProveedor } }).catch(() => 0),
+      Insumo.count({ where: { idProveedor } }).catch(() => 0),
+      Compra.findAll({
+        where: { idProveedor },
+        limit: 10,
+        order: [['idCompra', 'DESC']],
+        attributes: ['idCompra', 'numeroFactura', 'fechaFactura', 'total', 'estado'],
+        raw: true
+      }).catch(() => [])
+    ]);
+
+    const mapped = this._mapProveedor(p);
+    return {
+      ...mapped,
+      comprasCount,
+      tieneCompras: comprasCount > 0,
+      insumosCount,
+      ultimasCompras
+    };
   }
 
   static _mapProveedor(p) {
@@ -363,6 +429,13 @@ class ProveedorService {
       throw error;
     }
 
+    const comprasAsociadas = await Compra.count({ where: { idProveedor } });
+    if (comprasAsociadas > 0) {
+      const error = new Error(`No se puede eliminar el proveedor "${p.nombre}" porque tiene ${comprasAsociadas} compra(s) registrada(s) en el sistema.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
     p.eliminado = 1;
     await p.save();
 
@@ -408,11 +481,16 @@ class ProveedorService {
       throw error;
     }
 
-    const insumosAsociados = await Insumo.count({ where: { idProveedor } });
     const comprasAsociadas = await Compra.count({ where: { idProveedor } });
+    if (comprasAsociadas > 0) {
+      const error = new Error(`No se puede eliminar el proveedor "${p.nombre}" porque tiene ${comprasAsociadas} compra(s) registrada(s) en el sistema.`);
+      error.statusCode = 400;
+      throw error;
+    }
 
-    if (insumosAsociados > 0 || comprasAsociadas > 0) {
-      const error = new Error(`No se puede eliminar el proveedor porque tiene ${insumosAsociados > 0 ? insumosAsociados + ' insumo(s)' : ''}${insumosAsociados > 0 && comprasAsociadas > 0 ? ' y ' : ''}${comprasAsociadas > 0 ? comprasAsociadas + ' compra(s)' : ''} asociado(s).`);
+    const insumosAsociados = await Insumo.count({ where: { idProveedor } });
+    if (insumosAsociados > 0) {
+      const error = new Error(`No se puede eliminar el proveedor "${p.nombre}" porque tiene ${insumosAsociados} insumo(s) asociado(s).`);
       error.statusCode = 400;
       throw error;
     }

@@ -140,8 +140,18 @@ class InsumoService {
 
   static async getComprasMap() {
     try {
+      const { Op } = require('sequelize');
+      const { Compra } = require('../../persistence/models');
       const detalleCounts = await DetalleCompraInsumo.findAll({
-        attributes: ['idInsumo', [database.sequelize.fn('COUNT', database.sequelize.col('idDetalleCompra')), 'totalCompras']],
+        attributes: ['idInsumo', [database.sequelize.fn('COUNT', database.sequelize.col('DetalleCompraInsumo.idDetalleCompra')), 'totalCompras']],
+        include: [{
+          model: Compra,
+          as: 'compra',
+          attributes: [],
+          where: {
+            estado: { [Op.notIn]: ['CANCELADA', 'ANULADA'] }
+          }
+        }],
         group: ['idInsumo'],
         raw: true
       });
@@ -190,6 +200,8 @@ class InsumoService {
 
   static async getById(idInsumo) {
     const id = parseInt(idInsumo, 10);
+    const { Op } = require('sequelize');
+    const { Compra } = require('../../persistence/models');
     const [i, count] = await Promise.all([
       Insumo.findByPk(id, {
         include: [
@@ -198,7 +210,16 @@ class InsumoService {
           { model: LoteInsumo, as: 'lotes', required: false }
         ]
       }),
-      DetalleCompraInsumo.count({ where: { idInsumo: id } }).catch(() => 0)
+      DetalleCompraInsumo.count({
+        where: { idInsumo: id },
+        include: [{
+          model: Compra,
+          as: 'compra',
+          where: {
+            estado: { [Op.notIn]: ['CANCELADA', 'ANULADA'] }
+          }
+        }]
+      }).catch(() => 0)
     ]);
 
     if (!i) {
@@ -336,8 +357,8 @@ class InsumoService {
         stockMinimo, stockMaximo, descripcion, estado, fichaTecnica
       } = insumoData;
 
-      // ── Campos editables: Stock Mínimo, Stock Máximo, Descripción y Estado (#78) ──
-      // Los datos maestros (nombre, categoría, unidad, precio/costo, stock e IVA) son inmutables
+      // ── Campos editables: Stock Mínimo, Stock Máximo, Descripción, Estado, IVA y Adición ──
+      // Los datos maestros (nombre, categoría, unidad, precio/costo y stock) son inmutables
       if (stockMinimo !== undefined && stockMinimo !== null && stockMinimo !== '') {
         insumo.stockMinimo = parseFloat(stockMinimo);
       }
@@ -356,6 +377,24 @@ class InsumoService {
       }
       if (estado !== undefined) {
         insumo.estado = (estado === 'Activo' || estado === 1 || estado === '1') ? 1 : 0;
+      }
+      if (insumoData.esAdicion !== undefined) {
+        insumo.esAdicion = (insumoData.esAdicion === 1 || insumoData.esAdicion === true || insumoData.esAdicion === '1') ? 1 : 0;
+      }
+      if (insumoData.precioAdicion !== undefined && insumoData.precioAdicion !== null && insumoData.precioAdicion !== '') {
+        insumo.precioAdicion = parseFloat(insumoData.precioAdicion || 0);
+      }
+      if (insumoData.imagen !== undefined) {
+        insumo.imagen = insumoData.imagen || null;
+      }
+      if (insumoData.incluyeIva !== undefined) {
+        const llevaIva = (insumoData.incluyeIva === 1 || insumoData.incluyeIva === true || insumoData.incluyeIva === '1') ? 1 : 0;
+        insumo.incluyeIva = llevaIva;
+        insumo.porcentajeIva = llevaIva
+          ? (insumoData.porcentajeIva !== undefined && insumoData.porcentajeIva !== null && insumoData.porcentajeIva !== ""
+            ? parseFloat(insumoData.porcentajeIva)
+            : 19.00)
+          : 0.00;
       }
 
       // En caso de actualización completa administrativa interna (ej. migraciones o scripts autorizados)
@@ -429,18 +468,37 @@ class InsumoService {
         throw error;
       }
 
-      // ── Validar compras asociadas: No se puede eliminar si ya fue comprado ──
-      const comprasCount = await DetalleCompraInsumo.count({ where: { idInsumo }, transaction });
-      if (comprasCount > 0) {
-        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque ya ha sido registrado en ${comprasCount} compra(s). Por trazabilidad contable no es posible eliminarlo.`);
+      // ── Validar compras activas: Se puede eliminar si las compras fueron canceladas y stock es 0 ──
+      const { Op } = require('sequelize');
+      const { Compra } = require('../../persistence/models');
+      const activeComprasCount = await DetalleCompraInsumo.count({
+        where: { idInsumo },
+        include: [{
+          model: Compra,
+          as: 'compra',
+          where: {
+            estado: { [Op.notIn]: ['CANCELADA', 'ANULADA'] }
+          }
+        }],
+        transaction
+      });
+      if (activeComprasCount > 0) {
+        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque cuenta con ${activeComprasCount} compra(s) activa(s). Para eliminarlo, debes cancelar la compra del insumo primero.`);
         error.statusCode = 400;
         throw error;
       }
 
-      // ── Validar lotes asociados ──
-      const lotesCount = await LoteInsumo.count({ where: { idInsumo }, transaction });
-      if (lotesCount > 0) {
-        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque cuenta con ${lotesCount} lote(s) en su historial.`);
+      // ── Validar si aún existen lotes con disponibilidad activa ──
+      const activeLotesCount = await LoteInsumo.count({
+        where: {
+          idInsumo,
+          cantidadDisponible: { [Op.gt]: 0 },
+          estado: 'ACTIVO'
+        },
+        transaction
+      });
+      if (activeLotesCount > 0) {
+        const error = new Error(`No se puede eliminar el insumo "${insumo.nombre}" porque cuenta con ${activeLotesCount} lote(s) con stock disponible.`);
         error.statusCode = 400;
         throw error;
       }
@@ -522,9 +580,20 @@ class InsumoService {
       throw error;
     }
 
-    const comprasCount = await DetalleCompraInsumo.count({ where: { idInsumo: id } });
-    if (comprasCount > 0) {
-      const error = new Error(`No se puede eliminar definitivamente el insumo "${insumo.nombre}" porque ya ha sido registrado en ${comprasCount} compra(s).`);
+    const { Op } = require('sequelize');
+    const { Compra } = require('../../persistence/models');
+    const activeComprasCount = await DetalleCompraInsumo.count({
+      where: { idInsumo: id },
+      include: [{
+        model: Compra,
+        as: 'compra',
+        where: {
+          estado: { [Op.notIn]: ['CANCELADA', 'ANULADA'] }
+        }
+      }]
+    });
+    if (activeComprasCount > 0) {
+      const error = new Error(`No se puede eliminar definitivamente el insumo "${insumo.nombre}" porque cuenta con ${activeComprasCount} compra(s) activa(s). Para eliminarlo, se debe cancelar la compra del insumo primero.`);
       error.statusCode = 400;
       throw error;
     }
