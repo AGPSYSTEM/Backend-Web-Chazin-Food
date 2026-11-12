@@ -1767,14 +1767,14 @@ class VentaService {
       }
     }
 
-    // 3. Caso Postobón y Bebidas Específicas por Sabor
-    const isUva = rawText.includes('uva') || (targetProductId === 38) || (d.idProducto === 38);
-    const isNaranja = rawText.includes('naranja') || (targetProductId === 39) || (d.idProducto === 39);
-    const isColombiana = (rawText.includes('colombiana') || (targetProductId === 12) || (d.idProducto === 12)) && !isUva && !isNaranja && !rawText.includes('manzana');
-    const isManzana = (rawText.includes('manzana') || (targetProductId === 9) || (d.idProducto === 9)) && !isUva && !isNaranja && !isColombiana;
+    // 3. Caso Postobón y Bebidas Específicas por Sabor (reconocimiento estricto)
+    const isUva = (((rawText.includes('postob') || rawText.includes('gaseosa')) && rawText.includes('uva')) || (targetProductId === 38) || (d.idProducto === 38));
+    const isNaranja = (((rawText.includes('postob') || rawText.includes('gaseosa')) && rawText.includes('naranja')) || (targetProductId === 39) || (d.idProducto === 39));
+    const isColombiana = (((rawText.includes('postob') || rawText.includes('gaseosa') || rawText.includes('kola')) && rawText.includes('colombiana')) || (targetProductId === 12) || (d.idProducto === 12)) && !isUva && !isNaranja && !rawText.includes('manzana');
+    const isManzana = (((rawText.includes('postob') || rawText.includes('gaseosa')) && rawText.includes('manzana')) || (targetProductId === 9) || (d.idProducto === 9)) && !isUva && !isNaranja && !isColombiana;
     const isSprite = rawText.includes('sprite') || (targetProductId === 13) || (d.idProducto === 13);
-    const isQuatro = rawText.includes('cuatro') || rawText.includes('quatro') || (targetProductId === 14) || (d.idProducto === 14);
-    const isAgua = rawText.includes('agua') || rawText.includes('cristal') || (targetProductId === 10) || (d.idProducto === 10);
+    const isQuatro = (((rawText.includes('cuatro') || rawText.includes('quatro')) && (rawText.includes('gaseosa') || rawText.includes('toronja'))) || (targetProductId === 14) || (d.idProducto === 14));
+    const isAgua = ((rawText.includes('agua') && (rawText.includes('cristal') || rawText.includes('mineral') || rawText.includes('botella'))) || (targetProductId === 10) || (d.idProducto === 10));
 
     if (isUva) {
       return { directInsumoId: 47, targetProductId: 38, resolvedName: 'Gaseosa Uva Postobón 400ml' };

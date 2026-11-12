@@ -147,19 +147,19 @@ class ProductService {
         directInsumoId = (rawName.includes('light') || rawName.includes('sin az') || rawName.includes('zero') || pId === 16) ? 32 : 29;
       } else if (rawName.includes('pepsi')) {
         directInsumoId = (rawName.includes('light') || rawName.includes('black') || rawName.includes('zero')) ? 34 : 33;
-      } else if (rawName.includes('uva') || pId === 38) {
+      } else if (((rawName.includes('postob') || rawName.includes('gaseosa')) && rawName.includes('uva')) || pId === 38) {
         directInsumoId = 47;
-      } else if (rawName.includes('naranja') || pId === 39) {
+      } else if (((rawName.includes('postob') || rawName.includes('gaseosa')) && rawName.includes('naranja')) || pId === 39) {
         directInsumoId = 48;
-      } else if (rawName.includes('colombiana') || pId === 12) {
+      } else if (((rawName.includes('postob') || rawName.includes('gaseosa') || rawName.includes('kola')) && rawName.includes('colombiana')) || pId === 12) {
         directInsumoId = 35;
-      } else if (rawName.includes('manzana') || pId === 9) {
+      } else if (((rawName.includes('postob') || rawName.includes('gaseosa')) && rawName.includes('manzana')) || pId === 9) {
         directInsumoId = 30;
       } else if (rawName.includes('sprite') || pId === 13) {
         directInsumoId = 36;
-      } else if (rawName.includes('cuatro') || rawName.includes('quatro') || pId === 14) {
+      } else if (((rawName.includes('cuatro') || rawName.includes('quatro')) && (rawName.includes('gaseosa') || rawName.includes('toronja'))) || pId === 14) {
         directInsumoId = 37;
-      } else if (rawName.includes('agua') || rawName.includes('cristal') || pId === 10) {
+      } else if ((rawName.includes('agua') && (rawName.includes('cristal') || rawName.includes('mineral') || rawName.includes('botella'))) || pId === 10) {
         directInsumoId = 31;
       }
 
@@ -172,7 +172,7 @@ class ProductService {
 
       const matchedByName = allInsumos.find(ins => {
         const iName = String(ins.nombre || '').toLowerCase().trim();
-        return iName && rawName && (iName === rawName || rawName.includes(iName) || iName.includes(rawName));
+        return iName && rawName && (iName === rawName || (rawName.startsWith(iName) && iName.length >= 6));
       });
       if (matchedByName) {
         const directStock = Math.max(0, Math.floor(Number(matchedByName.stock || 0)));
