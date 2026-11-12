@@ -279,7 +279,7 @@ class ProveedorService {
       detalle: `Se registró el proveedor en el sistema: ${proveedor.nombre}`,
       motivo: 'Registro inicial de proveedor',
       usuarioId: data.usuarioId || null
-    }).catch(() => {});
+    }).catch(() => { });
 
     return this.getById(proveedor.idProveedor);
   }
@@ -386,7 +386,7 @@ class ProveedorService {
       detalle: `Se actualizaron los datos del proveedor: ${p.nombre}`,
       motivo: 'Actualización de datos',
       usuarioId: data.usuarioId || null
-    }).catch(() => {});
+    }).catch(() => { });
 
     return this.getById(idProveedor);
   }
@@ -416,7 +416,7 @@ class ProveedorService {
       detalle: `El proveedor ${p.nombre} cambió su estado a ${nuevoEstado === 1 ? 'Activo' : 'Inactivo'}`,
       motivo: 'Cambio de estado',
       usuarioId: options.usuarioId || null
-    }).catch(() => {});
+    }).catch(() => { });
 
     return this.getById(idProveedor);
   }
@@ -446,7 +446,7 @@ class ProveedorService {
       detalle: `Se envió a la papelera el proveedor: ${p.nombre}`,
       motivo: 'Papelera de reciclaje',
       usuarioId: options.usuarioId || null
-    }).catch(() => {});
+    }).catch(() => { });
 
     return { message: 'Proveedor enviado a la papelera exitosamente' };
   }
@@ -468,7 +468,7 @@ class ProveedorService {
       detalle: `Se restauró el proveedor desde la papelera: ${p.nombre}`,
       motivo: 'Restauración desde papelera',
       usuarioId: options.usuarioId || null
-    }).catch(() => {});
+    }).catch(() => { });
 
     return this.getById(idProveedor);
   }
@@ -505,7 +505,7 @@ class ProveedorService {
       detalle: `Se eliminó permanentemente el proveedor: ${nombreProv}`,
       motivo: 'Eliminación física definitiva',
       usuarioId: options.usuarioId || null
-    }).catch(() => {});
+    }).catch(() => { });
 
     const { resequenceTableIds } = require('../../infrastructure/utils/dbUtils');
     await resequenceTableIds('proveedor', 'idProveedor', ['insumo', 'compra']);
