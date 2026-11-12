@@ -1395,6 +1395,37 @@ class VentaService {
             const recipeResult = await VentaService.resolveRecipeOrInsumoForDetail(d, chosenVarianteId, targetProductId);
             const itemQty = Number(d.cantidad || 1);
 
+            // Detección de Combo para descuento automático de productos vinculados
+            let comboItems = [];
+            let prodRow = null;
+            if (targetProductId) {
+              const { Product: ProdModel, ComboProducto: CPModel } = require('../../persistence/models');
+              try {
+                prodRow = await ProdModel.findByPk(targetProductId);
+                if (prodRow) {
+                  let cfg = prodRow.configuracionCombo;
+                  if (typeof cfg === 'string') {
+                    try { cfg = JSON.parse(cfg); } catch (e) { cfg = null; }
+                  }
+                  if (cfg && cfg.esCombo) {
+                    if (Array.isArray(cfg.productosAsociados) && cfg.productosAsociados.length > 0) {
+                      comboItems = cfg.productosAsociados;
+                    } else if (Array.isArray(cfg.itemsCombo) && cfg.itemsCombo.length > 0) {
+                      comboItems = cfg.itemsCombo;
+                    }
+                  }
+                  if (comboItems.length === 0) {
+                    const dbComboItems = await CPModel.findAll({ where: { idCombo: targetProductId } });
+                    if (dbComboItems && dbComboItems.length > 0) {
+                      comboItems = dbComboItems.map(ci => ({ idProducto: ci.idProducto, cantidad: ci.cantidad }));
+                    }
+                  }
+                }
+              } catch (comboLookupErr) {
+                console.warn('Error identificando productos de combo para inventario:', comboLookupErr.message);
+              }
+            }
+
             if (recipeResult.directInsumoId) {
               const insumo = await Insumo.findByPk(recipeResult.directInsumoId);
               if (insumo && !isInsumoRemovedByMiseEnPlace(insumo, d, obsProdItem)) {
@@ -1417,6 +1448,67 @@ class VentaService {
                   });
                 } catch (tzErr) {
                   console.warn('Error registrando trazabilidad de insumo:', tzErr.message);
+                }
+              }
+            } else if (comboItems.length > 0) {
+              // Descuento automático de inventario para cada producto individual que compone el combo
+              for (const ci of comboItems) {
+                const childProdId = ci.idProducto || ci.id;
+                const childQty = (Number(ci.cantidad || 1)) * itemQty;
+                if (childProdId && childQty > 0) {
+                  try {
+                    const childRecipe = await VentaService.resolveRecipeOrInsumoForDetail({ idProducto: childProdId, cantidad: childQty }, null, childProdId);
+                    if (childRecipe.directInsumoId) {
+                      const insumoChild = await Insumo.findByPk(childRecipe.directInsumoId);
+                      if (insumoChild) {
+                        const stockAct = Number(insumoChild.stock || 0);
+                        insumoChild.stock = Math.max(0, stockAct - childQty);
+                        await insumoChild.save();
+                        try {
+                          await Trazabilidad.create({
+                            tipo: 'CONSUMO_VENTA',
+                            entidadNombre: insumoChild.nombre,
+                            detalle: `Consumo de ${childQty} und por Venta #${venta.idVenta} (Combo: ${prodRow?.nombre || targetProductId} -> ${insumoChild.nombre})`,
+                            idInsumo: insumoChild.idInsumo,
+                            tipoMovimiento: 'SALIDA',
+                            cantidad: childQty,
+                            motivo: `Venta #${venta.idVenta}`,
+                            usuarioId: responsibleUserId || targetUserId || null
+                          });
+                        } catch (e) {}
+                      }
+                    } else if (childRecipe.ficha && Array.isArray(childRecipe.ficha.detalles)) {
+                      for (const det of childRecipe.ficha.detalles) {
+                        const cantPorPlato = Number(det.cantidad || 0);
+                        const recipeUnit = det.unidadMedida || 'und';
+                        if (cantPorPlato > 0 && det.idInsumo) {
+                          const insumo = await Insumo.findByPk(det.idInsumo);
+                          if (insumo) {
+                            const insumoUnit = insumo.unidadMedida || recipeUnit;
+                            const cantConvertida = convertUnits(cantPorPlato, recipeUnit, insumoUnit);
+                            const totalADescontar = cantConvertida * childQty;
+                            const stockActual = Number(insumo.stock || 0);
+                            insumo.stock = Math.max(0, stockActual - totalADescontar);
+                            await insumo.save();
+                            try {
+                              await Trazabilidad.create({
+                                tipo: 'CONSUMO_VENTA',
+                                entidadNombre: insumo.nombre,
+                                detalle: `Consumo de ${totalADescontar.toFixed(2)} ${insumoUnit} por Venta #${venta.idVenta} (Combo: ${prodRow?.nombre || targetProductId} -> Prod #${childProdId})`,
+                                idInsumo: insumo.idInsumo,
+                                tipoMovimiento: 'SALIDA',
+                                cantidad: totalADescontar,
+                                motivo: `Venta #${venta.idVenta}`,
+                                usuarioId: responsibleUserId || targetUserId || null
+                              });
+                            } catch (tzErr) {}
+                          }
+                        }
+                      }
+                    }
+                  } catch (childErr) {
+                    console.warn(`Error descontando producto #${childProdId} de combo:`, childErr.message);
+                  }
                 }
               }
             } else if (recipeResult.ficha && Array.isArray(recipeResult.ficha.detalles)) {

@@ -242,17 +242,32 @@ class EventoService {
         ? fData.detalles
         : (Array.isArray(pData.insumosFicha) ? pData.insumosFicha : []);
 
-      if (listaInsumos.length === 0) {
-        const error = new Error('La ficha técnica es obligatoria para crear un producto. Debe incluir al menos un insumo o ingrediente base para costeo y receta.');
+      const isCombo = Boolean(
+        pData.configuracionCombo?.esCombo ||
+        pData.tipoEvento === 'COMBO_ESPECIAL' ||
+        tipoEvento === 'COMBO_ESPECIAL' ||
+        pData.idCategoriaProducto === 2 ||
+        (pData.categoria && String(pData.categoria).toLowerCase().includes('combo'))
+      );
+
+      if (!isCombo && listaInsumos.length === 0) {
+        const error = new Error('La ficha técnica es obligatoria para crear un producto individual. Debe incluir al menos un insumo o ingrediente base para costeo y receta.');
         error.statusCode = 400;
         throw error;
       }
 
       const prodNombre = pData.nombre || finalNombre;
-      const prodDesc = pData.descripcion || descripcion || 'Edición especial de temporada festiva';
+      const prodDesc = pData.descripcion || descripcion || (isCombo ? 'Combo especial festivo agrupando platillos favoritos' : 'Edición especial de temporada festiva');
       const prodPrecio = pData.precio || (nuevoPrecio ? parseFloat(nuevoPrecio) * 1.15 : 25000);
-      const prodCategoria = pData.idCategoriaProducto || 3; // Default a Hamburguesas
+      const prodCategoria = isCombo ? 2 : (pData.idCategoriaProducto || 3);
       const prodImagen = pData.imagen || '';
+
+      let comboConfigStr = null;
+      if (pData.configuracionCombo) {
+        comboConfigStr = typeof pData.configuracionCombo === 'string' ? pData.configuracionCombo : JSON.stringify(pData.configuracionCombo);
+      } else if (isCombo) {
+        comboConfigStr = JSON.stringify({ esCombo: true, itemsCombo: pData.itemsCombo || [] });
+      }
 
       const nuevoProd = await Product.create({
         idCategoriaProducto: prodCategoria,
@@ -260,12 +275,24 @@ class EventoService {
         descripcion: prodDesc,
         precio: prodPrecio,
         imagen: prodImagen,
+        categoria: isCombo ? 'Combos' : undefined,
         adiciones: pData.adiciones ? (typeof pData.adiciones === 'string' ? pData.adiciones : JSON.stringify(pData.adiciones)) : '[]',
-        configuracionCombo: pData.configuracionCombo ? (typeof pData.configuracionCombo === 'string' ? pData.configuracionCombo : JSON.stringify(pData.configuracionCombo)) : null,
+        configuracionCombo: comboConfigStr,
         estado: pData.estado === 'Inactivo' || pData.estado === 0 ? 0 : 1
       });
 
       finalProductoId = nuevoProd.idProducto;
+
+      // Sincronizar items del combo si aplica (Ítems #97, #106)
+      const comboItemsToSave = pData.itemsCombo || (pData.configuracionCombo && typeof pData.configuracionCombo === 'object' ? (pData.configuracionCombo.itemsCombo || pData.configuracionCombo.productosAsociados) : null);
+      if (isCombo && Array.isArray(comboItemsToSave) && comboItemsToSave.length > 0) {
+        try {
+          const ProductService = require('./productService');
+          await ProductService.syncItemsCombo(nuevoProd.idProducto, comboItemsToSave);
+        } catch (comboErr) {
+          console.warn('Error sincronizando combo en evento:', comboErr.message);
+        }
+      }
 
       // Crear Variantes (si vienen variantes personalizadas, crearlas; de lo contrario crear la predeterminada)
       let primaryVarianteId = null;
@@ -295,9 +322,9 @@ class EventoService {
         idProducto: nuevoProd.idProducto,
         idVariante: primaryVarianteId,
         tipo: 'PRODUCTO',
-        descripcion: fData.descripcion || `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`,
-        procedimiento: fData.procedimiento || pData.procedimiento || 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.',
-        tiempoPreparacion: Number(fData.tiempoPreparacion || pData.tiempoPreparacion) || 12,
+        descripcion: fData.descripcion || (isCombo ? `Paquete comercial Combo Festivo: ${prodNombre}` : `Ficha técnica oficial para ${prodNombre} (Producto de Evento)`),
+        procedimiento: fData.procedimiento || pData.procedimiento || (isCombo ? 'Armar paquete gastronómico reuniendo los productos vinculados del pedido y bebidas seleccionadas para entrega en mesa o despacho.' : 'Preparar los ingredientes selectos con los más altos estándares artesanales. Cocinar a la plancha a fuego medio-alto, tostar pan con mantequilla clarificada, montar capas con salsa festiva y servir de inmediato.'),
+        tiempoPreparacion: Number(fData.tiempoPreparacion || pData.tiempoPreparacion) || (isCombo ? 8 : 12),
         rendimiento: fData.rendimiento || pData.rendimiento || '1 porción',
         especificaciones: fData.especificaciones || pData.especificaciones || '',
         caracteristicas: fData.caracteristicas || pData.caracteristicas || '',
