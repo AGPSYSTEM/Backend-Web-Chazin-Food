@@ -277,7 +277,7 @@ class ProductService {
                 idVariante: v.idVariante,
                 nombre: v.nombre,
                 descripcion: v.descripcion || '',
-                precio: realPrecio,
+                precio: ProductService.resolveVariantPrice(v.precio, realPrecio),
                 imagen: v.imagen || '',
                 estado: v.estado !== undefined ? v.estado : 1,
                 fichaTecnica: vf ? {
@@ -401,6 +401,14 @@ class ProductService {
       });
   }
 
+  /** Resolves an optional variant price, falling back to basePrice when unset or non-positive. */
+  static resolveVariantPrice(rawPrecio, basePrice = 0) {
+    const parsed = rawPrecio !== undefined && rawPrecio !== null && rawPrecio !== ''
+      ? Number(rawPrecio)
+      : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : (Number(basePrice) || 0);
+  }
+
   static async getProductById(id) {
     const all = await this.getProducts();
     const found = all.find(p => Number(p.idProducto || p.id) === Number(id));
@@ -481,7 +489,7 @@ class ProductService {
           idProducto: product.idProducto,
           nombre: v.nombre.trim(),
           descripcion: v.descripcion || null,
-          precio: finalPrecio,
+          precio: ProductService.resolveVariantPrice(v.precio, finalPrecio),
           imagen: v.imagen || null,
           estado: normalizedEstado
         });
@@ -562,6 +570,7 @@ class ProductService {
       }
     }
 
+    const prevBasePrecio = Number(p.precio) || 0;
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
@@ -601,7 +610,7 @@ class ProductService {
           const v = filteredIncoming[i];
           const vNombre = v.nombre.trim();
           const vDesc = v.descripcion || null;
-          const vPrecio = basePrice;
+          const vPrecio = ProductService.resolveVariantPrice(v.precio, basePrice);
           const vImagen = v.imagen || null;
           let currentVarId = null;
 
@@ -698,7 +707,13 @@ class ProductService {
       }
     } else if (precio !== undefined && precio !== null && precio !== '') {
       const nuevoPrecio = Number(precio) || 0;
-      await Variante.update({ precio: nuevoPrecio }, { where: { idProducto: id } });
+      const existingVars = await Variante.findAll({ where: { idProducto: id } });
+      for (const ev of existingVars) {
+        const curPrecio = Number(ev.precio || 0);
+        if (curPrecio <= 0 || curPrecio === prevBasePrecio || isDummyOrBaseVariant(ev.nombre, p.nombre)) {
+          await Variante.update({ precio: nuevoPrecio }, { where: { idVariante: ev.idVariante } });
+        }
+      }
     }
 
     // Sincronizar items de combo si se enviaron (Ítems #97, #106)
