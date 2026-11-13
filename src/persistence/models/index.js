@@ -1342,6 +1342,7 @@ Variante.belongsTo(Product, { foreignKey: 'idProducto', as: 'producto' });
 Product.hasMany(Variante, { foreignKey: 'idProducto', as: 'variantes' });
 
 FichaTecnica.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
+Variante.hasMany(FichaTecnica, { foreignKey: 'idVariante', as: 'fichasTecnicas' });
 
 Descuento.belongsTo(Evento, { foreignKey: 'idEvento', as: 'evento' });
 Evento.hasMany(Descuento, { foreignKey: 'idEvento' });

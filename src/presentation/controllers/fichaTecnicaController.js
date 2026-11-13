@@ -27,6 +27,24 @@ const getFichaByProducto = async (req, res, next) => {
   }
 };
 
+const getFichaByVariante = async (req, res, next) => {
+  try {
+    const ficha = await FichaTecnicaService.getByVarianteId(req.params.idVariante);
+    res.json(ficha || {});
+  } catch (error) {
+    next(error);
+  }
+};
+
+const saveFichaByVariante = async (req, res, next) => {
+  try {
+    const ficha = await FichaTecnicaService.saveForVariante(req.body?.idProducto || null, req.params.idVariante, req.body);
+    res.json(ficha);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getFichaByInsumo = async (req, res, next) => {
   try {
     const ficha = await FichaTecnicaService.getByInsumoId(req.params.idInsumo);
@@ -105,6 +123,8 @@ module.exports = {
   getFichas,
   getFichaById,
   getFichaByProducto,
+  getFichaByVariante,
+  saveFichaByVariante,
   getFichaByInsumo,
   getFichaByInsumoPreparado,
   saveFichaByProducto,

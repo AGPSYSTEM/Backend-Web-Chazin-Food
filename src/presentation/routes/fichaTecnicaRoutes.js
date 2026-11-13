@@ -6,9 +6,11 @@ const {
   getFichas,
   getFichaById,
   getFichaByProducto,
+  getFichaByVariante,
   getFichaByInsumo,
   getFichaByInsumoPreparado,
   saveFichaByProducto,
+  saveFichaByVariante,
   saveFichaByInsumo,
   saveFichaByInsumoPreparado,
   createFicha,
@@ -25,6 +27,11 @@ router.route('/producto/:idProducto')
   .get(cacheFichas, getFichaByProducto)
   .put(protect, requirePrivilege(['Productos', 'Fichas Técnicas'], 'Editar'), saveFichaByProducto)
   .post(protect, requirePrivilege(['Productos', 'Fichas Técnicas'], 'Crear'), saveFichaByProducto);
+
+router.route('/variante/:idVariante')
+  .get(getFichaByVariante)
+  .put(protect, requirePrivilege(['Productos', 'Fichas Técnicas'], 'Editar'), saveFichaByVariante)
+  .post(protect, requirePrivilege(['Productos', 'Fichas Técnicas'], 'Crear'), saveFichaByVariante);
 
 router.route('/insumo-preparado/:idInsumoPreparado')
   .get(cacheFichas, getFichaByInsumoPreparado)

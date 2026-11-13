@@ -1910,11 +1910,21 @@ class VentaService {
     if (varId) {
       try {
         const fichaVar = await FichaTecnica.findOne({
-          where: { idVariante: varId, estado: 1 },
+          where: { idVariante: varId, tipo: 'VARIANTE', estado: 1 },
           include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
         });
         if (fichaVar && Array.isArray(fichaVar.detalles) && fichaVar.detalles.length > 0) {
           return { ficha: fichaVar, targetProductId: fichaVar.idProducto || targetProductId, resolvedName: varRow?.nombre };
+        }
+        // Compatibilidad con fichas especiales por variante (ej. Coca-Cola Light / Pepsi Light sin varDeltas)
+        if (!varDeltas || varDeltas.length === 0) {
+          const legacyFichaVar = await FichaTecnica.findOne({
+            where: { idVariante: varId, estado: 1 },
+            include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          });
+          if (legacyFichaVar && Array.isArray(legacyFichaVar.detalles) && legacyFichaVar.detalles.length > 0) {
+            return { ficha: legacyFichaVar, targetProductId: legacyFichaVar.idProducto || targetProductId, resolvedName: varRow?.nombre };
+          }
         }
       } catch (e) {}
     }
@@ -1922,9 +1932,15 @@ class VentaService {
     const finalProdId = d.idProducto || targetProductId || varRow?.idProducto;
     if (finalProdId) {
       try {
+        const { Op } = require('sequelize');
         const fichaBase = await FichaTecnica.findOne({
-          where: { idProducto: finalProdId, estado: 1 },
-          include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
+          where: {
+            idProducto: finalProdId,
+            estado: 1,
+            [Op.or]: [{ tipo: 'PRODUCTO' }, { tipo: null }]
+          },
+          include: [{ model: DetalleFichaInsumo, as: 'detalles' }],
+          order: [['idFichaTecnica', 'ASC']]
         });
         if (fichaBase) {
           if (varDeltas && varDeltas.length > 0) {

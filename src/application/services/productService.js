@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { Product, CategoriaProducto, Evento, Variante, VarianteInsumo, ComboProducto, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaProducto } = require('../../persistence/models');
+const FichaTecnicaService = require('./fichaTecnicaService');
 
 /**
  * Normaliza unidades de medida entre receta e inventario para calcular porciones disponibles.
@@ -129,16 +130,17 @@ class ProductService {
       ]
       }),
 
-      // Cargar recetas para cálculo dinámico de stock
+      // Cargar recetas para cálculo dinámico de stock (base por producto y fichas dedicadas por variante)
       FichaTecnica.findAll({
       where: { estado: 1 },
       include: [
         {
           model: DetalleFichaInsumo,
           as: 'detalles',
-          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'unidadMedida', 'estado'] }]
+          include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'unidadMedida', 'estado', 'precioUnitario'] }]
         }
-      ]
+      ],
+      order: [['idFichaTecnica', 'ASC']]
       }).catch(() => []),
 
       // Cargar todos los insumos para bebidas o productos directos sin ficha técnica
@@ -153,10 +155,14 @@ class ProductService {
         raw: true
       }).catch(() => [])
     ]);
-
     const fichaMap = new Map();
+    const varFichaMap = new Map();
     fichas.forEach(f => {
-      if (f.idProducto) fichaMap.set(f.idProducto, f);
+      if (f.tipo === 'VARIANTE' && f.idVariante) {
+        varFichaMap.set(Number(f.idVariante), f);
+      } else if (f.idProducto && !fichaMap.has(f.idProducto)) {
+        fichaMap.set(f.idProducto, f);
+      }
     });
     const insumoByIdMap = new Map();
     allInsumos.forEach(ins => {
@@ -268,26 +274,57 @@ class ProductService {
 
         const variantes = (isCombo || hasOnlyDummy || rawVars.length === 0)
           ? []
-          : rawVars.map(v => ({
-              id: v.idVariante,
-              idVariante: v.idVariante,
-              nombre: v.nombre,
-              descripcion: v.descripcion || '',
-              precio: realPrecio,
-              imagen: v.imagen || '',
-              estado: v.estado !== undefined ? v.estado : 1,
-              insumosModificados: Array.isArray(v.insumosModificados) ? v.insumosModificados.map(im => ({
-                idVarianteInsumo: im.idVarianteInsumo,
-                tipoAccion: im.tipoAccion,
-                idInsumo: im.idInsumo,
-                idInsumoReemplazado: im.idInsumoReemplazado,
-                cantidad: Number(im.cantidad || 0),
-                unidadMedida: im.unidadMedida,
-                observaciones: im.observaciones,
-                insumo: im.insumo ? { idInsumo: im.insumo.idInsumo, nombre: im.insumo.nombre, unidadMedida: im.insumo.unidadMedida, stock: im.insumo.stock } : null,
-                insumoReemplazado: im.insumoReemplazado ? { idInsumo: im.insumoReemplazado.idInsumo, nombre: im.insumoReemplazado.nombre, unidadMedida: im.insumoReemplazado.unidadMedida } : null
-              })) : []
-            }));
+          : rawVars.map(v => {
+              const vf = varFichaMap.get(Number(v.idVariante));
+              return {
+                id: v.idVariante,
+                idVariante: v.idVariante,
+                nombre: v.nombre,
+                descripcion: v.descripcion || '',
+                precio: ProductService.resolveVariantPrice(v.precio, realPrecio),
+                imagen: v.imagen || '',
+                estado: v.estado !== undefined ? v.estado : 1,
+                fichaTecnica: vf ? {
+                  idFichaTecnica: vf.idFichaTecnica,
+                  idProducto: vf.idProducto,
+                  idVariante: vf.idVariante,
+                  tipo: vf.tipo || 'VARIANTE',
+                  descripcion: vf.descripcion || '',
+                  procedimiento: vf.procedimiento || '',
+                  tiempoPreparacion: vf.tiempoPreparacion || 0,
+                  rendimiento: vf.rendimiento || '',
+                  condicionesAlmacenamiento: vf.condicionesAlmacenamiento || '',
+                  vidaUtil: vf.vidaUtil || '',
+                  observaciones: vf.observaciones || '',
+                  versionActual: vf.versionActual || 1,
+                  detalles: Array.isArray(vf.detalles) ? vf.detalles.map(d => ({
+                    idDetalleFicha: d.idDetalleFicha,
+                    idInsumo: d.idInsumo,
+                    cantidad: Number(d.cantidad || 0),
+                    unidadMedida: d.unidadMedida || d.insumo?.unidadMedida || 'und',
+                    precioUnitario: Number(d.insumo?.precioUnitario || 0),
+                    insumo: d.insumo ? {
+                      idInsumo: d.insumo.idInsumo,
+                      nombre: d.insumo.nombre,
+                      unidadMedida: d.insumo.unidadMedida,
+                      stock: d.insumo.stock,
+                      precioUnitario: Number(d.insumo.precioUnitario || 0)
+                    } : null
+                  })) : []
+                } : null,
+                insumosModificados: Array.isArray(v.insumosModificados) ? v.insumosModificados.map(im => ({
+                  idVarianteInsumo: im.idVarianteInsumo,
+                  tipoAccion: im.tipoAccion,
+                  idInsumo: im.idInsumo,
+                  idInsumoReemplazado: im.idInsumoReemplazado,
+                  cantidad: Number(im.cantidad || 0),
+                  unidadMedida: im.unidadMedida,
+                  observaciones: im.observaciones,
+                  insumo: im.insumo ? { idInsumo: im.insumo.idInsumo, nombre: im.insumo.nombre, unidadMedida: im.insumo.unidadMedida, stock: im.insumo.stock } : null,
+                  insumoReemplazado: im.insumoReemplazado ? { idInsumo: im.insumoReemplazado.idInsumo, nombre: im.insumoReemplazado.nombre, unidadMedida: im.insumoReemplazado.unidadMedida } : null
+                })) : []
+              };
+            });
 
         const idVariantePrincipal = rawVars[0]?.idVariante || p.idProducto;
 
@@ -366,6 +403,14 @@ class ProductService {
           eventos: p.eventos || []
         };
       });
+  }
+
+  /** Resolves an optional variant price, falling back to basePrice when unset or non-positive. */
+  static resolveVariantPrice(rawPrecio, basePrice = 0) {
+    const parsed = rawPrecio !== undefined && rawPrecio !== null && rawPrecio !== ''
+      ? Number(rawPrecio)
+      : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : (Number(basePrice) || 0);
   }
 
   static async getProductById(id) {
@@ -448,25 +493,34 @@ class ProductService {
           idProducto: product.idProducto,
           nombre: v.nombre.trim(),
           descripcion: v.descripcion || null,
-          precio: finalPrecio,
+          precio: ProductService.resolveVariantPrice(v.precio, finalPrecio),
           imagen: v.imagen || null,
           estado: normalizedEstado
         });
 
         if (Array.isArray(v.insumosModificados) && v.insumosModificados.length > 0) {
           for (const im of v.insumosModificados) {
-            if (im.idInsumo && Number(im.cantidad) > 0) {
+            const accion = String(im.tipoAccion || 'AGREGAR').toUpperCase();
+            if (im.idInsumo && (accion === 'QUITAR' || Number(im.cantidad) > 0)) {
               await VarianteInsumo.create({
                 idVariante: newVar.idVariante,
-                tipoAccion: im.tipoAccion || 'AGREGAR',
+                tipoAccion: accion,
                 idInsumo: Number(im.idInsumo),
                 idInsumoReemplazado: im.idInsumoReemplazado ? Number(im.idInsumoReemplazado) : null,
-                cantidad: Number(im.cantidad),
+                cantidad: accion === 'QUITAR' ? 0 : Number(im.cantidad),
                 unidadMedida: im.unidadMedida || 'und',
                 observaciones: im.observaciones || null
               });
             }
           }
+        }
+
+        if (v.fichaTecnica && Array.isArray(v.fichaTecnica.detalles || v.fichaTecnica.insumos)) {
+          await FichaTecnicaService.saveForVariante(product.idProducto, newVar.idVariante, {
+            ...v.fichaTecnica,
+            varianteNombre: v.nombre.trim(),
+            descripcion: v.fichaTecnica.descripcion || v.descripcion || null
+          });
         }
       }
     } else {
@@ -520,6 +574,7 @@ class ProductService {
       }
     }
 
+    const prevBasePrecio = Number(p.precio) || 0;
     if (nombre !== undefined) p.nombre = nombre.trim();
     if (descripcion !== undefined) p.descripcion = descripcion;
     if (imagen !== undefined) p.imagen = imagen;
@@ -547,12 +602,19 @@ class ProductService {
       const filteredIncoming = variantes.filter(v => v && v.nombre && v.nombre.trim() && v.nombre.trim().toLowerCase() !== p.nombre.toLowerCase());
 
       if (filteredIncoming.length > 0) {
+        const matchedExistingIds = new Set(
+          filteredIncoming
+            .map(v => Number(v.idVariante))
+            .filter(vId => vId && existingIds.includes(vId))
+        );
+        const usedExistingIds = new Set(matchedExistingIds);
         const incomingIds = [];
+
         for (let i = 0; i < filteredIncoming.length; i++) {
           const v = filteredIncoming[i];
           const vNombre = v.nombre.trim();
           const vDesc = v.descripcion || null;
-          const vPrecio = basePrice;
+          const vPrecio = ProductService.resolveVariantPrice(v.precio, basePrice);
           const vImagen = v.imagen || null;
           let currentVarId = null;
 
@@ -562,22 +624,28 @@ class ProductService {
               { nombre: vNombre, descripcion: vDesc, precio: vPrecio, imagen: vImagen },
               { where: { idVariante: currentVarId } }
             );
-          } else if (existingVariantes[i]) {
-            currentVarId = Number(existingVariantes[i].idVariante);
-            await Variante.update(
-              { nombre: vNombre, descripcion: vDesc, precio: vPrecio, imagen: vImagen },
-              { where: { idVariante: currentVarId } }
-            );
           } else {
-            const newVar = await Variante.create({
-              idProducto: id,
-              nombre: vNombre,
-              descripcion: vDesc,
-              precio: vPrecio,
-              imagen: vImagen,
-              estado: p.estado
-            });
-            currentVarId = Number(newVar.idVariante);
+            const reusableDummy = existingVariantes.find(
+              ev => !usedExistingIds.has(Number(ev.idVariante)) && isDummyOrBaseVariant(ev.nombre, p.nombre)
+            );
+            if (reusableDummy) {
+              currentVarId = Number(reusableDummy.idVariante);
+              usedExistingIds.add(currentVarId);
+              await Variante.update(
+                { nombre: vNombre, descripcion: vDesc, precio: vPrecio, imagen: vImagen },
+                { where: { idVariante: currentVarId } }
+              );
+            } else {
+              const newVar = await Variante.create({
+                idProducto: id,
+                nombre: vNombre,
+                descripcion: vDesc,
+                precio: vPrecio,
+                imagen: vImagen,
+                estado: p.estado
+              });
+              currentVarId = Number(newVar.idVariante);
+            }
           }
           incomingIds.push(currentVarId);
 
@@ -585,23 +653,36 @@ class ProductService {
           await VarianteInsumo.destroy({ where: { idVariante: currentVarId } });
           if (Array.isArray(v.insumosModificados) && v.insumosModificados.length > 0) {
             for (const im of v.insumosModificados) {
-              if (im.idInsumo && Number(im.cantidad) > 0) {
+              const accion = String(im.tipoAccion || 'AGREGAR').toUpperCase();
+              if (im.idInsumo && (accion === 'QUITAR' || Number(im.cantidad) > 0)) {
                 await VarianteInsumo.create({
                   idVariante: currentVarId,
-                  tipoAccion: im.tipoAccion || 'AGREGAR',
+                  tipoAccion: accion,
                   idInsumo: Number(im.idInsumo),
                   idInsumoReemplazado: im.idInsumoReemplazado ? Number(im.idInsumoReemplazado) : null,
-                  cantidad: Number(im.cantidad),
+                  cantidad: accion === 'QUITAR' ? 0 : Number(im.cantidad),
                   unidadMedida: im.unidadMedida || 'und',
                   observaciones: im.observaciones || null
                 });
               }
             }
           }
+
+          // Sincronizar ficha técnica dedicada para esta variante
+          if (v.fichaTecnica && Array.isArray(v.fichaTecnica.detalles || v.fichaTecnica.insumos)) {
+            await FichaTecnicaService.saveForVariante(id, currentVarId, {
+              ...v.fichaTecnica,
+              varianteNombre: vNombre,
+              descripcion: v.fichaTecnica.descripcion || vDesc || null
+            });
+          } else if (v.fichaTecnica === null) {
+            await FichaTecnicaService.deleteByVarianteId(currentVarId).catch(() => null);
+          }
         }
 
         const toRemove = existingIds.filter(vId => !incomingIds.includes(vId));
         for (const removeId of toRemove) {
+          await FichaTecnicaService.deleteByVarianteId(removeId).catch(() => null);
           const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: removeId } }).catch(() => null);
           if (!hasSales) {
             await VarianteInsumo.destroy({ where: { idVariante: removeId } }).catch(() => null);
@@ -611,6 +692,7 @@ class ProductService {
       } else {
         // El producto se guardó sin variantes adicionales (producto simple)
         if (existingVariantes.length > 0) {
+          await FichaTecnicaService.deleteByVarianteId(existingVariantes[0].idVariante).catch(() => null);
           await Variante.update(
             { nombre: `${p.nombre.trim()} - base`, precio: basePrice },
             { where: { idVariante: existingVariantes[0].idVariante } }
@@ -618,6 +700,7 @@ class ProductService {
           await VarianteInsumo.destroy({ where: { idVariante: existingVariantes[0].idVariante } });
           for (let i = 1; i < existingVariantes.length; i++) {
             const remVar = existingVariantes[i];
+            await FichaTecnicaService.deleteByVarianteId(remVar.idVariante).catch(() => null);
             const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: remVar.idVariante } }).catch(() => null);
             if (!hasSales) {
               await VarianteInsumo.destroy({ where: { idVariante: remVar.idVariante } }).catch(() => null);
@@ -628,7 +711,13 @@ class ProductService {
       }
     } else if (precio !== undefined && precio !== null && precio !== '') {
       const nuevoPrecio = Number(precio) || 0;
-      await Variante.update({ precio: nuevoPrecio }, { where: { idProducto: id } });
+      const existingVars = await Variante.findAll({ where: { idProducto: id } });
+      for (const ev of existingVars) {
+        const curPrecio = Number(ev.precio || 0);
+        if (curPrecio <= 0 || curPrecio === prevBasePrecio || isDummyOrBaseVariant(ev.nombre, p.nombre)) {
+          await Variante.update({ precio: nuevoPrecio }, { where: { idVariante: ev.idVariante } });
+        }
+      }
     }
 
     // Sincronizar items de combo si se enviaron (Ítems #97, #106)
@@ -672,14 +761,19 @@ class ProductService {
     } catch (_) {}
 
     try {
-      const ficha = await FichaTecnica.findOne({ where: { idProducto: id } });
-      if (ficha) {
-        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ficha.idFichaTecnica } });
-        await ficha.destroy();
+      const fichasProd = await FichaTecnica.findAll({
+        where: varianteIds.length > 0
+          ? { [Op.or]: [{ idProducto: id }, { idVariante: varianteIds }] }
+          : { idProducto: id }
+      });
+      for (const ft of fichasProd) {
+        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ft.idFichaTecnica } });
+        await ft.destroy();
       }
     } catch (_) {}
 
     if (varianteIds.length > 0) {
+      await VarianteInsumo.destroy({ where: { idVariante: varianteIds } }).catch(() => null);
       await Variante.destroy({ where: { idProducto: id } });
     }
 
