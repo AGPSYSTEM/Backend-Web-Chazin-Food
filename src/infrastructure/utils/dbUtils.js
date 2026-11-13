@@ -972,6 +972,26 @@ async function ensureDevolucionSchema() {
       await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `usuarioResolucionId` INT(11) NULL AFTER `fechaResolucion`");
     }
     await sequelize.query("ALTER TABLE `devolucion` MODIFY COLUMN `estado` VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE'");
+    const [dDatosReem] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'datosReembolso'");
+    if (!dDatosReem || dDatosReem.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `datosReembolso` TEXT NULL AFTER `valorDevuelto`");
+    }
+    const [dEstReem] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'estadoReembolso'");
+    if (!dEstReem || dEstReem.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `estadoReembolso` VARCHAR(40) NULL AFTER `datosReembolso`");
+    }
+    const [dRefReem] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'referenciaReembolso'");
+    if (!dRefReem || dRefReem.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `referenciaReembolso` VARCHAR(150) NULL AFTER `estadoReembolso`");
+    }
+    const [dIdVentReemp] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'idVentaReemplazo'");
+    if (!dIdVentReemp || dIdVentReemp.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `idVentaReemplazo` INT(11) NULL AFTER `usuarioResolucionId`");
+    }
+    const [dCodVentReemp] = await sequelize.query("SHOW COLUMNS FROM `devolucion` LIKE 'codigoVentaReemplazo'");
+    if (!dCodVentReemp || dCodVentReemp.length === 0) {
+      await sequelize.query("ALTER TABLE `devolucion` ADD COLUMN `codigoVentaReemplazo` VARCHAR(60) NULL AFTER `idVentaReemplazo`");
+    }
     console.log('[DB] ✅ Tabla y columnas de devolucion verificadas/aseguradas.');
   } catch (err) {
     console.warn('[DB Migration] ⚠️ Error asegurando columnas de devolucion:', err.message);

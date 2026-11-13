@@ -1175,6 +1175,26 @@ const Pago = sequelize.define('pago', {
 }, { tableName: 'pago', timestamps: false });
 
 const Devolucion = sequelize.define('devolucion', {
+  datosReembolso: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  estadoReembolso: {
+    type: DataTypes.STRING(40),
+    allowNull: true
+  },
+  referenciaReembolso: {
+    type: DataTypes.STRING(150),
+    allowNull: true
+  },
+  idVentaReemplazo: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  codigoVentaReemplazo: {
+    type: DataTypes.STRING(60),
+    allowNull: true
+  },
   idDevolucion: {
     type: DataTypes.INTEGER,
     primaryKey: true,

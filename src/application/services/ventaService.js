@@ -512,7 +512,8 @@ class VentaService {
     let descuentoAplicado = parseFloat(v.descuentoAplicado || 0);
 
     // Si total o subtotal está en 0 en base de datos, calcular de productos o detalles
-    if ((total === 0 || subtotal === 0) && Array.isArray(productos) && productos.length > 0) {
+    const esDevolucion = Boolean(obsData.esDevolucion);
+    if (!esDevolucion && (total === 0 || subtotal === 0) && Array.isArray(productos) && productos.length > 0) {
       subtotal = productos.reduce((acc, p) => acc + Number(p.total || 0), 0);
       descuentoAplicado = descuentoAplicado || (subtotal * (Number(obsData.descuentoPorcentaje || 0) / 100));
       total = Math.max(0, subtotal - descuentoAplicado);
@@ -559,7 +560,7 @@ class VentaService {
     }
 
     const iva = Math.round(subtotal * 0.19);
-    const precioOriginal = subtotal > total ? subtotal : (total + descuentoAplicado);
+    const precioOriginal = esDevolucion ? 0 : (subtotal > total ? subtotal : (total + descuentoAplicado));
     const montoDescuento = descuentoAplicado;
 
     let estadoStr = 'Pendiente';
@@ -671,6 +672,12 @@ class VentaService {
       pedidoCompleto: obsData.pedidoCompleto !== undefined ? Boolean(obsData.pedidoCompleto) : null,
       observacionCocina: obsData.observacionCocina || "",
       horaVerificacionCocina: obsData.horaVerificacionCocina || null,
+      esDevolucion,
+      idDevolucionAsociada: obsData.idDevolucionAsociada || null,
+      codigoDevolucionAsociada: obsData.codigoDevolucionAsociada || null,
+      idVentaOriginal: obsData.idVentaOriginal || null,
+      codigoVentaOriginal: obsData.codigoVentaOriginal || null,
+      telefono: obsData.telefono || obsData.celular || clienteUser?.telefono || null,
       productos,
       detalles: v.detalles || []
     };
@@ -789,7 +796,8 @@ class VentaService {
 
   static async getStats(filter = {}) {
     const filterObj = typeof filter === 'string' ? { periodo: filter } : (filter || {});
-    const list = await this.getAll(filterObj);
+    const rawList = await this.getAll(filterObj);
+    const list = rawList.filter(v => !v.esDevolucion);
     const totalVentasSum = list.reduce((acc, v) => acc + Number(v.total || 0), 0);
     const pedidosCount = list.length;
     const ticketPromedioVal = pedidosCount > 0 ? Math.round(totalVentasSum / pedidosCount) : 0;
@@ -902,6 +910,13 @@ class VentaService {
 
   static async create(data) {
     let targetUserId = data.idUsuario || data.userId;
+    let earlyObs = {};
+    if (typeof data.observaciones === 'string' && data.observaciones.startsWith('{')) {
+      try { earlyObs = JSON.parse(data.observaciones); } catch (e) {}
+    } else if (typeof data.observaciones === 'object' && data.observaciones !== null) {
+      earlyObs = data.observaciones;
+    }
+    const esDevolucion = Boolean(data.esDevolucion || earlyObs.esDevolucion);
 
     // Strict Validation 1: Check user provided
     if (!targetUserId) {
@@ -921,7 +936,7 @@ class VentaService {
     }
 
     // Strict Validation 3: Check user is ACTIVE
-    if (userObj.estado === 'INACTIVO' || userObj.estado === '0' || userObj.estado === 0) {
+    if (!esDevolucion && (userObj.estado === 'INACTIVO' || userObj.estado === '0' || userObj.estado === 0)) {
       const error = new Error('Tu usuario está inactivo y no puedes realizar pedidos. Comunícate con el administrador para activar tu cuenta.');
       error.statusCode = 403;
       throw error;
@@ -936,7 +951,15 @@ class VentaService {
 
     let finalClienteId = null;
 
-    if (isStaff) {
+    if (esDevolucion && data.idCliente) {
+      const targetClienteDev = await Cliente.findByPk(data.idCliente);
+      if (!targetClienteDev) {
+        const error = new Error('El cliente asociado a la devolución no existe.');
+        error.statusCode = 404;
+        throw error;
+      }
+      finalClienteId = targetClienteDev.idCliente;
+    } else if (isStaff) {
       // Staff (Vendedor/Admin) creating POS sale -> seller is employee, NOT customer
       if (data.idCliente) {
         const targetCliente = await Cliente.findByPk(data.idCliente, {
@@ -1037,7 +1060,7 @@ class VentaService {
     // Si es venta rápida (PUNTO_DE_VENTA), asegurar que se asocie al responsable con rol Vendedor o Administrador
     let responsibleUserId = targetUserId;
     if (resolvedTipoVenta === "PUNTO_DE_VENTA") {
-      if (!isStaff) {
+      if (!isStaff && !esDevolucion) {
         const { Op } = require('sequelize');
         const sellerUser = await User.findOne({
           include: [{ model: Role, as: 'rolInfo', where: { nombre: { [Op.like]: '%Vendedor%' } } }],
@@ -1069,7 +1092,7 @@ class VentaService {
       calculatedSubtotal += (itPrice + itAdds) * itQty;
     }
 
-    const finalSubtotal = Number(data.subtotal) > 0 ? Number(data.subtotal) : calculatedSubtotal;
+    const finalSubtotal = esDevolucion ? 0 : (Number(data.subtotal) > 0 ? Number(data.subtotal) : calculatedSubtotal);
     let finalDescuento = Number(data.descuentoAplicado || data.descuento || 0);
 
     const ClienteService = require('./clienteService');
@@ -1078,7 +1101,7 @@ class VentaService {
       (parsedObs.clienteNombre && String(parsedObs.clienteNombre).toLowerCase().includes('mostrador')) ||
       (!data.idCliente && isStaff);
 
-    if (finalDescuento === 0 && finalClienteId && !isMostradorSale) {
+    if (!esDevolucion && finalDescuento === 0 && finalClienteId && !isMostradorSale) {
       try {
         const clienteInfo = await ClienteService.getById(finalClienteId);
         if (clienteInfo && clienteInfo.tieneCuenta) {
@@ -1106,7 +1129,7 @@ class VentaService {
       }
     }
 
-    const finalTotal = Math.max(0, finalSubtotal - finalDescuento);
+    const finalTotal = esDevolucion ? 0 : Math.max(0, finalSubtotal - finalDescuento);
 
     // Ítem #123: origen de la venta (ONLINE = tienda web, PUNTO_FISICO = POS / mostrador)
     const rawOrigen = String(data.origen || parsedObs.origen || '').toUpperCase().replace(/\s+/g, '_');
@@ -1119,11 +1142,11 @@ class VentaService {
       origenVenta = isStaff ? 'PUNTO_FISICO' : 'ONLINE';
     }
     // Un cliente autenticado (no staff) nunca puede registrar ventas como punto físico
-    if (!isStaff) origenVenta = 'ONLINE';
+    if (!isStaff && !esDevolucion) origenVenta = 'ONLINE';
 
     // Ítem #122: las ventas online solo admiten pago electrónico con Wompi
     const metodoPagoSolicitado = String(data.metodoPago || parsedObs.metodoPago || '').trim();
-    if (origenVenta === 'ONLINE' && (!metodoPagoSolicitado || metodoPagoSolicitado.toLowerCase() === 'efectivo')) {
+    if (!esDevolucion && origenVenta === 'ONLINE' && (!metodoPagoSolicitado || metodoPagoSolicitado.toLowerCase() === 'efectivo')) {
       const error = new Error('Las ventas online únicamente admiten pago electrónico a través de Wompi.');
       error.statusCode = 400;
       throw error;
@@ -1161,7 +1184,7 @@ class VentaService {
       metodoPago: data.metodoPago || parsedObs.metodoPago || "Efectivo",
       direccion: data.direccion || parsedObs.direccion || "Recoger en Local",
       estadoPago: data.estadoPago || parsedObs.estadoPago || "Pagado",
-      codigoPedido: data.codigoPedido || data.numeroVenta || parsedObs.codigoPedido || `VEN-${String(Date.now()).slice(-4)}`,
+      codigoPedido: data.codigoPedido || parsedObs.codigoPedido || (esDevolucion ? undefined : `VEN-${String(Date.now()).slice(-4)}`),
       clienteNombre: data.clienteNombre || parsedObs.clienteNombre || `${userObj.nombre} ${userObj.apellidos || ''}`.trim(),
       productos: (Array.isArray(data.productos) && data.productos.length > 0)
         ? data.productos
@@ -1178,7 +1201,7 @@ class VentaService {
                 nombre: it.nombre || it.observaciones || it.observacion || "Producto",
                 cantidad: itQty,
                 precioUnitario: itPrice,
-                total: Number(it.subtotal || it.total) > 0 ? Number(it.subtotal || it.total) : (itPrice + itAdds) * itQty,
+                total: esDevolucion ? 0 : (Number(it.subtotal || it.total) > 0 ? Number(it.subtotal || it.total) : (itPrice + itAdds) * itQty),
                 observaciones: it.observacion || it.observaciones || "",
                 ingredientesRemovidos: Array.isArray(it.ingredientesRemovidos) ? it.ingredientesRemovidos : [],
                 personalizaciones: (it.personalizaciones && typeof it.personalizaciones === 'object') ? it.personalizaciones : undefined,
@@ -1201,6 +1224,14 @@ class VentaService {
       transferenciaReferencia: parsedObs.transferenciaReferencia || (data.datosPago ? data.datosPago.transferReferencia : null) || "",
       transferBanco: parsedObs.transferBanco || (data.datosPago ? data.datosPago.transferBanco : null) || "",
       tarjetaNumero: parsedObs.tarjetaNumero || (data.datosPago ? data.datosPago.tarjetaNumero : null) || "",
+      telefono: data.telefono || parsedObs.telefono || "",
+      mesa: data.mesa || parsedObs.mesa || null,
+      esDevolucion,
+      idDevolucionAsociada: data.idDevolucionAsociada || parsedObs.idDevolucionAsociada || null,
+      codigoDevolucionAsociada: data.codigoDevolucionAsociada || parsedObs.codigoDevolucionAsociada || null,
+      idVentaOriginal: data.idVentaOriginal || parsedObs.idVentaOriginal || null,
+      codigoVentaOriginal: data.codigoVentaOriginal || parsedObs.codigoVentaOriginal || null,
+      aprobadoPorUsuarioId: data.aprobadoPorUsuarioId || parsedObs.aprobadoPorUsuarioId || null,
       origen: origenVenta,
       tiempoEstimadoEntrega: tiempoEstimadoEntregaVenta,
       empaqueParaLlevar,
@@ -1228,7 +1259,7 @@ class VentaService {
     };
 
     // Las ventas online no pueden autodeclararse pagadas: quedan pendientes hasta confirmación de Wompi o aprobación manual (Ítem #116)
-    if (origenVenta === 'ONLINE' && !isStaff) {
+    if (origenVenta === 'ONLINE' && !isStaff && !esDevolucion) {
       obsObj.estadoPago = 'Pendiente';
     }
 
@@ -1236,7 +1267,7 @@ class VentaService {
     // se aprueban directamente en el módulo de Ventas, convirtiéndose en órdenes de producción (Ítem 114 y 116)
     const esPOS = resolvedTipoVenta === 'PUNTO_DE_VENTA' && origenVenta === 'PUNTO_FISICO';
     const esPagado = isStaff && String(obsObj.estadoPago || data.estadoPago || '').toLowerCase() === 'pagado';
-    const esAprobadoExplicito = isStaff && (data.estadoAprobacion === 'APROBADO' || parsedObs.estadoAprobacion === 'APROBADO');
+    const esAprobadoExplicito = esDevolucion || (isStaff && (data.estadoAprobacion === 'APROBADO' || parsedObs.estadoAprobacion === 'APROBADO'));
 
     const finalEstadoAprobacion = (esPOS || esPagado || esAprobadoExplicito)
       ? 'APROBADO' 
@@ -1375,7 +1406,7 @@ class VentaService {
             idVariante: chosenVarianteId,
             cantidad: d.cantidad || 1,
             precioUnitario: d.precioUnitario || d.precio || 0,
-            subtotal: d.subtotal || ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
+            subtotal: (esDevolucion || (d.subtotal !== undefined && d.subtotal !== null)) ? (esDevolucion ? 0 : Number(d.subtotal)) : ((d.precioUnitario || d.precio || 0) * (d.cantidad || 1)),
             observaciones: customNote
           });
 
@@ -1610,7 +1641,7 @@ class VentaService {
     }
 
     // Trigger client loyalty progression (strictly only for registered customer accounts and when sale is approved)
-    if (finalClienteId && !isMostradorSale && finalEstadoAprobacion === 'APROBADO') {
+    if (!esDevolucion && finalClienteId && !isMostradorSale && finalEstadoAprobacion === 'APROBADO') {
       await this.registrarFidelidadUnaVez(venta.idVenta);
     }
 

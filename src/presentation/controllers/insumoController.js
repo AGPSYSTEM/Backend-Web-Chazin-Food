@@ -95,6 +95,28 @@ const checkVencimientos = async (req, res, next) => {
   }
 };
 
+const deleteLoteVencido = async (req, res, next) => {
+  try {
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await InsumoService.deleteExpiredLote(req.params.id, req.params.idLote, { usuarioId });
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+const deleteLotesVencidos = async (req, res, next) => {
+  try {
+    const usuarioId = req.user ? (req.user.idUsuario || req.user.id) : (req.body?.usuarioId || null);
+    const result = await InsumoService.deleteExpiredLotesByInsumo(req.params.id, { usuarioId });
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   getInsumos,
   checkVencimientos,
@@ -105,4 +127,6 @@ module.exports = {
   deleteInsumo,
   restoreInsumo,
   hardDeleteInsumo,
+  deleteLoteVencido,
+  deleteLotesVencidos,
 };

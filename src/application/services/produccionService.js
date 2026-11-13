@@ -926,7 +926,13 @@ class ProduccionService {
           checklistPreparacion: savedChecklist,
           pedidoCompleto,
           observacionCocina: obsObj.observacionCocina || "",
-          fechaVerificacionCocina: obsObj.fechaVerificacionCocina || null
+          fechaVerificacionCocina: obsObj.fechaVerificacionCocina || null,
+          esDevolucion: Boolean(obsObj.esDevolucion),
+          idDevolucionAsociada: obsObj.idDevolucionAsociada || null,
+          codigoDevolucionAsociada: obsObj.codigoDevolucionAsociada || null,
+          codigoVentaOriginal: obsObj.codigoVentaOriginal || null,
+          direccion: obsObj.direccion || null,
+          telefono: obsObj.telefono || null
         };
       });
 

@@ -10,6 +10,8 @@ const {
   deleteInsumo,
   restoreInsumo,
   hardDeleteInsumo,
+  deleteLoteVencido,
+  deleteLotesVencidos,
 } = require('../controllers/insumoController');
 const { protect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
 
@@ -35,5 +37,7 @@ router.patch('/:id/restore', requirePrivilege('Insumos', 'Editar'), restoreInsum
 
 router.delete('/:id/fisico', requirePrivilege('Insumos', 'Eliminar'), hardDeleteInsumo);
 router.delete('/:id/permanent', requirePrivilege('Insumos', 'Eliminar'), hardDeleteInsumo);
+router.delete('/:id/lotes-vencidos', requirePrivilege(['Insumos', 'Gestión de Compras'], 'Eliminar'), deleteLotesVencidos);
+router.delete('/:id/lotes/:idLote', requirePrivilege(['Insumos', 'Gestión de Compras'], 'Eliminar'), deleteLoteVencido);
 
 module.exports = router;

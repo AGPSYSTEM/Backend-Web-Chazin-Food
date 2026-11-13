@@ -1,7 +1,20 @@
 const { Insumo, CategoriaInsumo, Proveedor, FichaTecnica, DetalleFichaInsumo, Trazabilidad, DetalleInsumoPreparadoInsumo, LoteInsumo, DetalleCompraInsumo } = require('../../persistence/models');
 const database = require('../../persistence/config/db');
 
+function getColombiaDateISO() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+}
+
+function isLoteExpiredByDateOrState(lote, todayCol = getColombiaDateISO()) {
+  if (!lote) return false;
+  if (lote.estado === 'VENCIDO') return true;
+  if (lote.estado === 'AGOTADO') return false;
+  const fechaStr = lote.fechaVencimiento ? String(lote.fechaVencimiento).slice(0, 10) : null;
+  return Boolean(fechaStr && fechaStr <= todayCol);
+}
+
 function formatInsumo(i, options = {}) {
+  const todayCol = getColombiaDateISO();
   const catNombre = i.categoria ? i.categoria.nombre : 'Sin categoría';
   const provNombre = i.proveedor ? i.proveedor.nombre : 'Sin Proveedor';
   const lotesList = (i.lotes || []).map(l => ({
@@ -12,7 +25,8 @@ function formatInsumo(i, options = {}) {
     cantidad: parseFloat(l.cantidad || 0),
     cantidadDisponible: parseFloat(l.cantidadDisponible !== undefined ? l.cantidadDisponible : l.cantidad || 0),
     fechaVencimiento: l.fechaVencimiento || null,
-    estado: l.estado || 'ACTIVO'
+    estado: isLoteExpiredByDateOrState(l, todayCol) ? 'VENCIDO' : (l.estado || 'ACTIVO'),
+    estaVencido: isLoteExpiredByDateOrState(l, todayCol)
   }));
 
   const stockNum = parseFloat(i.stock || 0);
@@ -58,7 +72,7 @@ function formatInsumo(i, options = {}) {
 class InsumoService {
   static async checkVencimientos() {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getColombiaDateISO();
       const { Op } = require('sequelize');
 
       // 1. Lotes con fecha de vencimiento cumplida o pasada que sigan activos
@@ -646,6 +660,162 @@ class InsumoService {
 
     return { message: 'Insumo y su ficha técnica eliminados físicamente' };
   }
+
+  /**
+   * Elimina uno o todos los lotes vencidos de un insumo y resta su stock disponible.
+   */
+  static async _removeExpiredLotes(idInsumo, targetLoteId = null, options = {}) {
+    const insumoId = parseInt(idInsumo, 10);
+    if (!insumoId || isNaN(insumoId)) {
+      const error = new Error('ID de insumo no válido');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const todayCol = getColombiaDateISO();
+    const TrazabilidadService = require('./trazabilidadService');
+    const sequelize = database.sequelize;
+
+    const result = await sequelize.transaction(async (t) => {
+      const insumo = await Insumo.findByPk(insumoId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!insumo || Number(insumo.eliminado) === 1) {
+        const error = new Error('Insumo no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const lotesWhere = { idInsumo: insumoId };
+      if (targetLoteId !== null && targetLoteId !== undefined) {
+        const loteIdNum = parseInt(targetLoteId, 10);
+        if (!loteIdNum || isNaN(loteIdNum)) {
+          const error = new Error('ID de lote no válido');
+          error.statusCode = 400;
+          throw error;
+        }
+        lotesWhere.idLote = loteIdNum;
+      }
+
+      const candidatos = await LoteInsumo.findAll({
+        where: lotesWhere,
+        transaction: t,
+        lock: t.LOCK.UPDATE
+      });
+
+      if (targetLoteId !== null && targetLoteId !== undefined) {
+        if (!candidatos.length) {
+          const error = new Error('Lote no encontrado para este insumo');
+          error.statusCode = 404;
+          throw error;
+        }
+        if (!isLoteExpiredByDateOrState(candidatos[0], todayCol)) {
+          const error = new Error('Solo se pueden eliminar lotes que se encuentren vencidos.');
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+
+      const lotesAEliminar = candidatos.filter((l) => isLoteExpiredByDateOrState(l, todayCol));
+      if (!lotesAEliminar.length) {
+        const error = new Error('No se encontraron lotes vencidos para retirar en este insumo.');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const cantidadDescontada = Number(
+        lotesAEliminar.reduce((acc, lote) => {
+          const disp = lote.cantidadDisponible !== undefined && lote.cantidadDisponible !== null
+            ? lote.cantidadDisponible
+            : lote.cantidad;
+          return acc + Math.max(0, Number(disp || 0));
+        }, 0).toFixed(3)
+      );
+
+      const deletedLotes = lotesAEliminar.map((l) => ({
+        idLote: l.idLote,
+        numeroLote: l.numeroLote,
+        cantidadDescontada: Math.max(0, Number(l.cantidadDisponible ?? l.cantidad ?? 0)),
+        fechaVencimiento: l.fechaVencimiento
+      }));
+
+      await LoteInsumo.destroy({
+        where: {
+          idInsumo: insumoId,
+          idLote: lotesAEliminar.map((l) => l.idLote)
+        },
+        transaction: t
+      });
+
+      const stockAnterior = Math.max(0, Number(insumo.stock || 0));
+      const nuevoStock = Math.max(0, Number((stockAnterior - cantidadDescontada).toFixed(3)));
+
+      const lotesRestantes = await LoteInsumo.findAll({
+        where: { idInsumo: insumoId },
+        order: [['fechaVencimiento', 'ASC']],
+        transaction: t
+      });
+
+      const proximoActivo = lotesRestantes.find(
+        (l) => !isLoteExpiredByDateOrState(l, todayCol) && Number(l.cantidadDisponible || 0) > 0 && l.fechaVencimiento
+      );
+      const cualquierRestante = lotesRestantes.find((l) => l.fechaVencimiento);
+      const nuevaFechaVencimiento = proximoActivo
+        ? proximoActivo.fechaVencimiento
+        : (cualquierRestante ? cualquierRestante.fechaVencimiento : null);
+
+      await insumo.update(
+        {
+          stock: nuevoStock,
+          fechaVencimiento: nuevaFechaVencimiento
+        },
+        { transaction: t }
+      );
+
+      const codigosResumen = deletedLotes.map((d) => d.numeroLote || `#${d.idLote}`).join(', ');
+      const unidad = insumo.unidadMedida || 'und';
+      await TrazabilidadService.create(
+        {
+          tipo: 'Retiro Lote Vencido',
+          entidadNombre: insumo.nombre,
+          idInsumo: insumo.idInsumo,
+          tipoMovimiento: 'Salida',
+          cantidad: cantidadDescontada,
+          motivo: `Retiro de lote(s) vencido(s): ${codigosResumen}`,
+          detalle: `Se eliminó ${deletedLotes.length} lote(s) vencido(s) (${codigosResumen}) de "${insumo.nombre}", descontando ${cantidadDescontada} ${unidad} del stock (${stockAnterior} -> ${nuevoStock}).`,
+          usuarioId: options.usuarioId || null,
+          skipStockUpdate: true
+        },
+        { transaction: t }
+      );
+
+      return {
+        deletedCount: deletedLotes.length,
+        deletedLotes,
+        cantidadDescontada,
+        stockAnterior,
+        nuevoStock
+      };
+    });
+
+    const insumoActualizado = await this.getById(insumoId);
+    return {
+      message: result.deletedCount === 1
+        ? `Lote vencido eliminado. Se descontaron ${result.cantidadDescontada} ${insumoActualizado.unidadMedida || 'und'} del stock.`
+        : `${result.deletedCount} lotes vencidos eliminados. Se descontaron ${result.cantidadDescontada} ${insumoActualizado.unidadMedida || 'und'} del stock.`,
+      ...result,
+      insumo: insumoActualizado
+    };
+  }
+
+  static async deleteExpiredLote(idInsumo, idLote, options = {}) {
+    return this._removeExpiredLotes(idInsumo, idLote, options);
+  }
+
+  static async deleteExpiredLotesByInsumo(idInsumo, options = {}) {
+    return this._removeExpiredLotes(idInsumo, null, options);
+  }
 }
+
+InsumoService.getColombiaDateISO = getColombiaDateISO;
+InsumoService.isLoteExpiredByDateOrState = isLoteExpiredByDateOrState;
 
 module.exports = InsumoService;
