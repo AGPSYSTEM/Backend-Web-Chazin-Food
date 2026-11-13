@@ -498,6 +498,29 @@ async function ensureInsumoEliminadoSchema() {
 }
 
 /**
+ * Ensures 'eliminado' and 'fechaEliminacion' columns exist in 'producto' table
+ * to support soft deletion (recycle bin) and restoration.
+ */
+async function ensureProductoEliminadoSchema() {
+  const sequelize = connectDB.sequelize;
+  try {
+    const [elimCols] = await sequelize.query("SHOW COLUMNS FROM `producto` LIKE 'eliminado'");
+    if (elimCols.length === 0) {
+      await sequelize.query('ALTER TABLE `producto` ADD COLUMN `eliminado` TINYINT NOT NULL DEFAULT 0 AFTER `estado`');
+      console.log('[DB] ✅ Columna producto.eliminado agregada exitosamente.');
+    }
+    const [fechaCols] = await sequelize.query("SHOW COLUMNS FROM `producto` LIKE 'fechaEliminacion'");
+    if (fechaCols.length === 0) {
+      await sequelize.query('ALTER TABLE `producto` ADD COLUMN `fechaEliminacion` DATETIME NULL AFTER `eliminado`');
+      console.log('[DB] ✅ Columna producto.fechaEliminacion agregada exitosamente.');
+    }
+    await sequelize.query('UPDATE `producto` SET `eliminado` = 0 WHERE `idProducto` = 0 AND `eliminado` <> 0').catch(() => {});
+  } catch (err) {
+    console.warn('[DB] ⚠️ Error asegurando esquema de papelera en producto:', err.message);
+  }
+}
+
+/**
  * Ensures 'idCategoriaInsumo' column in 'insumo' allows NULL
  * so that deleting categories or assigning unclassified items does not violate FK constraints.
  */
@@ -1207,6 +1230,7 @@ module.exports = {
   ensureResenaSchema,
   ensureNoNegativeStock,
   ensureInsumoEliminadoSchema,
+  ensureProductoEliminadoSchema,
   ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema,

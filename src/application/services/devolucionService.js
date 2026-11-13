@@ -315,15 +315,19 @@ class DevolucionService {
 
     // Extraer lista resumida de productos disponibles para devolución
     const productos = (plainVenta.detalles || []).map(det => {
-      const nombre = det.variante?.producto?.nombre || 'Producto';
-      const nombreVariante = det.variante?.nombre || '';
+      const rawProdName = det.variante?.producto?.nombre || '';
+      const rawVarName = det.variante?.nombre || '';
+      const isSystemZero = Number(det.idVariante) === 0 || rawProdName.startsWith('__SISTEMA') || rawVarName.startsWith('__SISTEMA');
+      const fallbackObs = det.observaciones && !String(det.observaciones).startsWith('{') ? det.observaciones : 'Producto eliminado';
+      const nombre = !isSystemZero && rawProdName ? rawProdName : fallbackObs;
+      const nombreVariante = !isSystemZero ? rawVarName : '';
       const nombreCompleto = nombreVariante && nombreVariante !== 'Normal' && nombreVariante !== 'Estándar'
         ? `${nombre} (${nombreVariante})`
         : nombre;
       return {
         idDetalleVenta: det.idDetalleVenta,
         idVariante: det.idVariante,
-        idProducto: det.variante?.producto?.idProducto,
+        idProducto: isSystemZero ? null : det.variante?.producto?.idProducto,
         nombre: nombreCompleto,
         cantidadOriginal: det.cantidad,
         precioUnitario: Number(det.precioUnitario || 0),

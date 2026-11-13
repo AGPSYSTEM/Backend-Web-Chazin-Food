@@ -247,14 +247,17 @@ class ProduccionService {
 
         if (v.detalles && v.detalles.length > 0) {
           for (const d of v.detalles) {
-            const prod = d.variante?.producto;
+            const rawProd = d.variante?.producto;
+            const isSystemZero = Number(d.idVariante) === 0 || rawProd?.nombre?.startsWith('__SISTEMA') || d.variante?.nombre?.startsWith('__SISTEMA');
+            const prod = isSystemZero ? null : rawProd;
             const ft = prod?.fichaTecnica;
             const qty = Number(d.cantidad) || 1;
             totalItemsCount += qty;
 
-            let itemNombre = d.observaciones || d.variante?.nombre || prod?.nombre || `Producto #${d.idVariante || d.idDetalleVenta}`;
+            const safeVarNombre = !isSystemZero ? d.variante?.nombre : '';
+            let itemNombre = d.observaciones || safeVarNombre || prod?.nombre || `Producto #${d.idVariante || d.idDetalleVenta}`;
             const pName = prod?.nombre || "";
-            const vName = d.variante?.nombre || "";
+            const vName = safeVarNombre || "";
 
             if (pName && vName) {
               const pLower = pName.toLowerCase().trim();

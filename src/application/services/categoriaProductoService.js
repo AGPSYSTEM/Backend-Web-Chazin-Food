@@ -8,7 +8,7 @@ class CategoriaProductoService {
         .filter(cat => cat.idCategoriaProducto !== 0 && !cat.nombre?.startsWith('__SISTEMA'))
         .map(async (cat) => {
           const cantidad = await Product.count({
-            where: { idCategoriaProducto: cat.idCategoriaProducto }
+            where: { idCategoriaProducto: cat.idCategoriaProducto, eliminado: 0 }
           });
           return {
             id: cat.idCategoriaProducto,
@@ -32,7 +32,7 @@ class CategoriaProductoService {
       throw error;
     }
     const cantidad = await Product.count({
-      where: { idCategoriaProducto: id }
+      where: { idCategoriaProducto: id, eliminado: 0 }
     });
     return {
       id: cat.idCategoriaProducto,
@@ -127,12 +127,21 @@ class CategoriaProductoService {
       throw error;
     }
 
-    const cantidadProductos = await Product.count({
-      where: { idCategoriaProducto: id }
+    const cantidadActivos = await Product.count({
+      where: { idCategoriaProducto: id, eliminado: 0 }
     });
 
-    if (cantidadProductos > 0) {
-      const error = new Error(`No se puede eliminar la categoría "${cat.nombre}" porque tiene ${cantidadProductos} producto(s) asociado(s).`);
+    if (cantidadActivos > 0) {
+      const error = new Error(`No se puede eliminar la categoría "${cat.nombre}" porque tiene ${cantidadActivos} producto(s) asociado(s).`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const cantidadPapelera = await Product.count({
+      where: { idCategoriaProducto: id, eliminado: 1 }
+    });
+    if (cantidadPapelera > 0) {
+      const error = new Error(`No se puede eliminar la categoría "${cat.nombre}" porque tiene ${cantidadPapelera} producto(s) en la papelera de reciclaje. Elimínalos definitivamente o muévelos de categoría primero.`);
       error.statusCode = 400;
       throw error;
     }

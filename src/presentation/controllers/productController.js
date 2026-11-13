@@ -10,6 +10,16 @@ const getProducts = async (req, res, next) => {
   }
 };
 
+const getProductsPapelera = async (req, res, next) => {
+  try {
+    const products = await ProductService.getProductsPapelera();
+    res.json(products);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 const getProductById = async (req, res, next) => {
   try {
     const product = await ProductService.getProductById(req.params.id);
@@ -50,10 +60,33 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
+const restoreProduct = async (req, res, next) => {
+  try {
+    const restored = await ProductService.restoreProduct(req.params.id);
+    res.json(restored);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+const hardDeleteProduct = async (req, res, next) => {
+  try {
+    const result = await ProductService.hardDeleteProduct(req.params.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
+  getProductsPapelera,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
+  restoreProduct,
+  hardDeleteProduct,
 };

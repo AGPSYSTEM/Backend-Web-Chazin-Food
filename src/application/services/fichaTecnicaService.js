@@ -197,7 +197,7 @@ class FichaTecnicaService {
           as: 'detalles',
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario', 'estado'] }]
         },
-        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado', 'categoria'] },
+        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado', 'eliminado', 'categoria'] },
         { model: Insumo, as: 'insumoInfo', attributes: ['idInsumo', 'nombre', 'estado'] },
         { model: InsumoPreparado, as: 'insumoPreparado', attributes: ['id', 'nombre', 'estado', 'unidadMedida', 'descripcion'] },
         { model: Variante, as: 'variante', attributes: ['idVariante', 'nombre', 'precio'] }
@@ -208,7 +208,7 @@ class FichaTecnicaService {
     const filtered = fichas.filter((f) => {
       const insumoActivo = !f.insumoInfo || f.insumoInfo.eliminado !== 1;
       const insumoPrepActivo = !f.insumoPreparado || f.insumoPreparado.eliminado !== 1;
-      const productoActivo = !f.producto || f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1;
+      const productoActivo = !f.producto || (Number(f.producto.eliminado || 0) !== 1 && (f.producto.estado === null || f.producto.estado === undefined || f.producto.estado === 1));
 
       const prodName = String(f.producto?.nombre || '').toLowerCase();
       const catName = String(f.producto?.categoria || '').toLowerCase();
@@ -246,6 +246,7 @@ class FichaTecnicaService {
     const { Product } = require('../../persistence/models');
     const prod = await Product.findByPk(idProducto);
     if (prod) {
+      if (Number(prod.eliminado || 0) === 1) return null;
       const prodName = String(prod.nombre || '').toLowerCase();
       const catName = String(prod.categoria || '').toLowerCase();
       const isCombo = /combo/i.test(catName) || /combo/i.test(prodName);
@@ -267,12 +268,12 @@ class FichaTecnicaService {
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'precioUnitario'] }]
         },
         { model: Variante, as: 'variante' },
-        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado'] }
+        { model: Product, as: 'producto', attributes: ['idProducto', 'nombre', 'estado', 'eliminado'] }
       ],
       order: [['idFichaTecnica', 'ASC']]
     });
 
-    if (f && f.producto && f.producto.estado !== null && f.producto.estado !== undefined && f.producto.estado !== 1) {
+    if (f && f.producto && (Number(f.producto.eliminado || 0) === 1 || (f.producto.estado !== null && f.producto.estado !== undefined && f.producto.estado !== 1))) {
       return null;
     }
 

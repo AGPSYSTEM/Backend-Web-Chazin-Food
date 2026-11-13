@@ -214,7 +214,7 @@ class DashboardService {
         clientesTotal,
         clientesActivos,
         clientesVariacion: 0,
-        productosTotal: await Product.count({ where: { estado: 1 } }).catch(() => 0),
+        productosTotal: await Product.count({ where: { estado: 1, eliminado: 0 } }).catch(() => 0),
         insumosBajoStock: insumosBajoStockList.length,
         divisa: "COP"
       };
@@ -552,11 +552,18 @@ class DashboardService {
 
       const productCounts = {};
       rows.forEach(r => {
-        // Priorizar el nombre real del producto en base de datos
-        let pName = r.productoNombre || r.varNombre || null;
-        let unitPrice = parseFloat(r.precioUnitario) || parseFloat(r.varPrecio) || parseFloat(r.productoPrecio) || 0;
+        // Ignorar referencias al marcador de sistema (variante/producto 0)
+        const isSistema = Number(r.idVariante) === 0 ||
+          String(r.productoNombre || '').startsWith('__SISTEMA') ||
+          String(r.varNombre || '').startsWith('__SISTEMA');
+        const realProdName = !isSistema && r.productoNombre && !String(r.productoNombre).startsWith('__SISTEMA') ? r.productoNombre : null;
+        const realVarName = !isSistema && r.varNombre && !String(r.varNombre).startsWith('__SISTEMA') ? r.varNombre : null;
 
-        // Si no tiene nombre por join, verificar si observaciones es un JSON estructurado con nombre
+        // Priorizar el nombre real del producto en base de datos
+        let pName = realProdName || realVarName || null;
+        let unitPrice = parseFloat(r.precioUnitario) || (!isSistema ? (parseFloat(r.varPrecio) || parseFloat(r.productoPrecio)) : 0) || 0;
+
+        // Si no tiene nombre por join (o producto fue eliminado), verificar observaciones JSON o texto
         if (r.observaciones) {
           try {
             if (typeof r.observaciones === 'string' && r.observaciones.startsWith('{')) {
@@ -565,6 +572,8 @@ class DashboardService {
               if (parsed.precio && !unitPrice) {
                 unitPrice = parseFloat(parsed.precio) || 0;
               }
+            } else if (!pName && typeof r.observaciones === 'string' && r.observaciones.trim()) {
+              pName = r.observaciones.split('—')[0].trim();
             }
           } catch (e) {}
         }
@@ -572,6 +581,7 @@ class DashboardService {
         // Descartar si es un placeholder genérico o inválido
         if (
           !pName ||
+          pName.startsWith("__SISTEMA") ||
           pName === "Producto" ||
           pName === "Pedido de Venta" ||
           pName === "Producto General" ||
