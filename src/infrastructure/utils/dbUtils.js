@@ -629,6 +629,42 @@ async function ensureVarianteImagenSchema() {
   }
 }
 
+async function ensureVarianteInsumoSchema() {
+  try {
+    const sequelize = connectDB.sequelize;
+    // 1. Asegurar columna descripcion en tabla variante
+    const [descCols] = await sequelize.query("SHOW COLUMNS FROM `variante` LIKE 'descripcion'");
+    if (!descCols || descCols.length === 0) {
+      await sequelize.query("ALTER TABLE `variante` ADD COLUMN `descripcion` TEXT NULL AFTER `nombre`");
+      console.log('[DB Migration] Columna descripcion agregada a tabla variante');
+    }
+
+    // 2. Crear tabla variante_insumo para modificaciones/deltas de ingredientes por variante
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS \`variante_insumo\` (
+        \`idVarianteInsumo\` INT NOT NULL AUTO_INCREMENT,
+        \`idVariante\` INT NOT NULL,
+        \`tipoAccion\` ENUM('AGREGAR', 'REEMPLAZAR', 'MODIFICAR_CANTIDAD', 'QUITAR') NOT NULL DEFAULT 'AGREGAR',
+        \`idInsumo\` INT NOT NULL,
+        \`idInsumoReemplazado\` INT NULL DEFAULT NULL,
+        \`cantidad\` DECIMAL(10, 3) NOT NULL DEFAULT 1.000,
+        \`unidadMedida\` VARCHAR(20) NOT NULL DEFAULT 'und',
+        \`observaciones\` VARCHAR(255) NULL DEFAULT NULL,
+        PRIMARY KEY (\`idVarianteInsumo\`),
+        KEY \`idx_varins_variante\` (\`idVariante\`),
+        KEY \`idx_varins_insumo\` (\`idInsumo\`),
+        KEY \`idx_varins_insumoreemp\` (\`idInsumoReemplazado\`),
+        CONSTRAINT \`fk_varins_variante\` FOREIGN KEY (\`idVariante\`) REFERENCES \`variante\` (\`idVariante\`) ON DELETE CASCADE ON UPDATE CASCADE,
+        CONSTRAINT \`fk_varins_insumo\` FOREIGN KEY (\`idInsumo\`) REFERENCES \`insumo\` (\`idInsumo\`) ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT \`fk_varins_insumoreemp\` FOREIGN KEY (\`idInsumoReemplazado\`) REFERENCES \`insumo\` (\`idInsumo\`) ON DELETE SET NULL ON UPDATE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('[DB Migration] Tabla variante_insumo verificada/creada');
+  } catch (err) {
+    console.warn('[DB Migration] ⚠️ Error asegurando schema de variante_insumo:', err.message);
+  }
+}
+
 async function ensureCompraLotesYCancelacionSchema() {
   const sequelize = connectDB.sequelize;
   try {
@@ -1179,5 +1215,6 @@ module.exports = {
   ensureEmpleadoSchema,
   ensureDevolucionSchema,
   ensureInsumoIvaManualSchema,
-  ensurePreciosRealesInsumosYStock
+  ensurePreciosRealesInsumosYStock,
+  ensureVarianteInsumoSchema
 };

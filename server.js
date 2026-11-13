@@ -36,7 +36,8 @@ const {
   ensureEmpleadoSchema,
   ensureDevolucionSchema,
   ensureInsumoIvaManualSchema,
-  ensurePreciosRealesInsumosYStock
+  ensurePreciosRealesInsumosYStock,
+  ensureVarianteInsumoSchema
 } = require('./src/infrastructure/utils/dbUtils');
 
 async function initializeDatabaseSchema() {
@@ -47,6 +48,7 @@ async function initializeDatabaseSchema() {
     await ensureInsumoCategoriaNullableSchema();
     await ensureInsumoAdicionSchema();
     await ensureVarianteImagenSchema();
+    await ensureVarianteInsumoSchema();
     await ensureUsuarioDocumentoSchema();
     await ensureFichaTecnicaTrashSchema();
     await ensureFichaTecnicaInsumoVariantZero();

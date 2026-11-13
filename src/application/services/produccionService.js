@@ -1,4 +1,4 @@
-const { Venta, DetalleVentaProducto, DetalleVentaAdicion, Adicion, Variante, Product, FichaTecnica, DetalleFichaInsumo, Insumo, Cliente, User } = require('../../persistence/models');
+const { Venta, DetalleVentaProducto, DetalleVentaAdicion, Adicion, Variante, VarianteInsumo, Product, FichaTecnica, DetalleFichaInsumo, Insumo, Cliente, User } = require('../../persistence/models');
 
 const getProductEmoji = (nombre = "") => {
   const n = (nombre || "").toLowerCase();
@@ -166,6 +166,14 @@ class ProduccionService {
                 model: Variante,
                 as: 'variante',
                 include: [
+                  {
+                    model: VarianteInsumo,
+                    as: 'insumosModificados',
+                    include: [
+                      { model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] },
+                      { model: Insumo, as: 'insumoReemplazado', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }
+                    ]
+                  },
                   {
                     model: Product,
                     as: 'producto',
@@ -347,11 +355,66 @@ class ProduccionService {
             let receta = null;
             const inferredPrepMin = inferProductPrepMinutes(itemNombre, ft?.tiempoPreparacion);
             if (ft) {
-              const ingredientes = (ft.detalles || []).map(det => ({
-                idInsumo: det.idInsumo,
-                nombre: det.insumo?.nombre || `Insumo #${det.idInsumo}`,
-                cantidad: `${det.cantidad || 1} ${det.unidadMedida || det.insumo?.unidadMedida || 'und'}`
-              }));
+              const rawDetalles = [...(ft.detalles || [])];
+              const varDeltas = d.variante?.insumosModificados || [];
+              let ingredientes = [];
+
+              if (varDeltas && varDeltas.length > 0) {
+                let mappedIngs = rawDetalles.map(det => ({
+                  idInsumo: det.idInsumo,
+                  nombre: det.insumo?.nombre || `Insumo #${det.idInsumo}`,
+                  cantidad: `${det.cantidad || 1} ${det.unidadMedida || det.insumo?.unidadMedida || 'und'}`,
+                  tipo: 'BASE'
+                }));
+
+                for (const delta of varDeltas) {
+                  const deltaAccion = String(delta.tipoAccion || 'AGREGAR').toUpperCase();
+                  const deltaQty = `${delta.cantidad || 1} ${delta.unidadMedida || delta.insumo?.unidadMedida || 'und'}`;
+                  const insName = delta.insumo?.nombre || `Insumo #${delta.idInsumo}`;
+
+                  if (deltaAccion === 'AGREGAR') {
+                    mappedIngs.push({
+                      idInsumo: delta.idInsumo,
+                      nombre: `+ ${insName} (Variante)`,
+                      cantidad: deltaQty,
+                      tipo: 'AGREGADO_VARIANTE'
+                    });
+                  } else if (deltaAccion === 'REEMPLAZAR') {
+                    if (delta.idInsumoReemplazado) {
+                      mappedIngs = mappedIngs.filter(det => Number(det.idInsumo) !== Number(delta.idInsumoReemplazado));
+                    }
+                    mappedIngs.push({
+                      idInsumo: delta.idInsumo,
+                      nombre: `🔄 ${insName} (Reemplazo Variante)`,
+                      cantidad: deltaQty,
+                      tipo: 'REEMPLAZO_VARIANTE'
+                    });
+                  } else if (deltaAccion === 'MODIFICAR_CANTIDAD') {
+                    const existingIdx = mappedIngs.findIndex(det => Number(det.idInsumo) === Number(delta.idInsumo));
+                    if (existingIdx >= 0) {
+                      mappedIngs[existingIdx].cantidad = `${deltaQty} (Ajuste Variante)`;
+                      mappedIngs[existingIdx].tipo = 'MODIFICADO_VARIANTE';
+                    } else {
+                      mappedIngs.push({
+                        idInsumo: delta.idInsumo,
+                        nombre: `${insName} (Ajuste Variante)`,
+                        cantidad: deltaQty,
+                        tipo: 'MODIFICADO_VARIANTE'
+                      });
+                    }
+                  } else if (deltaAccion === 'QUITAR') {
+                    mappedIngs = mappedIngs.filter(det => Number(det.idInsumo) !== Number(delta.idInsumo));
+                  }
+                }
+                ingredientes = mappedIngs;
+              } else {
+                ingredientes = rawDetalles.map(det => ({
+                  idInsumo: det.idInsumo,
+                  nombre: det.insumo?.nombre || `Insumo #${det.idInsumo}`,
+                  cantidad: `${det.cantidad || 1} ${det.unidadMedida || det.insumo?.unidadMedida || 'und'}`,
+                  tipo: 'BASE'
+                }));
+              }
 
               const rawPasos = ft.procedimiento || ft.descripcion || "";
               const pasos = rawPasos
@@ -435,6 +498,8 @@ class ProduccionService {
               id: d.idDetalleVenta,
               idProducto: prod?.idProducto || null,
               idVariante: d.idVariante,
+              varianteNombre: d.variante && !d.variante.nombre?.includes('- base') ? d.variante.nombre : null,
+              varianteDescripcion: d.variante?.descripcion || null,
               nombre: itemNombre,
               cantidad: kitchenQty,
               cantidadFacturada: qty,

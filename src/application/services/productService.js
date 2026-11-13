@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Product, CategoriaProducto, Evento, Variante, ComboProducto, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaProducto } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante, VarianteInsumo, ComboProducto, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaProducto } = require('../../persistence/models');
 
 /**
  * Normaliza unidades de medida entre receta e inventario para calcular porciones disponibles.
@@ -86,7 +86,21 @@ class ProductService {
       attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'categoria', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
-        { model: Variante, as: 'variantes', attributes: ['idVariante', 'nombre', 'precio'] },
+        {
+          model: Variante,
+          as: 'variantes',
+          attributes: ['idVariante', 'nombre', 'descripcion', 'precio', 'imagen', 'estado'],
+          include: [
+            {
+              model: VarianteInsumo,
+              as: 'insumosModificados',
+              include: [
+                { model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida', 'stock'] },
+                { model: Insumo, as: 'insumoReemplazado', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }
+              ]
+            }
+          ]
+        },
         { 
           model: Evento, 
           as: 'eventos', 
@@ -249,7 +263,26 @@ class ProductService {
 
         const variantes = (isCombo || hasOnlyDummy || rawVars.length === 0)
           ? []
-          : rawVars.map(v => ({ id: v.idVariante, idVariante: v.idVariante, nombre: v.nombre, precio: realPrecio, imagen: v.imagen || '' }));
+          : rawVars.map(v => ({
+              id: v.idVariante,
+              idVariante: v.idVariante,
+              nombre: v.nombre,
+              descripcion: v.descripcion || '',
+              precio: realPrecio,
+              imagen: v.imagen || '',
+              estado: v.estado !== undefined ? v.estado : 1,
+              insumosModificados: Array.isArray(v.insumosModificados) ? v.insumosModificados.map(im => ({
+                idVarianteInsumo: im.idVarianteInsumo,
+                tipoAccion: im.tipoAccion,
+                idInsumo: im.idInsumo,
+                idInsumoReemplazado: im.idInsumoReemplazado,
+                cantidad: Number(im.cantidad || 0),
+                unidadMedida: im.unidadMedida,
+                observaciones: im.observaciones,
+                insumo: im.insumo ? { idInsumo: im.insumo.idInsumo, nombre: im.insumo.nombre, unidadMedida: im.insumo.unidadMedida, stock: im.insumo.stock } : null,
+                insumoReemplazado: im.insumoReemplazado ? { idInsumo: im.insumoReemplazado.idInsumo, nombre: im.insumoReemplazado.nombre, unidadMedida: im.insumoReemplazado.unidadMedida } : null
+              })) : []
+            }));
 
         const idVariantePrincipal = rawVars[0]?.idVariante || p.idProducto;
 
@@ -406,13 +439,30 @@ class ProductService {
 
     if (validVariants.length > 0) {
       for (const v of validVariants) {
-        await Variante.create({
+        const newVar = await Variante.create({
           idProducto: product.idProducto,
           nombre: v.nombre.trim(),
+          descripcion: v.descripcion || null,
           precio: finalPrecio,
           imagen: v.imagen || null,
           estado: normalizedEstado
         });
+
+        if (Array.isArray(v.insumosModificados) && v.insumosModificados.length > 0) {
+          for (const im of v.insumosModificados) {
+            if (im.idInsumo && Number(im.cantidad) > 0) {
+              await VarianteInsumo.create({
+                idVariante: newVar.idVariante,
+                tipoAccion: im.tipoAccion || 'AGREGAR',
+                idInsumo: Number(im.idInsumo),
+                idInsumoReemplazado: im.idInsumoReemplazado ? Number(im.idInsumoReemplazado) : null,
+                cantidad: Number(im.cantidad),
+                unidadMedida: im.unidadMedida || 'und',
+                observaciones: im.observaciones || null
+              });
+            }
+          }
+        }
       }
     } else {
       await Variante.create({
@@ -496,31 +546,52 @@ class ProductService {
         for (let i = 0; i < filteredIncoming.length; i++) {
           const v = filteredIncoming[i];
           const vNombre = v.nombre.trim();
+          const vDesc = v.descripcion || null;
           const vPrecio = basePrice;
           const vImagen = v.imagen || null;
+          let currentVarId = null;
 
           if (v.idVariante && existingIds.includes(Number(v.idVariante))) {
-            incomingIds.push(Number(v.idVariante));
+            currentVarId = Number(v.idVariante);
             await Variante.update(
-              { nombre: vNombre, precio: vPrecio, imagen: vImagen },
-              { where: { idVariante: v.idVariante } }
+              { nombre: vNombre, descripcion: vDesc, precio: vPrecio, imagen: vImagen },
+              { where: { idVariante: currentVarId } }
             );
           } else if (existingVariantes[i]) {
-            const matchedVar = existingVariantes[i];
-            incomingIds.push(Number(matchedVar.idVariante));
+            currentVarId = Number(existingVariantes[i].idVariante);
             await Variante.update(
-              { nombre: vNombre, precio: vPrecio, imagen: vImagen },
-              { where: { idVariante: matchedVar.idVariante } }
+              { nombre: vNombre, descripcion: vDesc, precio: vPrecio, imagen: vImagen },
+              { where: { idVariante: currentVarId } }
             );
           } else {
             const newVar = await Variante.create({
               idProducto: id,
               nombre: vNombre,
+              descripcion: vDesc,
               precio: vPrecio,
               imagen: vImagen,
               estado: p.estado
             });
-            incomingIds.push(Number(newVar.idVariante));
+            currentVarId = Number(newVar.idVariante);
+          }
+          incomingIds.push(currentVarId);
+
+          // Sincronizar insumosModificados para esta variante
+          await VarianteInsumo.destroy({ where: { idVariante: currentVarId } });
+          if (Array.isArray(v.insumosModificados) && v.insumosModificados.length > 0) {
+            for (const im of v.insumosModificados) {
+              if (im.idInsumo && Number(im.cantidad) > 0) {
+                await VarianteInsumo.create({
+                  idVariante: currentVarId,
+                  tipoAccion: im.tipoAccion || 'AGREGAR',
+                  idInsumo: Number(im.idInsumo),
+                  idInsumoReemplazado: im.idInsumoReemplazado ? Number(im.idInsumoReemplazado) : null,
+                  cantidad: Number(im.cantidad),
+                  unidadMedida: im.unidadMedida || 'und',
+                  observaciones: im.observaciones || null
+                });
+              }
+            }
           }
         }
 
@@ -528,6 +599,7 @@ class ProductService {
         for (const removeId of toRemove) {
           const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: removeId } }).catch(() => null);
           if (!hasSales) {
+            await VarianteInsumo.destroy({ where: { idVariante: removeId } }).catch(() => null);
             await Variante.destroy({ where: { idVariante: removeId } }).catch(() => null);
           }
         }
@@ -538,10 +610,12 @@ class ProductService {
             { nombre: `${p.nombre.trim()} - base`, precio: basePrice },
             { where: { idVariante: existingVariantes[0].idVariante } }
           );
+          await VarianteInsumo.destroy({ where: { idVariante: existingVariantes[0].idVariante } });
           for (let i = 1; i < existingVariantes.length; i++) {
             const remVar = existingVariantes[i];
             const hasSales = await DetalleVentaProducto.findOne({ where: { idVariante: remVar.idVariante } }).catch(() => null);
             if (!hasSales) {
+              await VarianteInsumo.destroy({ where: { idVariante: remVar.idVariante } }).catch(() => null);
               await Variante.destroy({ where: { idVariante: remVar.idVariante } }).catch(() => null);
             }
           }

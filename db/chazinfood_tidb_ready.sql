@@ -1469,11 +1469,31 @@ CREATE TABLE `variante` (
   `idVariante` int(11) NOT NULL AUTO_INCREMENT,
   `idProducto` int(11) NOT NULL,
   `nombre` varchar(80) NOT NULL,
+  `descripcion` text DEFAULT NULL,
   `precio` decimal(10,2) NOT NULL,
   `estado` tinyint(4) DEFAULT 1,
   `imagen` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`idVariante`),
   KEY `IDX_VarianteProducto` (`idProducto`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Tabla: `variante_insumo`
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `variante_insumo`;
+CREATE TABLE `variante_insumo` (
+  `idVarianteInsumo` int(11) NOT NULL AUTO_INCREMENT,
+  `idVariante` int(11) NOT NULL,
+  `tipoAccion` enum('AGREGAR','REEMPLAZAR','MODIFICAR_CANTIDAD','QUITAR') NOT NULL DEFAULT 'AGREGAR',
+  `idInsumo` int(11) NOT NULL,
+  `idInsumoReemplazado` int(11) DEFAULT NULL,
+  `cantidad` decimal(10,3) NOT NULL DEFAULT 1.000,
+  `unidadMedida` varchar(20) NOT NULL DEFAULT 'und',
+  `observaciones` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idVarianteInsumo`),
+  KEY `idx_varins_variante` (`idVariante`),
+  KEY `idx_varins_insumo` (`idInsumo`),
+  KEY `idx_varins_insumoreemp` (`idInsumoReemplazado`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Volcado de datos para la tabla `variante`
@@ -1728,6 +1748,11 @@ ALTER TABLE `usuario`
 
 ALTER TABLE `variante`
   ADD CONSTRAINT `variante_ibfk_1` FOREIGN KEY (`idProducto`) REFERENCES `producto` (`idProducto`) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+ALTER TABLE `variante_insumo`
+  ADD CONSTRAINT `fk_varins_variante` FOREIGN KEY (`idVariante`) REFERENCES `variante` (`idVariante`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_varins_insumo` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_varins_insumoreemp` FOREIGN KEY (`idInsumoReemplazado`) REFERENCES `insumo` (`idInsumo`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE `venta`
   ADD CONSTRAINT `venta_ibfk_178` FOREIGN KEY (`idCliente`) REFERENCES `cliente` (`idCliente`) ON DELETE NO ACTION ON UPDATE CASCADE,

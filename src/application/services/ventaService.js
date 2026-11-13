@@ -1782,7 +1782,7 @@ class VentaService {
   }
 
   static async resolveRecipeOrInsumoForDetail(d, chosenVarianteId, targetProductId) {
-    const { FichaTecnica, DetalleFichaInsumo, Variante, Product } = require('../../persistence/models');
+    const { FichaTecnica, DetalleFichaInsumo, Variante, VarianteInsumo, Insumo, Product } = require('../../persistence/models');
     const { Op } = require('sequelize');
 
     // Revisar todo el texto descriptivo del ítem
@@ -1893,9 +1893,17 @@ class VentaService {
     // 4. Demás casos generales (Platos, combos, etc.)
     const varId = chosenVarianteId || d.idVariante;
     let varRow = null;
+    let varDeltas = [];
     if (varId) {
       try {
         varRow = await Variante.findByPk(varId);
+        varDeltas = await VarianteInsumo.findAll({
+          where: { idVariante: varId },
+          include: [
+            { model: Insumo, as: 'insumo' },
+            { model: Insumo, as: 'insumoReemplazado' }
+          ]
+        });
       } catch (e) {}
     }
 
@@ -1911,7 +1919,7 @@ class VentaService {
       } catch (e) {}
     }
 
-    const finalProdId = d.idProducto || targetProductId;
+    const finalProdId = d.idProducto || targetProductId || varRow?.idProducto;
     if (finalProdId) {
       try {
         const fichaBase = await FichaTecnica.findOne({
@@ -1919,7 +1927,68 @@ class VentaService {
           include: [{ model: DetalleFichaInsumo, as: 'detalles' }]
         });
         if (fichaBase) {
-          return { ficha: fichaBase, targetProductId: finalProdId };
+          if (varDeltas && varDeltas.length > 0) {
+            // Aplicar modificaciones delta de la variante a la receta base
+            let effectiveDetalles = (fichaBase.detalles || []).map(det => ({
+              idDetalleFicha: det.idDetalleFicha,
+              idFichaTecnica: det.idFichaTecnica,
+              idInsumo: det.idInsumo,
+              cantidad: Number(det.cantidad || 0),
+              unidadMedida: det.unidadMedida,
+              insumo: det.insumo
+            }));
+
+            for (const delta of varDeltas) {
+              const deltaAccion = String(delta.tipoAccion || 'AGREGAR').toUpperCase();
+              const deltaQty = Number(delta.cantidad || 0);
+
+              if (deltaAccion === 'AGREGAR') {
+                effectiveDetalles.push({
+                  idInsumo: delta.idInsumo,
+                  cantidad: deltaQty,
+                  unidadMedida: delta.unidadMedida || delta.insumo?.unidadMedida || 'und',
+                  insumo: delta.insumo
+                });
+              } else if (deltaAccion === 'REEMPLAZAR') {
+                if (delta.idInsumoReemplazado) {
+                  effectiveDetalles = effectiveDetalles.filter(det => Number(det.idInsumo) !== Number(delta.idInsumoReemplazado));
+                }
+                effectiveDetalles.push({
+                  idInsumo: delta.idInsumo,
+                  cantidad: deltaQty,
+                  unidadMedida: delta.unidadMedida || delta.insumo?.unidadMedida || 'und',
+                  insumo: delta.insumo
+                });
+              } else if (deltaAccion === 'MODIFICAR_CANTIDAD') {
+                const existingIdx = effectiveDetalles.findIndex(det => Number(det.idInsumo) === Number(delta.idInsumo));
+                if (existingIdx >= 0) {
+                  effectiveDetalles[existingIdx].cantidad = deltaQty;
+                  if (delta.unidadMedida) effectiveDetalles[existingIdx].unidadMedida = delta.unidadMedida;
+                } else {
+                  effectiveDetalles.push({
+                    idInsumo: delta.idInsumo,
+                    cantidad: deltaQty,
+                    unidadMedida: delta.unidadMedida || delta.insumo?.unidadMedida || 'und',
+                    insumo: delta.insumo
+                  });
+                }
+              } else if (deltaAccion === 'QUITAR') {
+                effectiveDetalles = effectiveDetalles.filter(det => Number(det.idInsumo) !== Number(delta.idInsumo));
+              }
+            }
+
+            const customFicha = {
+              ...(fichaBase.toJSON ? fichaBase.toJSON() : fichaBase),
+              detalles: effectiveDetalles
+            };
+            return {
+              ficha: customFicha,
+              targetProductId: finalProdId,
+              resolvedName: varRow?.nombre ? `${varRow.nombre}` : null
+            };
+          }
+
+          return { ficha: fichaBase, targetProductId: finalProdId, resolvedName: varRow?.nombre };
         }
       } catch (e) {}
     }

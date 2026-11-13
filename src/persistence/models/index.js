@@ -1035,6 +1035,10 @@ const Variante = sequelize.define('variante', {
     type: DataTypes.STRING(80),
     allowNull: false
   },
+  descripcion: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   precio: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
@@ -1048,6 +1052,52 @@ const Variante = sequelize.define('variante', {
     defaultValue: 1
   }
 }, { tableName: 'variante', timestamps: false });
+
+const VarianteInsumo = sequelize.define('varianteinsumo', {
+  idVarianteInsumo: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    field: 'idVarianteInsumo'
+  },
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.idVarianteInsumo;
+    }
+  },
+  idVariante: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  tipoAccion: {
+    type: DataTypes.ENUM('AGREGAR', 'REEMPLAZAR', 'MODIFICAR_CANTIDAD', 'QUITAR'),
+    defaultValue: 'AGREGAR',
+    allowNull: false
+  },
+  idInsumo: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  idInsumoReemplazado: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  cantidad: {
+    type: DataTypes.DECIMAL(10, 3),
+    allowNull: false,
+    defaultValue: 1.000
+  },
+  unidadMedida: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'und'
+  },
+  observaciones: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  }
+}, { tableName: 'variante_insumo', timestamps: false });
 
 const Descuento = sequelize.define('descuento', {
   idDescuento: {
@@ -1317,6 +1367,11 @@ DetalleVentaAdicion.belongsTo(Insumo, { foreignKey: 'idAdicion', as: 'adicion' }
 
 DetalleVentaProducto.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
 
+Variante.hasMany(VarianteInsumo, { foreignKey: 'idVariante', as: 'insumosModificados' });
+VarianteInsumo.belongsTo(Variante, { foreignKey: 'idVariante', as: 'variante' });
+VarianteInsumo.belongsTo(Insumo, { foreignKey: 'idInsumo', as: 'insumo' });
+VarianteInsumo.belongsTo(Insumo, { foreignKey: 'idInsumoReemplazado', as: 'insumoReemplazado' });
+
 Pedido.belongsTo(Cliente, { foreignKey: 'clienteId', as: 'cliente' });
 
 // Resena associations
@@ -1468,6 +1523,7 @@ module.exports = {
   Evento,
   Adicion,
   Variante,
+  VarianteInsumo,
   Descuento,
   Pago,
   Devolucion,
