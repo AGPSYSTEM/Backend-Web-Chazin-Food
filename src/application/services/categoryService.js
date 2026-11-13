@@ -1,22 +1,29 @@
+const { fn, col } = require('sequelize');
 const { CategoriaInsumo, Insumo } = require('../../persistence/models');
 
 class CategoryService {
   static async getAllCategories() {
-    const categories = await CategoriaInsumo.findAll();
-    const list = await Promise.all(categories.map(async (cat) => {
-      const cantidad = await Insumo.count({ where: { idCategoriaInsumo: cat.id, eliminado: 0 } });
-      return {
-        id: cat.id,
-        idCategoriaInsumo: cat.id,
-        nombre: cat.nombre,
-        descripcion: cat.descripcion || '',
+    const [categories, conteos] = await Promise.all([
+      CategoriaInsumo.findAll(),
+      Insumo.findAll({
+        where: { eliminado: 0 },
+        attributes: ['idCategoriaInsumo', [fn('COUNT', col('idInsumo')), 'cantidad']],
+        group: ['idCategoriaInsumo'],
+        raw: true
+      }).catch(() => [])
+    ]);
+    const conteoMap = new Map(
+      conteos.map(c => [Number(c.idCategoriaInsumo), Number(c.cantidad || 0)])
+    );
+    return categories.map((cat) => ({
+      id: cat.id,
+      idCategoriaInsumo: cat.id,
+      nombre: cat.nombre,
+      descripcion: cat.descripcion || '',
       icon: cat.icon || null,
-        icon: cat.icon || null,
-        estado: cat.estado === 1 || cat.estado === 'Activo' ? 'Activo' : 'Inactivo',
-        cantidad
-      };
+      estado: cat.estado === 1 || cat.estado === 'Activo' ? 'Activo' : 'Inactivo',
+      cantidad: conteoMap.get(Number(cat.id)) || 0
     }));
-    return list;
   }
 
   static async getCategoryById(id) {

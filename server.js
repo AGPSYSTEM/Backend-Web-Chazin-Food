@@ -9,85 +9,9 @@ const morgan = require('morgan');
 const path = require('path');
 
 const connectDB = require('./src/persistence/config/db');
-const { sequelize } = require('./src/persistence/models');
 const { errorHandler } = require('./src/infrastructure/middlewares/errorMiddleware');
 const { swaggerUi, swaggerSpec } = require('./src/infrastructure/swagger/swagger');
-
-const {
-  resequenceAllCoreTables,
-  ensureFichaTecnicaTrashSchema,
-  ensureFichaTecnicaInsumoVariantZero,
-  ensureEventoColumnsSchema,
-  syncVentasTotals,
-  ensureCategoriaProductoIconSchema,
-  ensureCategoriaInsumoIconSchema,
-  ensureConfiguracionComboSchema,
-  ensureVarianteImagenSchema,
-  ensureVentaAprobacionSchema,
-  ensureUsuarioDocumentoSchema,
-  ensureResenaSchema,
-  ensureNoNegativeStock,
-  ensureInsumoEliminadoSchema,
-  ensureInsumoCategoriaNullableSchema,
-  ensureInsumoAdicionSchema,
-  ensureProductoAdicionesDefaultSchema,
-  ensureCompraLotesYCancelacionSchema,
-  ensureActaRevisionSchema,
-  ensureEmpleadoSchema,
-  ensureDevolucionSchema,
-  ensureInsumoIvaManualSchema,
-  ensurePreciosRealesInsumosYStock,
-  ensureVarianteInsumoSchema
-} = require('./src/infrastructure/utils/dbUtils');
-
-async function initializeDatabaseSchema() {
-  try {
-    await connectDB();
-    await ensureActaRevisionSchema();
-    await ensureInsumoEliminadoSchema();
-    await ensureInsumoCategoriaNullableSchema();
-    await ensureInsumoAdicionSchema();
-    await ensureVarianteImagenSchema();
-    await ensureVarianteInsumoSchema();
-    await ensureUsuarioDocumentoSchema();
-    await ensureFichaTecnicaTrashSchema();
-    await ensureFichaTecnicaInsumoVariantZero();
-    await ensureEventoColumnsSchema();
-    await ensureCategoriaProductoIconSchema();
-    await ensureCategoriaInsumoIconSchema();
-    await ensureConfiguracionComboSchema();
-    await ensureVentaAprobacionSchema();
-    await syncVentasTotals();
-    await resequenceAllCoreTables();
-    await ensureResenaSchema();
-    await ensureNoNegativeStock();
-    await ensureProductoAdicionesDefaultSchema();
-    await ensureCompraLotesYCancelacionSchema();
-    await ensureEmpleadoSchema();
-    await ensureDevolucionSchema();
-    await ensureInsumoIvaManualSchema();
-    await ensurePreciosRealesInsumosYStock();
-    try {
-      const [results] = await sequelize.query(
-        "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta' AND COLUMN_NAME = 'tipoVenta'"
-      );
-      const columnExists = results[0].cnt > 0;
-      if (!columnExists) {
-        await sequelize.query(
-          "ALTER TABLE venta ADD COLUMN tipoVenta VARCHAR(50) NOT NULL DEFAULT 'PUNTO_DE_VENTA'"
-        );
-        console.log('✅ Added venta.tipoVenta column');
-      } else {
-        console.log('✅ venta.tipoVenta column already exists');
-      }
-    } catch (err) {
-      console.warn('⚠️ could not ensure venta.tipoVenta column:', err.message);
-    }
-    console.log('Esquema y modelos de base de datos verificados correctamente.');
-  } catch (err) {
-    console.error('Error al verificar esquemas de base de datos:', err.message);
-  }
-}
+const { cacheInvalidationMiddleware } = require('./src/infrastructure/utils/apiCache');
 
 const app = express();
 
@@ -139,6 +63,7 @@ app.use((req, res, next) => {
             return originalJson.call(this, obj);
           }
           res.setHeader('Content-Encoding', 'gzip');
+          res.setHeader('Vary', 'Accept-Encoding');
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Content-Length', compressed.length);
           return res.send(compressed);
@@ -149,6 +74,9 @@ app.use((req, res, next) => {
   };
   next();
 });
+
+// Invalidación automática de caché en memoria tras mutaciones exitosas
+app.use(cacheInvalidationMiddleware);
 
 app.use(
   helmet({
@@ -204,10 +132,13 @@ app.use('/api/adiciones', require('./src/presentation/routes/adicionRoutes'));
 app.use('/api/resenas', require('./src/presentation/routes/resenaRoutes'));
 app.use('/api/wompi', require('./src/presentation/routes/wompiRoutes'));
 
-// Health Check Endpoint para Render y monitoreo
-app.get('/healthz', (req, res) => {
+// Health Check Endpoints ligeros para Render y monitoreo keep-alive
+const healthHandler = (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
-});
+};
+app.get('/healthz', healthHandler);
+app.get('/api/health', healthHandler);
 
 // Root route redirects to Swagger UI
 app.get('/', (req, res) => {
@@ -222,9 +153,16 @@ let server;
 
 server = app.listen(PORT, () => {
   console.log(`Servidor monolítico unificado escuchando en el puerto ${PORT} en modo ${process.env.NODE_ENV || 'development'}`);
-  initializeDatabaseSchema().catch((err) => {
-    console.error('Error al verificar esquemas en segundo plano:', err.message);
-  });
+  if (process.env.RUN_MIGRATIONS_ON_BOOT === 'true') {
+    const { initializeDatabaseSchema } = require('./scripts/migrate');
+    initializeDatabaseSchema().catch((err) => {
+      console.error('Error al verificar esquemas en segundo plano:', err.message);
+    });
+  } else {
+    connectDB().catch((err) => {
+      console.error('Error conectando a MySQL en arranque:', err.message);
+    });
+  }
 });
 
 server.on('error', (error) => {

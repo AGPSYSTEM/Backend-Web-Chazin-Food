@@ -82,7 +82,8 @@ class ProductService {
   }
 
   static async getProducts() {
-    const products = await Product.findAll({
+    const [products, fichas, allInsumos, ventasPorVariante] = await Promise.all([
+      Product.findAll({
       attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'categoria', 'adiciones', 'configuracionCombo'],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
@@ -126,10 +127,10 @@ class ProductService {
           ]
         }
       ]
-    });
+      }),
 
-    // Cargar recetas para cálculo dinámico de stock
-    const fichas = await FichaTecnica.findAll({
+      // Cargar recetas para cálculo dinámico de stock
+      FichaTecnica.findAll({
       where: { estado: 1 },
       include: [
         {
@@ -138,16 +139,25 @@ class ProductService {
           include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'stock', 'unidadMedida', 'estado'] }]
         }
       ]
-    }).catch(() => []);
+      }).catch(() => []),
+
+      // Cargar todos los insumos para bebidas o productos directos sin ficha técnica
+      Insumo.findAll({
+        attributes: ['idInsumo', 'nombre', 'stock', 'unidadMedida', 'estado']
+      }).catch(() => []),
+
+      // Cargar historial de ventas por variante para contar ventas reales
+      DetalleVentaProducto.findAll({
+        attributes: ['idVariante', [DetalleVentaProducto.sequelize.fn('COUNT', DetalleVentaProducto.sequelize.col('idDetalleVenta')), 'totalVentas']],
+        group: ['idVariante'],
+        raw: true
+      }).catch(() => [])
+    ]);
+
     const fichaMap = new Map();
     fichas.forEach(f => {
       if (f.idProducto) fichaMap.set(f.idProducto, f);
     });
-
-    // Cargar todos los insumos para bebidas o productos directos sin ficha técnica
-    const allInsumos = await Insumo.findAll({
-      attributes: ['idInsumo', 'nombre', 'stock', 'unidadMedida', 'estado']
-    }).catch(() => []);
     const insumoByIdMap = new Map();
     allInsumos.forEach(ins => {
       insumoByIdMap.set(Number(ins.idInsumo), ins);
@@ -225,12 +235,7 @@ class ProductService {
       return 0;
     };
 
-    // Cargar historial de ventas por variante para contar ventas reales
-    const ventasPorVariante = await DetalleVentaProducto.findAll({
-      attributes: ['idVariante', [DetalleVentaProducto.sequelize.fn('COUNT', DetalleVentaProducto.sequelize.col('idDetalleVenta')), 'totalVentas']],
-      group: ['idVariante'],
-      raw: true
-    }).catch(() => []);
+    // Conteo de ventas por variante (ya precargado en paralelo)
     const ventasMap = new Map();
     ventasPorVariante.forEach(v => {
       ventasMap.set(Number(v.idVariante), Number(v.totalVentas || 0));

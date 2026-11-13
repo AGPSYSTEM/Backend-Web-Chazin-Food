@@ -1,27 +1,30 @@
+const { fn, col } = require('sequelize');
 const { CategoriaProducto, Product } = require('../../persistence/models');
 
 class CategoriaProductoService {
   static async getAll() {
-    const categorias = await CategoriaProducto.findAll();
-    const list = await Promise.all(
-      categorias
-        .filter(cat => cat.idCategoriaProducto !== 0 && !cat.nombre?.startsWith('__SISTEMA'))
-        .map(async (cat) => {
-          const cantidad = await Product.count({
-            where: { idCategoriaProducto: cat.idCategoriaProducto }
-          });
-          return {
-            id: cat.idCategoriaProducto,
-            idCategoriaProducto: cat.idCategoriaProducto,
-            nombre: cat.nombre,
-            descripcion: cat.descripcion || '',
-            icon: cat.icon || '',
-            estado: cat.estado === 1 ? 'Activo' : 'Inactivo',
-            cantidad
-          };
-        })
+    const [categorias, conteos] = await Promise.all([
+      CategoriaProducto.findAll(),
+      Product.findAll({
+        attributes: ['idCategoriaProducto', [fn('COUNT', col('idProducto')), 'cantidad']],
+        group: ['idCategoriaProducto'],
+        raw: true
+      }).catch(() => [])
+    ]);
+    const conteoMap = new Map(
+      conteos.map(c => [Number(c.idCategoriaProducto), Number(c.cantidad || 0)])
     );
-    return list;
+    return categorias
+      .filter(cat => cat.idCategoriaProducto !== 0 && !cat.nombre?.startsWith('__SISTEMA'))
+      .map((cat) => ({
+        id: cat.idCategoriaProducto,
+        idCategoriaProducto: cat.idCategoriaProducto,
+        nombre: cat.nombre,
+        descripcion: cat.descripcion || '',
+        icon: cat.icon || '',
+        estado: cat.estado === 1 ? 'Activo' : 'Inactivo',
+        cantidad: conteoMap.get(Number(cat.idCategoriaProducto)) || 0
+      }));
   }
 
   static async getById(id) {

@@ -57,7 +57,22 @@ class DashboardService {
       const now = new Date();
       const { startDate, endDate, year, periodo } = parseDateRange(filtro);
 
-      const todasVentas = await Venta.findAll({ raw: true }).catch(() => []);
+      const [todasVentas, clientesTotal, clientesActivos, insumosBajoStock, productosTotal] = await Promise.all([
+        Venta.findAll({
+          attributes: ['fechaVenta', 'total', 'estadoEntrega'],
+          raw: true
+        }).catch(() => []),
+        Cliente.count().catch(() => 0),
+        Cliente.count({ where: { estado: 1 } }).catch(() => null),
+        Insumo.count({
+          where: {
+            estado: 1,
+            eliminado: 0,
+            stock: { [Op.lte]: sequelize.col('stockMinimo') }
+          }
+        }).catch(() => 0),
+        Product.count({ where: { estado: 1 } }).catch(() => 0)
+      ]);
       
       // Total Global acumulado de todas las ventas no anuladas de la empresa
       const totalVentasGlobal = todasVentas
@@ -188,36 +203,22 @@ class DashboardService {
         frecuenciaVentas = parseFloat((pedidosTotal / dayOfYear).toFixed(1));
       }
 
-      // Clientes activos
-      const clientesTotal = await Cliente.count().catch(() => 0);
-      const clientesActivos = await Cliente.count({ where: { estado: 1 } }).catch(() => clientesTotal);
-
-      // Insumos críticos
-      const insumosBajoStockList = await Insumo.findAll({
-        where: {
-          estado: 1,
-          eliminado: 0,
-          stock: { [Op.lte]: sequelize.col('stockMinimo') }
-        },
-        raw: true
-      }).catch(() => []);
-
-      return {
-        totalVentasGlobal: Math.round(totalVentasGlobal),
-        ventasTotal: Math.round(totalVentasPeriodo),
-        ventasMesActual: Math.round(totalVentasPeriodo),
-        ventasVariacion,
-        labelVariacion,
-        pedidosTotal,
-        pedidosVariacion,
-        frecuenciaVentas,
-        clientesTotal,
-        clientesActivos,
-        clientesVariacion: 0,
-        productosTotal: await Product.count({ where: { estado: 1 } }).catch(() => 0),
-        insumosBajoStock: insumosBajoStockList.length,
-        divisa: "COP"
-      };
+      return {
+        totalVentasGlobal: Math.round(totalVentasGlobal),
+        ventasTotal: Math.round(totalVentasPeriodo),
+        ventasMesActual: Math.round(totalVentasPeriodo),
+        ventasVariacion,
+        labelVariacion,
+        pedidosTotal,
+        pedidosVariacion,
+        frecuenciaVentas,
+        clientesTotal,
+        clientesActivos: clientesActivos ?? clientesTotal,
+        clientesVariacion: 0,
+        productosTotal,
+        insumosBajoStock,
+        divisa: "COP"
+      };
     } catch (error) {
       console.error('Error in DashboardService.getStats:', error);
       return {
@@ -239,288 +240,190 @@ class DashboardService {
     }
   }
 
-  static async getVentasChart(filtro = {}) {
-    try {
-      const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-      const now = new Date();
-      const { year, periodo } = parseDateRange(filtro);
-      const result = [];
-
-      if (periodo === 'hoy') {
-        // Franjas horarias de hoy
-        const horas = [
-          { label: "08:00", start: 0, end: 8 },
-          { label: "12:00", start: 8, end: 12 },
-          { label: "15:00", start: 12, end: 15 },
-          { label: "18:00", start: 15, end: 18 },
-          { label: "21:00", start: 18, end: 21 },
-          { label: "23:59", start: 21, end: 24 }
-        ];
-
-        for (const h of horas) {
-          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h.start, 0, 0);
-          const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h.end === 24 ? 23 : h.end, h.end === 24 ? 59 : 0, 0);
-
-          const ventasH = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [start, end] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasH = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [start, end] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          result.push({
-            mes: h.label,
-            ventas: Math.round(ventasH.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasH.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      } else if (periodo === '7_dias' || periodo === '7dias' || periodo === 'semana') {
-        const diasNombres = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000));
-          const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
-          const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
-
-          const ventasDia = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [startOfDay, endOfDay] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasDia = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [startOfDay, endOfDay] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const dayLabel = `${diasNombres[d.getDay()]} ${d.getDate()}`;
-          result.push({
-            mes: dayLabel,
-            ventas: Math.round(ventasDia.reduce((s, v) => s + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasDia.reduce((s, c) => s + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      } else if (periodo === 'este_mes' || periodo === 'mes' || periodo === 'mes_actual' || periodo === 'mes actual') {
-        // Semanas del mes actual
-        const yr = now.getFullYear();
-        const mo = now.getMonth();
-        const lastDay = new Date(yr, mo + 1, 0).getDate();
-        const semanas = [
-          { label: "1 - 7", startDay: 1, endDay: 7 },
-          { label: "8 - 14", startDay: 8, endDay: 14 },
-          { label: "15 - 21", startDay: 15, endDay: 21 },
-          { label: `22 - ${lastDay}`, startDay: 22, endDay: lastDay }
-        ];
-
-        for (const s of semanas) {
-          const start = new Date(yr, mo, s.startDay, 0, 0, 0);
-          const end = new Date(yr, mo, s.endDay, 23, 59, 59);
-
-          const ventasSem = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [start, end] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasSem = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [start, end] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          result.push({
-            mes: `Sem ${s.label}`,
-            ventas: Math.round(ventasSem.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasSem.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      } else if (periodo === 'todos' || periodo === 'historico' || periodo === 'all') {
-        // Ítem #30: Histórico multi-anual real agrupado por año
-        const ventasAll = await Venta.findAll({
-          where: { estadoEntrega: { [Op.ne]: 'CANCELADO' } },
-          attributes: ['fechaVenta', 'total'],
-          raw: true
-        }).catch(() => []);
-
-        const comprasAll = await Compra.findAll({
-          where: { estado: { [Op.ne]: 'CANCELADA' } },
-          attributes: ['fechaCompra', 'total', 'subtotal'],
-          raw: true
-        }).catch(() => []);
-
-        const yearMap = new Map();
-        const currentY = now.getFullYear();
-        for (let y = currentY - 2; y <= currentY; y++) {
-          yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
-        }
-
-        ventasAll.forEach(v => {
-          if (!v.fechaVenta) return;
-          const y = new Date(v.fechaVenta).getFullYear();
-          if (!yearMap.has(y)) yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
-          yearMap.get(y).ventas += Math.round(parseFloat(v.total || 0));
-        });
-
-        comprasAll.forEach(c => {
-          if (!c.fechaCompra) return;
-          const y = new Date(c.fechaCompra).getFullYear();
-          if (!yearMap.has(y)) yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
-          yearMap.get(y).compras += Math.round(parseFloat(c.total || c.subtotal || 0));
-        });
-
-        return Array.from(yearMap.entries())
-          .sort(([a], [b]) => a - b)
-          .map(([_, val]) => val);
-      } else if (periodo === 'mes_anterior' || periodo === 'mes anterior') {
-        // Semanas del mes anterior
-        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const yr = prevDate.getFullYear();
-        const mo = prevDate.getMonth();
-        const lastDay = new Date(yr, mo + 1, 0).getDate();
-        const semanas = [
-          { label: "1 - 7", startDay: 1, endDay: 7 },
-          { label: "8 - 14", startDay: 8, endDay: 14 },
-          { label: "15 - 21", startDay: 15, endDay: 21 },
-          { label: `22 - ${lastDay}`, startDay: 22, endDay: lastDay }
-        ];
-
-        for (const s of semanas) {
-          const start = new Date(yr, mo, s.startDay, 0, 0, 0);
-          const end = new Date(yr, mo, s.endDay, 23, 59, 59);
-
-          const ventasSem = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [start, end] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasSem = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [start, end] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          result.push({
-            mes: `Sem ${s.label}`,
-            ventas: Math.round(ventasSem.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasSem.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      } else if (periodo === 'ultimos_3_meses' || periodo === 'últimos 3 meses' || periodo === 'ultimos 3 meses' || periodo === '3_meses' || periodo === '3meses') {
-        for (let i = 2; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
-          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-
-          const ventasMes = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [start, end] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasMes = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [start, end] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          result.push({
-            mes: mesesNombres[d.getMonth()],
-            ventas: Math.round(ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasMes.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      } else if (periodo === 'ultimos_6_meses' || periodo === 'últimos 6 meses' || periodo === 'ultimos 6 meses' || periodo === '6_meses' || periodo === '6meses') {
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
-          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-
-          const ventasMes = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [start, end] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasMes = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [start, end] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          result.push({
-            mes: mesesNombres[d.getMonth()],
-            ventas: Math.round(ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasMes.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      } else {
-        // 'este_ano' o año específico (12 meses)
-        const targetYear = year;
-        for (let m = 0; m < 12; m++) {
-          const startOfMonth = new Date(targetYear, m, 1, 0, 0, 0);
-          const endOfMonth = new Date(targetYear, m + 1, 0, 23, 59, 59);
-
-          const ventasMes = await Venta.findAll({
-            where: {
-              fechaVenta: { [Op.between]: [startOfMonth, endOfMonth] },
-              estadoEntrega: { [Op.ne]: 'CANCELADO' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          const comprasMes = await Compra.findAll({
-            where: {
-              fechaCompra: { [Op.between]: [startOfMonth, endOfMonth] },
-              estado: { [Op.ne]: 'CANCELADA' }
-            },
-            raw: true
-          }).catch(() => []);
-
-          result.push({
-            mes: mesesNombres[m],
-            ventas: Math.round(ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0)),
-            compras: Math.round(comprasMes.reduce((sum, c) => sum + parseFloat(c.total || c.montoTotal || 0), 0))
-          });
-        }
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error in getVentasChart:', error);
-      return [];
-    }
-  }
-
+  static async getVentasChart(filtro = {}) {
+    try {
+      const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      const now = new Date();
+      const { year, periodo } = parseDateRange(filtro);
+
+      if (periodo === 'todos' || periodo === 'historico' || periodo === 'all') {
+        const [ventasAll, comprasAll] = await Promise.all([
+          Venta.findAll({
+            where: { estadoEntrega: { [Op.ne]: 'CANCELADO' } },
+            attributes: ['fechaVenta', 'total'],
+            raw: true
+          }).catch(() => []),
+          Compra.findAll({
+            where: { estado: { [Op.ne]: 'CANCELADA' } },
+            attributes: ['fechaCompra', 'total', 'subtotal'],
+            raw: true
+          }).catch(() => [])
+        ]);
+
+        const yearMap = new Map();
+        const currentY = now.getFullYear();
+        for (let y = currentY - 2; y <= currentY; y++) {
+          yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
+        }
+
+        ventasAll.forEach(v => {
+          if (!v.fechaVenta) return;
+          const y = new Date(v.fechaVenta).getFullYear();
+          if (!yearMap.has(y)) yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
+          yearMap.get(y).ventas += Math.round(parseFloat(v.total || 0));
+        });
+
+        comprasAll.forEach(c => {
+          if (!c.fechaCompra) return;
+          const y = new Date(c.fechaCompra).getFullYear();
+          if (!yearMap.has(y)) yearMap.set(y, { mes: String(y), ventas: 0, compras: 0 });
+          yearMap.get(y).compras += Math.round(parseFloat(c.total || c.subtotal || 0));
+        });
+
+        return Array.from(yearMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([_, val]) => val);
+      }
+
+      const buckets = [];
+      if (periodo === 'hoy') {
+        const horas = [
+          { label: "08:00", start: 0, end: 8 },
+          { label: "12:00", start: 8, end: 12 },
+          { label: "15:00", start: 12, end: 15 },
+          { label: "18:00", start: 15, end: 18 },
+          { label: "21:00", start: 18, end: 21 },
+          { label: "23:59", start: 21, end: 24 }
+        ];
+        for (const h of horas) {
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h.start, 0, 0);
+          const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h.end === 24 ? 23 : h.end, h.end === 24 ? 59 : 0, 0);
+          buckets.push({ mes: h.label, startMs: start.getTime(), endMs: end.getTime(), ventas: 0, compras: 0 });
+        }
+      } else if (periodo === '7_dias' || periodo === '7dias' || periodo === 'semana') {
+        const diasNombres = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000));
+          const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+          const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+          buckets.push({
+            mes: `${diasNombres[d.getDay()]} ${d.getDate()}`,
+            startMs: start.getTime(),
+            endMs: end.getTime(),
+            ventas: 0,
+            compras: 0
+          });
+        }
+      } else if (periodo === 'este_mes' || periodo === 'mes' || periodo === 'mes_actual' || periodo === 'mes actual') {
+        const yr = now.getFullYear();
+        const mo = now.getMonth();
+        const lastDay = new Date(yr, mo + 1, 0).getDate();
+        const semanas = [
+          { label: "1 - 7", startDay: 1, endDay: 7 },
+          { label: "8 - 14", startDay: 8, endDay: 14 },
+          { label: "15 - 21", startDay: 15, endDay: 21 },
+          { label: `22 - ${lastDay}`, startDay: 22, endDay: lastDay }
+        ];
+        for (const s of semanas) {
+          const start = new Date(yr, mo, s.startDay, 0, 0, 0);
+          const end = new Date(yr, mo, s.endDay, 23, 59, 59);
+          buckets.push({ mes: `Sem ${s.label}`, startMs: start.getTime(), endMs: end.getTime(), ventas: 0, compras: 0 });
+        }
+      } else if (periodo === 'mes_anterior' || periodo === 'mes anterior') {
+        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const yr = prevDate.getFullYear();
+        const mo = prevDate.getMonth();
+        const lastDay = new Date(yr, mo + 1, 0).getDate();
+        const semanas = [
+          { label: "1 - 7", startDay: 1, endDay: 7 },
+          { label: "8 - 14", startDay: 8, endDay: 14 },
+          { label: "15 - 21", startDay: 15, endDay: 21 },
+          { label: `22 - ${lastDay}`, startDay: 22, endDay: lastDay }
+        ];
+        for (const s of semanas) {
+          const start = new Date(yr, mo, s.startDay, 0, 0, 0);
+          const end = new Date(yr, mo, s.endDay, 23, 59, 59);
+          buckets.push({ mes: `Sem ${s.label}`, startMs: start.getTime(), endMs: end.getTime(), ventas: 0, compras: 0 });
+        }
+      } else if (periodo === 'ultimos_3_meses' || periodo === 'últimos 3 meses' || periodo === 'ultimos 3 meses' || periodo === '3_meses' || periodo === '3meses') {
+        for (let i = 2; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+          buckets.push({ mes: mesesNombres[d.getMonth()], startMs: start.getTime(), endMs: end.getTime(), ventas: 0, compras: 0 });
+        }
+      } else if (periodo === 'ultimos_6_meses' || periodo === 'últimos 6 meses' || periodo === 'ultimos 6 meses' || periodo === '6_meses' || periodo === '6meses') {
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+          buckets.push({ mes: mesesNombres[d.getMonth()], startMs: start.getTime(), endMs: end.getTime(), ventas: 0, compras: 0 });
+        }
+      } else {
+        for (let m = 0; m < 12; m++) {
+          const start = new Date(year, m, 1, 0, 0, 0);
+          const end = new Date(year, m + 1, 0, 23, 59, 59);
+          buckets.push({ mes: mesesNombres[m], startMs: start.getTime(), endMs: end.getTime(), ventas: 0, compras: 0 });
+        }
+      }
+
+      if (buckets.length === 0) return [];
+
+      const rangeStart = new Date(buckets[0].startMs);
+      const rangeEnd = new Date(buckets[buckets.length - 1].endMs);
+
+      const [ventasRange, comprasRange] = await Promise.all([
+        Venta.findAll({
+          where: {
+            fechaVenta: { [Op.between]: [rangeStart, rangeEnd] },
+            estadoEntrega: { [Op.ne]: 'CANCELADO' }
+          },
+          attributes: ['fechaVenta', 'total'],
+          raw: true
+        }).catch(() => []),
+        Compra.findAll({
+          where: {
+            fechaCompra: { [Op.between]: [rangeStart, rangeEnd] },
+            estado: { [Op.ne]: 'CANCELADA' }
+          },
+          attributes: ['fechaCompra', 'total', 'subtotal'],
+          raw: true
+        }).catch(() => [])
+      ]);
+
+      for (const v of ventasRange) {
+        if (!v.fechaVenta) continue;
+        const ts = new Date(v.fechaVenta).getTime();
+        const monto = parseFloat(v.total || 0);
+        for (const b of buckets) {
+          if (ts >= b.startMs && ts <= b.endMs) {
+            b.ventas += monto;
+          }
+        }
+      }
+
+      for (const c of comprasRange) {
+        if (!c.fechaCompra) continue;
+        const ts = new Date(c.fechaCompra).getTime();
+        const monto = parseFloat(c.total || c.subtotal || 0);
+        for (const b of buckets) {
+          if (ts >= b.startMs && ts <= b.endMs) {
+            b.compras += monto;
+          }
+        }
+      }
+
+      return buckets.map(b => ({
+        mes: b.mes,
+        ventas: Math.round(b.ventas),
+        compras: Math.round(b.compras)
+      }));
+    } catch (error) {
+      console.error('Error in getVentasChart:', error);
+      return [];
+    }
+  }
+
   static async getProductosPopulares(filtro = {}) {
     try {
       const { startDate, endDate } = parseDateRange(filtro);

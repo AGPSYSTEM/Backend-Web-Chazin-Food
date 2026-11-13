@@ -166,7 +166,11 @@ class InsumoService {
   }
 
   static async getAll() {
-    await this.checkVencimientos();
+    const nowTs = Date.now();
+    if (!this._lastVencimientoCheckAt || nowTs - this._lastVencimientoCheckAt >= 3 * 60 * 1000) {
+      await this.checkVencimientos();
+      this._lastVencimientoCheckAt = Date.now();
+    }
     const [insumos, comprasMap] = await Promise.all([
       Insumo.findAll({
         where: { eliminado: 0 },

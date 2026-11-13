@@ -108,24 +108,30 @@ function evaluarVigenciaEvento(e, now = new Date()) {
   };
 }
 
+let lastAutoExpireAt = 0;
+const AUTO_EXPIRE_TTL_MS = 5 * 60 * 1000;
+
 class EventoService {
   static async getAll() {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Auto-expirar eventos cuya fecha límite ya pasó para mantener la base de datos sincronizada
-    try {
-      await Evento.update(
-        { estado: 0 },
-        {
-          where: {
-            estado: 1,
-            fechaFin: { [Op.ne]: null, [Op.lt]: todayStr }
+    // Auto-expirar eventos vencidos como máximo una vez cada 5 minutos para no escribir en cada GET público
+    if (Date.now() - lastAutoExpireAt >= AUTO_EXPIRE_TTL_MS) {
+      try {
+        await Evento.update(
+          { estado: 0 },
+          {
+            where: {
+              estado: 1,
+              fechaFin: { [Op.ne]: null, [Op.lt]: todayStr }
+            }
           }
-        }
-      );
-    } catch (e) {
-      // Ignorar si hay algún bloqueo transaccional menor
+        );
+        lastAutoExpireAt = Date.now();
+      } catch (e) {
+        // Ignorar si hay algún bloqueo transaccional menor
+      }
     }
 
     const eventos = await Evento.findAll({

@@ -8,13 +8,19 @@ const {
   deleteProduct,
 } = require('../controllers/productController');
 const { protect, requirePrivilege } = require('../../infrastructure/middlewares/authMiddleware');
+const { cacheResponse } = require('../../infrastructure/utils/apiCache');
+
+const cacheProductos = cacheResponse('productos', {
+  ttlMs: 30000,
+  cacheControl: 'public, max-age=15, stale-while-revalidate=30'
+});
 
 router.route('/')
-  .get(getProducts)
+  .get(cacheProductos, getProducts)
   .post(protect, requirePrivilege('Productos', 'Crear'), createProduct);
 
 router.route('/:id')
-  .get(getProductById)
+  .get(cacheProductos, getProductById)
   .put(protect, requirePrivilege('Productos', 'Editar'), updateProduct)
   .delete(protect, requirePrivilege('Productos', 'Eliminar'), deleteProduct);
 
