@@ -18,6 +18,7 @@ const {
   ensureResenaSchema,
   ensureNoNegativeStock,
   ensureInsumoEliminadoSchema,
+  ensureProductoEliminadoSchema,
   ensureInsumoCategoriaNullableSchema,
   ensureInsumoAdicionSchema,
   ensureProductoAdicionesDefaultSchema,
@@ -35,6 +36,7 @@ async function initializeDatabaseSchema() {
     await connectDB();
     await ensureActaRevisionSchema();
     await ensureInsumoEliminadoSchema();
+    await ensureProductoEliminadoSchema();
     await ensureInsumoCategoriaNullableSchema();
     await ensureInsumoAdicionSchema();
     await ensureVarianteImagenSchema();

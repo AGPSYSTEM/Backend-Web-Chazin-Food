@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
-const { Product, CategoriaProducto, Evento, Variante, VarianteInsumo, ComboProducto, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaProducto } = require('../../persistence/models');
+const { Product, CategoriaProducto, Evento, Variante, VarianteInsumo, ComboProducto, FichaTecnica, DetalleFichaInsumo, Insumo, DetalleVentaProducto, Resena } = require('../../persistence/models');
 const FichaTecnicaService = require('./fichaTecnicaService');
+const EventoService = require('./eventoService');
 
 /**
  * Normaliza unidades de medida entre receta e inventario para calcular porciones disponibles.
@@ -82,10 +83,28 @@ class ProductService {
     }
   }
 
-  static async getProducts() {
+  static async _queryFormattedProducts({ eliminado = 0, order = [['idProducto', 'ASC']] } = {}) {
     const [products, fichas, allInsumos, ventasPorVariante] = await Promise.all([
       Product.findAll({
-      attributes: ['idProducto', 'idCategoriaProducto', 'nombre', 'descripcion', 'imagen', 'estado', 'precio', 'categoria', 'adiciones', 'configuracionCombo'],
+        where: {
+          eliminado,
+          idProducto: { [Op.ne]: 0 }
+        },
+        order,
+        attributes: [
+          'idProducto',
+          'idCategoriaProducto',
+          'nombre',
+          'descripcion',
+          'imagen',
+          'estado',
+          'eliminado',
+          'fechaEliminacion',
+          'precio',
+          'categoria',
+          'adiciones',
+          'configuracionCombo'
+        ],
       include: [
         { model: CategoriaProducto, as: 'categoriaProducto', attributes: ['idCategoriaProducto', 'nombre'] },
         {
@@ -123,7 +142,7 @@ class ProductService {
             {
               model: Product,
               as: 'productoComponente',
-              attributes: ['idProducto', 'nombre', 'precio', 'imagen', 'estado']
+              attributes: ['idProducto', 'nombre', 'precio', 'imagen', 'estado', 'eliminado']
             }
           ]
         }
@@ -347,7 +366,7 @@ class ProductService {
             const comp = it.productoComponente;
             const reqCompQty = Math.max(1, Number(it.cantidad || 1));
             if (comp) {
-              if (comp.estado === 0) {
+              if (comp.estado === 0 || Number(comp.eliminado) === 1) {
                 minCombo = 0;
                 break;
               }
@@ -393,6 +412,8 @@ class ProductService {
           categoriaId: p.idCategoriaProducto,
           categoria: p.categoriaProducto ? p.categoriaProducto.nombre : (p.categoria || ''),
           estado: p.estado === 1 ? 'Activo' : 'Inactivo',
+          eliminado: Number(p.eliminado || 0),
+          fechaEliminacion: p.fechaEliminacion || null,
           esCombo: isCombo,
           configuracionCombo: cfgCombo,
           itemsCombo: itemsComboFormatted,
@@ -400,9 +421,20 @@ class ProductService {
           idVariantePrincipal,
           tieneVariantes: variantes.length > 0,
           adiciones,
-          eventos: p.eventos || []
+          eventos: Array.isArray(p.eventos) ? p.eventos.map(ev => EventoService.serializeEventoRelation(ev)) : []
         };
       });
+  }
+
+  static async getProducts() {
+    return this._queryFormattedProducts({ eliminado: 0, order: [['idProducto', 'ASC']] });
+  }
+
+  static async getProductsPapelera() {
+    return this._queryFormattedProducts({
+      eliminado: 1,
+      order: [['fechaEliminacion', 'DESC'], ['idProducto', 'DESC']]
+    });
   }
 
   /** Resolves an optional variant price, falling back to basePrice when unset or non-positive. */
@@ -432,7 +464,7 @@ class ProductService {
       throw error;
     }
 
-    const existing = await Product.findOne({ where: { nombre: nombre.trim() } });
+    const existing = await Product.findOne({ where: { nombre: nombre.trim(), eliminado: 0 } });
     if (existing) {
       const error = new Error('Ya existe un producto registrado con ese nombre');
       error.statusCode = 400;
@@ -478,6 +510,8 @@ class ProductService {
       categoria: resolvedCatNombre,
       precio: finalPrecio,
       estado: normalizedEstado,
+      eliminado: 0,
+      fechaEliminacion: null,
       adiciones: adiciones ? (typeof adiciones === 'string' ? adiciones : JSON.stringify(adiciones)) : '[]',
       configuracionCombo: comboConfigStr
     });
@@ -582,7 +616,7 @@ class ProductService {
       p.precio = Number(precio) || 0;
     }
     if (estado !== undefined) {
-      p.estado = estado === 'Activo' || estado === 1 ? 1 : 0;
+      p.estado = estado === 'Activo' || estado === 1 || estado === '1' ? 1 : 0;
     }
     if (adiciones !== undefined) {
       p.adiciones = typeof adiciones === 'string' ? adiciones : JSON.stringify(adiciones);
@@ -730,57 +764,184 @@ class ProductService {
   }
 
   static async deleteProduct(id) {
-    const p = await Product.findByPk(id);
+    const prodId = Number(id);
+    if (!Number.isFinite(prodId) || prodId <= 0) {
+      const error = new Error('No se puede eliminar un registro reservado del sistema');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const p = await Product.findByPk(prodId);
     if (!p) {
       const error = new Error('Producto no encontrado');
       error.statusCode = 404;
       throw error;
     }
 
-    // Paso 1: Verificar SIEMPRE el historial de ventas antes de eliminar fichas o registros
-    const variantes = await Variante.findAll({ where: { idProducto: id } });
-    const varianteIds = variantes.map(v => v.idVariante);
+    p.eliminado = 1;
+    p.fechaEliminacion = new Date();
+    await p.save();
 
-    if (varianteIds.length > 0) {
-      const inVenta = await DetalleVentaProducto.findOne({ where: { idVariante: varianteIds } });
-      if (inVenta) {
-        // Desactivación lógica preservando receta histórica e integridad de pedidos previos
-        p.estado = 0;
-        await p.save();
-        return { message: 'Producto desactivado (con historial de ventas)' };
-      }
+    return {
+      deleted: true,
+      softDeleted: true,
+      id: prodId,
+      nombre: p.nombre,
+      message: `"${p.nombre}" se movió a la papelera de reciclaje`
+    };
+  }
+
+  static async restoreProduct(id) {
+    const prodId = Number(id);
+    if (!Number.isFinite(prodId) || prodId <= 0) {
+      const error = new Error('Registro del sistema inválido');
+      error.statusCode = 400;
+      throw error;
     }
 
-    // Paso 2: Si NO tiene ventas, eliminar dependencias asociadas
-    try {
-      await Evento.destroy({ where: { idProducto: id } });
-    } catch (_) {}
+    const p = await Product.findByPk(prodId);
+    if (!p) {
+      const error = new Error('Producto no encontrado en la papelera');
+      error.statusCode = 404;
+      throw error;
+    }
 
-    try {
-      await ComboProducto.destroy({ where: { idCombo: id } });
-    } catch (_) {}
+    const duplicateActive = await Product.findOne({
+      where: {
+        nombre: p.nombre,
+        eliminado: 0,
+        idProducto: { [Op.ne]: prodId }
+      }
+    });
+    if (duplicateActive) {
+      const error = new Error(`Ya existe otro producto activo llamado "${p.nombre}". Renómbralo antes de restaurar este registro.`);
+      error.statusCode = 400;
+      throw error;
+    }
 
+    p.eliminado = 0;
+    p.fechaEliminacion = null;
+    await p.save();
+
+    return this.getProductById(prodId);
+  }
+
+  static async hardDeleteProduct(id) {
+    const prodId = Number(id);
+    if (!Number.isFinite(prodId) || prodId <= 0) {
+      const error = new Error('No se puede eliminar un registro reservado del sistema');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const t = await Product.sequelize.transaction();
     try {
-      const fichasProd = await FichaTecnica.findAll({
-        where: varianteIds.length > 0
-          ? { [Op.or]: [{ idProducto: id }, { idVariante: varianteIds }] }
-          : { idProducto: id }
+      const p = await Product.findByPk(prodId, { transaction: t });
+      if (!p) {
+        await t.rollback();
+        const error = new Error('Producto no encontrado');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const variantes = await Variante.findAll({ where: { idProducto: prodId }, transaction: t });
+      const varianteIds = variantes.map(v => Number(v.idVariante));
+      const varianteMap = new Map(variantes.map(v => [Number(v.idVariante), v.nombre]));
+
+      // Preservar el historial de ventas reasignando detalles al placeholder técnico (idVariante=0)
+      // con el nombre del producto/variante congelado en observaciones.
+      if (varianteIds.length > 0) {
+        const ventasRelacionadas = await DetalleVentaProducto.findAll({
+          where: { idVariante: varianteIds },
+          transaction: t
+        });
+
+        if (ventasRelacionadas.length > 0) {
+          let zeroVariant = await Variante.findByPk(0, { transaction: t });
+          if (!zeroVariant) {
+            await Product.sequelize.query(
+              "SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO')",
+              { transaction: t }
+            );
+            await Product.sequelize.query(
+              "INSERT IGNORE INTO `producto` (`idProducto`, `idCategoriaProducto`, `nombre`, `estado`, `precio`, `categoria`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 0, 0, '__SISTEMA_VARIANTE_CERO__')",
+              { transaction: t }
+            );
+            await Product.sequelize.query(
+              "INSERT IGNORE INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`) VALUES (0, 0, '__SISTEMA_VARIANTE_CERO__', 0, 0)",
+              { transaction: t }
+            );
+          }
+
+          for (const det of ventasRelacionadas) {
+            const vName = varianteMap.get(Number(det.idVariante)) || '';
+            const snapshotLabel =
+              vName && !isDummyOrBaseVariant(vName, p.nombre)
+                ? `${p.nombre} (${vName})`
+                : p.nombre;
+
+            let updatedObs = det.observaciones;
+            if (!updatedObs || !String(updatedObs).trim()) {
+              updatedObs = snapshotLabel;
+            } else if (String(updatedObs).trim().startsWith('{')) {
+              try {
+                const parsed = JSON.parse(updatedObs);
+                if (!parsed.nombreProducto && !parsed.nombre) {
+                  parsed.nombre = snapshotLabel;
+                  parsed.nombreProducto = p.nombre;
+                  if (vName && !isDummyOrBaseVariant(vName, p.nombre)) parsed.nombreVariante = vName;
+                  updatedObs = JSON.stringify(parsed);
+                }
+              } catch (_) {
+                // Conservar observación existente si el JSON no se pudo parsear
+              }
+            } else if (!String(updatedObs).toLowerCase().includes(p.nombre.toLowerCase())) {
+              updatedObs = `${snapshotLabel} — ${String(updatedObs).trim()}`;
+            }
+
+            await det.update(
+              { idVariante: 0, observaciones: String(updatedObs).slice(0, 255) },
+              { transaction: t }
+            );
+          }
+        }
+
+        await VarianteInsumo.destroy({ where: { idVariante: varianteIds }, transaction: t });
+      }
+
+      // Eliminar fichas técnicas asociadas al producto o sus variantes
+      const fichaWhere = varianteIds.length > 0
+        ? { [Op.or]: [{ idProducto: prodId }, { idVariante: varianteIds }] }
+        : { idProducto: prodId };
+      const fichasProd = await FichaTecnica.findAll({ where: fichaWhere, transaction: t });
+      const fichaIds = fichasProd.map(ft => ft.idFichaTecnica);
+      if (fichaIds.length > 0) {
+        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: fichaIds }, transaction: t });
+        await FichaTecnica.destroy({ where: { idFichaTecnica: fichaIds }, transaction: t });
+      }
+
+      // Eliminar dependencias restantes del producto
+      await Evento.destroy({ where: { idProducto: prodId }, transaction: t });
+      await ComboProducto.destroy({
+        where: { [Op.or]: [{ idCombo: prodId }, { idProducto: prodId }] },
+        transaction: t
       });
-      for (const ft of fichasProd) {
-        await DetalleFichaInsumo.destroy({ where: { idFichaTecnica: ft.idFichaTecnica } });
-        await ft.destroy();
-      }
-    } catch (_) {}
+      await Resena.destroy({ where: { idProducto: prodId }, transaction: t });
 
-    if (varianteIds.length > 0) {
-      await VarianteInsumo.destroy({ where: { idVariante: varianteIds } }).catch(() => null);
-      await Variante.destroy({ where: { idProducto: id } });
+      if (varianteIds.length > 0) {
+        await Variante.destroy({ where: { idProducto: prodId }, transaction: t });
+      }
+
+      await p.destroy({ transaction: t });
+      await t.commit();
+    } catch (err) {
+      await t.rollback().catch(() => {});
+      throw err;
     }
 
-    await p.destroy();
     const { resetAutoIncrement } = require('../../infrastructure/utils/dbUtils');
     await resetAutoIncrement('producto', 'idProducto');
-    return { message: 'Producto eliminado correctamente' };
+    return { deleted: true, id: prodId, message: 'Producto eliminado correctamente' };
   }
 }
 

@@ -429,8 +429,12 @@ class VentaService {
           Number(d.idVariante) === Number(p.idVariante || p.id)
         ) || (v.detalles || [])[pIdx];
 
-        const realProductoNombre = matchingDetail?.variante?.producto?.nombre || null;
-        const realVarianteNombre = matchingDetail?.variante?.nombre || null;
+        const rawMatchingProd = matchingDetail?.variante?.producto?.nombre || null;
+        const rawMatchingVar = matchingDetail?.variante?.nombre || null;
+        const realProductoNombre =
+          rawMatchingProd && !rawMatchingProd.startsWith('__SISTEMA') ? rawMatchingProd : null;
+        const realVarianteNombre =
+          rawMatchingVar && !rawMatchingVar.startsWith('__SISTEMA') ? rawMatchingVar : null;
 
         const finalNombre = realProductoNombre || p.nombreProducto || p.nombre || "Producto";
 
@@ -451,7 +455,11 @@ class VentaService {
       });
     } else if (v.detalles && v.detalles.length > 0) {
       productos = v.detalles.map(d => {
-        let pName = d.variante?.producto?.nombre || d.variante?.nombre || null;
+        const rawJoinedProd = d.variante?.producto?.nombre;
+        const rawJoinedVar = d.variante?.nombre;
+        const cleanJoinedProd = rawJoinedProd && !rawJoinedProd.startsWith('__SISTEMA') ? rawJoinedProd : null;
+        const cleanJoinedVar = rawJoinedVar && !rawJoinedVar.startsWith('__SISTEMA') ? rawJoinedVar : null;
+        let pName = cleanJoinedProd || cleanJoinedVar || null;
         let pAdiciones = [];
         let pObs = "";
 
@@ -474,9 +482,11 @@ class VentaService {
                 pAdiciones = parsedObs.adiciones.map(a => typeof a === 'object' ? a : { nombre: String(a), precio: 0, cantidad: 1 });
               }
             } else {
+              pName = pName || d.observaciones;
               pObs = d.observaciones;
             }
           } catch (e) {
+            pName = pName || d.observaciones;
             pObs = d.observaciones;
           }
         }
@@ -486,8 +496,8 @@ class VentaService {
         const pUnit = parseFloat(d.precioUnitario || 0);
         const pTot = parseFloat(d.subtotal || 0) > 0 ? parseFloat(d.subtotal) : (pUnit + addsSum) * pQty;
 
-        const realProdName = d.variante?.producto?.nombre || pName || `Producto #${d.idVariante}`;
-        const realVarName = d.variante?.nombre || null;
+        const realProdName = cleanJoinedProd || pName || `Producto #${d.idVariante}`;
+        const realVarName = cleanJoinedVar || null;
 
         return {
           id: d.idDetalleVenta || d.idVariante,
@@ -679,7 +689,15 @@ class VentaService {
       codigoVentaOriginal: obsData.codigoVentaOriginal || null,
       telefono: obsData.telefono || obsData.celular || clienteUser?.telefono || null,
       productos,
-      detalles: v.detalles || []
+      detalles: (v.detalles || []).map(d => {
+        const plain = typeof d?.toJSON === 'function' ? d.toJSON() : { ...d };
+        const varName = String(plain?.variante?.nombre || '');
+        const prodName = String(plain?.variante?.producto?.nombre || '');
+        if (Number(plain?.idVariante) === 0 || varName.startsWith('__SISTEMA') || prodName.startsWith('__SISTEMA')) {
+          plain.variante = null;
+        }
+        return plain;
+      })
     };
   }
 

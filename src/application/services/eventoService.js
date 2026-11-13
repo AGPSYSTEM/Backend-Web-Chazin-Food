@@ -140,13 +140,15 @@ class EventoService {
         {
           model: Product,
           as: 'producto',
-          attributes: ['idProducto', 'nombre', 'precio', 'imagen'],
+          attributes: ['idProducto', 'nombre', 'precio', 'imagen', 'eliminado'],
           required: false
         }
       ]
     });
 
-    return eventos.map((e) => {
+    return eventos
+      .filter((e) => !e.producto || Number(e.producto.eliminado || 0) !== 1)
+      .map((e) => {
       const vigencia = evaluarVigenciaEvento(e, now);
       return {
         id: e.idEvento,
@@ -164,7 +166,7 @@ class EventoService {
         descuento: e.descuento,
         nuevoPrecio: e.nuevoPrecio,
         accionInsumo: e.accionInsumo,
-        insumosAsociados: e.insumosAsociados ? (typeof e.insumosAsociados === 'string' ? JSON.parse(e.insumosAsociados) : e.insumosAsociados) : [],
+        insumosAsociados: this.normalizeInsumos(e.insumosAsociados),
         productosAsociados: e.productosAsociados ? (typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : e.productosAsociados) : [],
         producto: e.producto ? {
           id: e.producto.idProducto,
@@ -211,7 +213,7 @@ class EventoService {
       descuento: e.descuento,
       nuevoPrecio: e.nuevoPrecio,
       accionInsumo: e.accionInsumo,
-      insumosAsociados: e.insumosAsociados ? (typeof e.insumosAsociados === 'string' ? JSON.parse(e.insumosAsociados) : e.insumosAsociados) : [],
+      insumosAsociados: this.normalizeInsumos(e.insumosAsociados),
       productosAsociados: e.productosAsociados ? (typeof e.productosAsociados === 'string' ? JSON.parse(e.productosAsociados) : e.productosAsociados) : [],
       producto: e.producto ? {
         id: e.producto.idProducto,
@@ -224,12 +226,58 @@ class EventoService {
     };
   }
 
+  static parseJsonArray(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        return parsed && typeof parsed === 'object' ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    }
+    return typeof raw === 'object' ? [raw] : [];
+  }
+
+  static normalizeInsumos(raw) {
+    return this.parseJsonArray(raw)
+      .filter(item => item && typeof item === 'object' && (item.idInsumo || item.id || item.nombre))
+      .map(item => {
+        const numericId = Number(item.idInsumo || item.id);
+        const idVal = Number.isFinite(numericId) && numericId > 0 ? numericId : (item.idInsumo || item.id || null);
+        const unitVal = String(item.unidadMedida || item.unidad || 'und').trim() || 'und';
+        const qty = Number(item.cantidad);
+        return {
+          id: idVal,
+          idInsumo: idVal,
+          nombre: String(item.nombre || '').trim(),
+          cantidad: Number.isFinite(qty) && qty > 0 ? qty : 1,
+          unidad: unitVal,
+          unidadMedida: unitVal
+        };
+      });
+  }
+
+  static serializeEventoRelation(ev) {
+    const plain = ev && typeof ev.get === 'function' ? ev.get({ plain: true }) : { ...ev };
+    return {
+      ...plain,
+      accionInsumo: plain.accionInsumo || null,
+      insumosAsociados: this.normalizeInsumos(plain.insumosAsociados),
+      productosAsociados: this.parseJsonArray(plain.productosAsociados)
+    };
+  }
+
   static async create(data) {
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, icono, imagen, descuento, nuevoPrecio, accion, insumos, productos, isTemporal,
+      productoId, tipoEvento, icono, imagen, descuento, nuevoPrecio, accion, insumos, insumosAsociados, productos, isTemporal,
       crearComoProducto, productoNuevo
     } = data;
+    const rawInsumos = insumos !== undefined ? insumos : insumosAsociados;
+    const normalizedInsumos = rawInsumos !== undefined ? this.normalizeInsumos(rawInsumos) : [];
     const finalNombre = nombreEvento || nombre;
 
     if (!finalNombre || !finalNombre.trim()) {
@@ -376,8 +424,8 @@ class EventoService {
       imagen: imagen ? imagen.trim() : (productoNuevo?.imagen ? productoNuevo.imagen.trim() : null),
       descuento: descuento || null,
       nuevoPrecio: nuevoPrecio || null,
-      accionInsumo: accion || null,
-      insumosAsociados: insumos ? JSON.stringify(insumos) : null,
+      accionInsumo: accion || (normalizedInsumos.length > 0 ? 'Añadir' : null),
+      insumosAsociados: normalizedInsumos.length > 0 ? JSON.stringify(normalizedInsumos) : null,
       productosAsociados: productos ? JSON.stringify(productos) : null
     });
 
@@ -394,8 +442,9 @@ class EventoService {
 
     const { 
       nombreEvento, nombre, descripcion, fechaInicio, fechaFin, estado,
-      productoId, tipoEvento, icono, imagen, descuento, nuevoPrecio, accion, insumos, productos, isTemporal
+      productoId, tipoEvento, icono, imagen, descuento, nuevoPrecio, accion, insumos, insumosAsociados, productos, isTemporal
     } = data;
+    const rawInsumos = insumos !== undefined ? insumos : insumosAsociados;
     const finalNombre = nombreEvento || nombre;
 
     if (finalNombre !== undefined && finalNombre.trim()) {
@@ -424,7 +473,13 @@ class EventoService {
     if (descuento !== undefined) e.descuento = descuento;
     if (nuevoPrecio !== undefined) e.nuevoPrecio = nuevoPrecio;
     if (accion !== undefined) e.accionInsumo = accion;
-    if (insumos !== undefined) e.insumosAsociados = insumos ? JSON.stringify(insumos) : null;
+    if (rawInsumos !== undefined) {
+      const normalizedInsumos = this.normalizeInsumos(rawInsumos);
+      e.insumosAsociados = normalizedInsumos.length > 0 ? JSON.stringify(normalizedInsumos) : null;
+      if (accion === undefined && normalizedInsumos.length > 0 && !e.accionInsumo) {
+        e.accionInsumo = 'Añadir';
+      }
+    }
     if (productos !== undefined) e.productosAsociados = productos ? JSON.stringify(productos) : null;
 
     await e.save();

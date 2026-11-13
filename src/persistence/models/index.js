@@ -485,6 +485,14 @@ const Product = sequelize.define('producto', {
   estado: {
     type: DataTypes.TINYINT,
     defaultValue: 1
+  },
+  eliminado: {
+    type: DataTypes.TINYINT,
+    defaultValue: 0
+  },
+  fechaEliminacion: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, { tableName: 'producto', timestamps: false });
 

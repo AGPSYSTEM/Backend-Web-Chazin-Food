@@ -204,8 +204,8 @@ class AuthService {
     });
 
     if (!user) {
-      const error = new Error('La cuenta no existe');
-      error.statusCode = 404;
+      const error = new Error('Credenciales inválidas');
+      error.statusCode = 401;
       throw error;
     }
 
