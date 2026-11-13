@@ -790,7 +790,7 @@ class CompraService {
 
         console.log(`[COMPRA STOCK] DIF ${operacion} insumo #${idIns} compra #${idCompra}: stock=${stockActual} + diff=${diff} = ${nuevoStock}`);
         await Insumo.update(
-          { stock: nuevoStock, ...(signo > 0 && nuevoStock > 0 ? { estado: 1 } : {}) },
+          { stock: nuevoStock, ...(diff > 0 && nuevoStock > 0 ? { estado: 1 } : {}) },
           { where: { idInsumo: idIns } }
         );
       } catch (err) {
