@@ -175,6 +175,19 @@ class ProduccionService {
                     ]
                   },
                   {
+                    model: FichaTecnica,
+                    as: 'fichasTecnicas',
+                    required: false,
+                    where: { estado: 1, tipo: 'VARIANTE' },
+                    include: [
+                      {
+                        model: DetalleFichaInsumo,
+                        as: 'detalles',
+                        include: [{ model: Insumo, as: 'insumo', attributes: ['idInsumo', 'nombre', 'unidadMedida'] }]
+                      }
+                    ]
+                  },
+                  {
                     model: Product,
                     as: 'producto',
                     include: [
@@ -351,12 +364,18 @@ class ProduccionService {
               }
             }
 
-            // Build recipe / ficha técnica if exists
+            // Build recipe / ficha técnica if exists (prioritizing dedicated variant ficha when configured)
             let receta = null;
-            const inferredPrepMin = inferProductPrepMinutes(itemNombre, ft?.tiempoPreparacion);
-            if (ft) {
-              const rawDetalles = [...(ft.detalles || [])];
-              const varDeltas = d.variante?.insumosModificados || [];
+            const variantFicha = Array.isArray(d.variante?.fichasTecnicas)
+              ? d.variante.fichasTecnicas.find(vf => vf.tipo === 'VARIANTE' && vf.estado === 1)
+              : null;
+            const activeFt = (variantFicha && Array.isArray(variantFicha.detalles) && variantFicha.detalles.length > 0)
+              ? variantFicha
+              : ft;
+            const inferredPrepMin = inferProductPrepMinutes(itemNombre, activeFt?.tiempoPreparacion);
+            if (activeFt) {
+              const rawDetalles = [...(activeFt.detalles || [])];
+              const varDeltas = (activeFt === variantFicha) ? [] : (d.variante?.insumosModificados || []);
               let ingredientes = [];
 
               if (varDeltas && varDeltas.length > 0) {
@@ -416,22 +435,22 @@ class ProduccionService {
                 }));
               }
 
-              const rawPasos = ft.procedimiento || ft.descripcion || "";
+              const rawPasos = activeFt.procedimiento || activeFt.descripcion || "";
               const pasos = rawPasos
                 ? rawPasos.split("\n").map(p => p.trim()).filter(Boolean)
                 : ["Preparar los ingredientes según porciones", "Cocinar y montar según estándares de la casa"];
 
               receta = {
-                idFichaTecnica: ft.idFichaTecnica,
-                idProducto: ft.idProducto,
+                idFichaTecnica: activeFt.idFichaTecnica,
+                idProducto: activeFt.idProducto,
                 tiempoPreparacion: `${inferredPrepMin} min`,
                 tiempoPreparacionMin: inferredPrepMin,
-                rendimiento: ft.rendimiento || "1 porción",
-                especificaciones: ft.especificaciones || "",
-                caracteristicas: ft.caracteristicas || "",
-                informacionNutricional: ft.informacionNutricional || "",
-                condicionesAlmacenamiento: ft.condicionesAlmacenamiento || "",
-                vidaUtil: ft.vidaUtil || "",
+                rendimiento: activeFt.rendimiento || "1 porción",
+                especificaciones: activeFt.especificaciones || "",
+                caracteristicas: activeFt.caracteristicas || "",
+                informacionNutricional: activeFt.informacionNutricional || "",
+                condicionesAlmacenamiento: activeFt.condicionesAlmacenamiento || "",
+                vidaUtil: activeFt.vidaUtil || "",
                 ingredientes,
                 pasos
               };
