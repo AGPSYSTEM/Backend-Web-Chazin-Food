@@ -2,8 +2,6 @@
 -- Chazin Food DB Dump - 100% Compatible con TiDB Cloud Serverless
 -- Generado: 2026-10-30T13:56:48.907Z
 -- ==========================================
-SET NAMES utf8mb4;
-SET CHARACTER SET utf8mb4;
 USE chazinfood;
 SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -48,8 +46,9 @@ CREATE TABLE `categoriaproducto` (
   `estado` tinyint(4) DEFAULT 1,
   `icon` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`idCategoriaProducto`),
-  UNIQUE KEY `UK_CategoriaProducto` (`nombre`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `UK_CategoriaProducto` (`nombre`),
+  UNIQUE KEY `nombre` (`nombre`)
+                                                                                                                      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Volcado de datos para la tabla `categoriaproducto`
 INSERT INTO `categoriaproducto` (`idCategoriaProducto`, `nombre`, `descripcion`, `estado`, `icon`) VALUES
@@ -1477,25 +1476,6 @@ CREATE TABLE `variante` (
   KEY `IDX_VarianteProducto` (`idProducto`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- --------------------------------------------------------
--- Tabla: `variante_insumo`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `variante_insumo`;
-CREATE TABLE `variante_insumo` (
-  `idVarianteInsumo` int(11) NOT NULL AUTO_INCREMENT,
-  `idVariante` int(11) NOT NULL,
-  `tipoAccion` enum('AGREGAR','REEMPLAZAR','MODIFICAR_CANTIDAD','QUITAR') NOT NULL DEFAULT 'AGREGAR',
-  `idInsumo` int(11) NOT NULL,
-  `idInsumoReemplazado` int(11) DEFAULT NULL,
-  `cantidad` decimal(10,3) NOT NULL DEFAULT 1.000,
-  `unidadMedida` varchar(20) NOT NULL DEFAULT 'und',
-  `observaciones` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`idVarianteInsumo`),
-  KEY `idx_varins_variante` (`idVariante`),
-  KEY `idx_varins_insumo` (`idInsumo`),
-  KEY `idx_varins_insumoreemp` (`idInsumoReemplazado`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Volcado de datos para la tabla `variante`
 INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`, `imagen`) VALUES
 (0, 0, '__SISTEMA_VARIANTE_CERO__', 0.00, 0, NULL),
@@ -1567,6 +1547,30 @@ INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`
 (88, 39, 'Sabor Uva 400ml', 8500.00, 1, '/images/drinks/uva_postobon-removebg-preview.png'),
 (89, 39, 'Sabor Manzana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790140466/xnkmahkxmrvwlrueok5y.png'),
 (90, 39, 'Sabor Colombiana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790140466/mwzer41bv7rr3y5xbela.png');
+
+
+
+-- --------------------------------------------------------
+-- Tabla: `variante_insumo`
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `variante_insumo`;
+CREATE TABLE `variante_insumo` (
+  `idVarianteInsumo` int(11) NOT NULL AUTO_INCREMENT,
+  `idVariante` int(11) NOT NULL,
+  `tipoAccion` enum('AGREGAR','REEMPLAZAR','MODIFICAR_CANTIDAD','QUITAR') NOT NULL DEFAULT 'AGREGAR',
+  `idInsumo` int(11) NOT NULL,
+  `idInsumoReemplazado` int(11) DEFAULT NULL,
+  `cantidad` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `unidadMedida` varchar(30) DEFAULT NULL,
+  `observaciones` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idVarianteInsumo`),
+  KEY `idx_vi_variante` (`idVariante`),
+  KEY `idx_vi_insumo` (`idInsumo`),
+  KEY `idx_vi_insumo_reemplazado` (`idInsumoReemplazado`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `variante_insumo` (`idVarianteInsumo`, `idVariante`, `tipoAccion`, `idInsumo`, `idInsumoReemplazado`, `cantidad`, `unidadMedida`, `observaciones`) VALUES
+(1, 10, 'AGREGAR', 25, NULL, 30.00, 'g', 'Jalapeños en Rodajas para variante');
 
 -- --------------------------------------------------------
 -- Tabla: `venta`
@@ -1749,49 +1753,16 @@ ALTER TABLE `usuario`
 ALTER TABLE `variante`
   ADD CONSTRAINT `variante_ibfk_1` FOREIGN KEY (`idProducto`) REFERENCES `producto` (`idProducto`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
-ALTER TABLE `variante_insumo`
-  ADD CONSTRAINT `fk_varins_variante` FOREIGN KEY (`idVariante`) REFERENCES `variante` (`idVariante`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_varins_insumo` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_varins_insumoreemp` FOREIGN KEY (`idInsumoReemplazado`) REFERENCES `insumo` (`idInsumo`) ON DELETE SET NULL ON UPDATE CASCADE;
-
 ALTER TABLE `venta`
   ADD CONSTRAINT `venta_ibfk_178` FOREIGN KEY (`idCliente`) REFERENCES `cliente` (`idCliente`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_179` FOREIGN KEY (`idUsuario`) REFERENCES `usuario` (`idUsuario`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_180` FOREIGN KEY (`idDescuento`) REFERENCES `descuento` (`idDescuento`) ON DELETE NO ACTION ON UPDATE CASCADE;
 
--- --------------------------------------------------------
--- Tabla: `empleado`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `empleado`;
-CREATE TABLE `empleado` (
-  `idEmpleado` int(11) NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(100) NOT NULL,
-  `apellidos` varchar(100) NOT NULL,
-  `tipoDocumento` varchar(20) NOT NULL DEFAULT 'C.C.',
-  `numeroDocumento` varchar(50) NOT NULL,
-  `telefono` varchar(30) DEFAULT NULL,
-  `correo` varchar(150) DEFAULT NULL,
-  `direccion` varchar(255) DEFAULT NULL,
-  `cargo` varchar(100) NOT NULL,
-  `fechaContratacion` date DEFAULT NULL,
-  `fechaInicio` date DEFAULT NULL,
-  `fechaFin` date DEFAULT NULL,
-  `tipoContrato` varchar(50) DEFAULT 'Término Fijo',
-  `salario` decimal(12,2) DEFAULT 0.00,
-  `turno` varchar(50) DEFAULT 'Completo',
-  `estado` varchar(20) DEFAULT 'Activo',
-  `eliminado` tinyint(4) DEFAULT 0,
-  `idUsuario` int(11) DEFAULT NULL,
-  `foto` text DEFAULT NULL,
-  PRIMARY KEY (`idEmpleado`),
-  UNIQUE KEY `UK_Empleado_Documento` (`numeroDocumento`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcado de datos para la tabla `empleado`
-INSERT INTO `empleado` (`idEmpleado`, `idUsuario`, `nombre`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `correo`, `direccion`, `cargo`, `fechaContratacion`, `fechaInicio`, `fechaFin`, `tipoContrato`, `salario`, `turno`, `estado`, `eliminado`) VALUES
-(1, 4, 'Admin', 'Sistema', 'C.C.', '1020304050', '3190000001', 'admin@chazinfood.com', 'Sede Principal Chazin Food', 'Administrador', '2026-01-01', '2026-01-01', NULL, 'Término Indefinido', 2500000.00, 'Completo', 'Activo', 0),
-(2, 27, 'Magnolia', 'Pripra', 'C.C.', '1010101010', '1010101010', 'magnolia@gmail.com', 'Calle 10 # 45-20', 'Cocinero', '2026-01-15', '2026-01-15', '2026-12-31', 'Término Fijo', 1600000.00, 'Mañana - Tarde', 'Activo', 0),
-(3, 24, 'Vendedor Principal', 'Chazin', 'C.C.', '1030405060', '3001234567', 'vendedor@chazinfood.com', 'Carrera 50 # 32-15', 'Vendedor', '2026-02-01', '2026-02-01', '2026-12-31', 'Término Fijo', 1400000.00, 'Tarde - Noche', 'Activo', 0);
+ALTER TABLE `variante_insumo`
+  ADD CONSTRAINT `fk_vi_variante` FOREIGN KEY (`idVariante`) REFERENCES `variante` (`idVariante`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_vi_insumo` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_vi_insumo_reemp` FOREIGN KEY (`idInsumoReemplazado`) REFERENCES `insumo` (`idInsumo`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;

@@ -47,7 +47,7 @@ CREATE TABLE `categoriaproducto` (
   `icon` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`idCategoriaProducto`),
   UNIQUE KEY `UK_CategoriaProducto` (`nombre`),
-  UNIQUE KEY `nombre` (`nombre`),
+  UNIQUE KEY `nombre` (`nombre`)
                                                                                                                       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Volcado de datos para la tabla `categoriaproducto`
@@ -1468,6 +1468,7 @@ CREATE TABLE `variante` (
   `idVariante` int(11) NOT NULL AUTO_INCREMENT,
   `idProducto` int(11) NOT NULL,
   `nombre` varchar(80) NOT NULL,
+  `descripcion` text DEFAULT NULL,
   `precio` decimal(10,2) NOT NULL,
   `estado` tinyint(4) DEFAULT 1,
   `imagen` varchar(255) DEFAULT NULL,
@@ -1546,6 +1547,30 @@ INSERT INTO `variante` (`idVariante`, `idProducto`, `nombre`, `precio`, `estado`
 (88, 39, 'Sabor Uva 400ml', 8500.00, 1, '/images/drinks/uva_postobon-removebg-preview.png'),
 (89, 39, 'Sabor Manzana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790140466/xnkmahkxmrvwlrueok5y.png'),
 (90, 39, 'Sabor Colombiana 400ml', 8500.00, 1, 'https://res.cloudinary.com/dckwtknmq/image/upload/v1790140466/mwzer41bv7rr3y5xbela.png');
+
+
+
+-- --------------------------------------------------------
+-- Tabla: `variante_insumo`
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `variante_insumo`;
+CREATE TABLE `variante_insumo` (
+  `idVarianteInsumo` int(11) NOT NULL AUTO_INCREMENT,
+  `idVariante` int(11) NOT NULL,
+  `tipoAccion` enum('AGREGAR','REEMPLAZAR','MODIFICAR_CANTIDAD','QUITAR') NOT NULL DEFAULT 'AGREGAR',
+  `idInsumo` int(11) NOT NULL,
+  `idInsumoReemplazado` int(11) DEFAULT NULL,
+  `cantidad` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `unidadMedida` varchar(30) DEFAULT NULL,
+  `observaciones` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`idVarianteInsumo`),
+  KEY `idx_vi_variante` (`idVariante`),
+  KEY `idx_vi_insumo` (`idInsumo`),
+  KEY `idx_vi_insumo_reemplazado` (`idInsumoReemplazado`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `variante_insumo` (`idVarianteInsumo`, `idVariante`, `tipoAccion`, `idInsumo`, `idInsumoReemplazado`, `cantidad`, `unidadMedida`, `observaciones`) VALUES
+(1, 10, 'AGREGAR', 25, NULL, 30.00, 'g', 'Jalapeños en Rodajas para variante');
 
 -- --------------------------------------------------------
 -- Tabla: `venta`
@@ -1732,6 +1757,12 @@ ALTER TABLE `venta`
   ADD CONSTRAINT `venta_ibfk_178` FOREIGN KEY (`idCliente`) REFERENCES `cliente` (`idCliente`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_179` FOREIGN KEY (`idUsuario`) REFERENCES `usuario` (`idUsuario`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `venta_ibfk_180` FOREIGN KEY (`idDescuento`) REFERENCES `descuento` (`idDescuento`) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+
+ALTER TABLE `variante_insumo`
+  ADD CONSTRAINT `fk_vi_variante` FOREIGN KEY (`idVariante`) REFERENCES `variante` (`idVariante`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_vi_insumo` FOREIGN KEY (`idInsumo`) REFERENCES `insumo` (`idInsumo`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_vi_insumo_reemp` FOREIGN KEY (`idInsumoReemplazado`) REFERENCES `insumo` (`idInsumo`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
